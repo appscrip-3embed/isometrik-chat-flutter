@@ -2,42 +2,28 @@ part of '../chat_page_controller.dart';
 
 /// Mixin for handling document message sending in the chat page controller.
 ///
-/// This mixin provides functionality for sending document (PDF) messages.
+/// This mixin provides functionality for sending document (PDF) messages and
+/// routes image/video picks from the document file picker through the gallery
+/// media send path.
 /// It depends on:
 /// - `createConversation()` from send_message_core mixin
 /// - `ismPostMediaUrl()` from send_message_media mixin
+/// - `webMediaModelFromPlatformFile()` from media_operations mixin
 mixin IsmChatPageSendMessageDocumentMixin {
   /// Gets the controller instance.
   IsmChatPageController get _controller => this as IsmChatPageController;
 
-  /// Sends a document (PDF) message.
+  /// Opens the document attachment file picker and sends each selection.
   ///
-  /// [conversationId] - ID of the conversation
-  /// [userId] - ID of the user
-  ///
-  /// Opens a file picker to select PDF files and sends them as messages.
-  /// Note: This method requires `createConversation` and `ismPostMediaUrl`
-  /// to be available through other mixins on the controller.
+  /// PDFs use the file/document pipeline; images and videos are delegated to
+  /// [IsmChatPageSendMessageMediaMixin] (`sendImage` / `sendGif` / `sendVideo`).
   void sendDocument({
     required String conversationId,
     required String userId,
   }) async {
-    final allowed = await IsmChatProperties
-        .chatPageProperties.messageAllowedConfig
-        .shouldAllowOutboundSend(
-      context:
-          IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context,
-      conversation: _controller.conversation,
-      customType: IsmChatCustomMessageType.file,
-      messageText: _controller.chatInputController.text.trim(),
-    );
-    if (!allowed) {
-      return;
-    }
-
-    // Resolve the conversation immediately after the allow-check and before
-    // the file picker. Reuse this pattern in other attachment send paths:
-    // never send against the inbound/stale id if creation fails or returns ''.
+    // Resolve the conversation before the file picker. Reuse this pattern in
+    // other attachment send paths: never send against the inbound/stale id if
+    // creation fails or returns ''.
     final resolvedConversationId = await _controller.createConversation(
       conversationId: conversationId,
       userId: userId,
@@ -51,19 +37,123 @@ mixin IsmChatPageSendMessageDocumentMixin {
 
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
       withData: true,
     );
 
     if (result?.files.isNotEmpty ?? false) {
       for (final file in result!.files) {
-        await _sendPickedDocumentFile(
+        await _dispatchPickedAttachmentFile(
           conversationId: resolvedConversationId,
+          userId: userId,
           file: file,
         );
       }
     }
+  }
+
+  String _pickedFileExtension(PlatformFile file) {
+    final fromPicker = file.extension?.toLowerCase().trim();
+    if (fromPicker != null && fromPicker.isNotEmpty) {
+      return fromPicker;
+    }
+    final name = file.name;
+    if (name.contains('.')) {
+      return name.split('.').last.toLowerCase();
+    }
+    return '';
+  }
+
+  Future<void> _dispatchPickedAttachmentFile({
+    required String conversationId,
+    required String userId,
+    required PlatformFile file,
+  }) async {
+    final context =
+        IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context;
+    final messageText = _controller.chatInputController.text.trim();
+    final ext = _pickedFileExtension(file);
+
+    if (IsmChatConstants.imageExtensions.contains(ext)) {
+      final allowed = await IsmChatProperties
+          .chatPageProperties.messageAllowedConfig
+          .shouldAllowOutboundSend(
+        context: context,
+        conversation: _controller.conversation,
+        customType: IsmChatCustomMessageType.image,
+        messageText: messageText,
+      );
+      if (!allowed) {
+        return;
+      }
+      final webMediaModel =
+          await _controller.webMediaModelFromPlatformFile(file);
+      if (webMediaModel == null) {
+        return;
+      }
+      if (ext == 'gif') {
+        await _controller.sendGif(
+          conversationId: conversationId,
+          userId: userId,
+          webMediaModel: webMediaModel,
+          skipConversationCreate: true,
+        );
+      } else {
+        await _controller.sendImage(
+          conversationId: conversationId,
+          userId: userId,
+          webMediaModel: webMediaModel,
+          skipConversationCreate: true,
+        );
+      }
+      return;
+    }
+
+    if (IsmChatConstants.videoExtensions.contains(ext)) {
+      final allowed = await IsmChatProperties
+          .chatPageProperties.messageAllowedConfig
+          .shouldAllowOutboundSend(
+        context: context,
+        conversation: _controller.conversation,
+        customType: IsmChatCustomMessageType.video,
+        messageText: messageText,
+      );
+      if (!allowed) {
+        return;
+      }
+      final webMediaModel =
+          await _controller.webMediaModelFromPlatformFile(file);
+      if (webMediaModel == null) {
+        return;
+      }
+      await _controller.sendVideo(
+        conversationId: conversationId,
+        userId: userId,
+        webMediaModel: webMediaModel,
+        skipConversationCreate: true,
+      );
+      return;
+    }
+
+    if (ext == 'pdf') {
+      final allowed = await IsmChatProperties
+          .chatPageProperties.messageAllowedConfig
+          .shouldAllowOutboundSend(
+        context: context,
+        conversation: _controller.conversation,
+        customType: IsmChatCustomMessageType.file,
+        messageText: messageText,
+      );
+      if (!allowed) {
+        return;
+      }
+      await _sendPickedDocumentFile(
+        conversationId: conversationId,
+        file: file,
+      );
+      return;
+    }
+
+    IsmChatUtility.showToast(IsmChatStrings.youCanNotSend);
   }
 
   /// Builds and uploads one picked PDF as a chat message.
@@ -71,6 +161,13 @@ mixin IsmChatPageSendMessageDocumentMixin {
     required String conversationId,
     required PlatformFile file,
   }) async {
+    if (_pickedFileExtension(file) != 'pdf') {
+      IsmChatLog.error(
+        '_sendPickedDocumentFile called for non-PDF: ${file.name}',
+      );
+      return;
+    }
+
     final bytes = file.bytes;
     final sizeMedia = kIsWeb
         ? IsmChatUtility.formatBytes(

@@ -13,6 +13,77 @@ mixin IsmChatPageMediaOperationsMixin on GetxController {
     _controller.isProcessingMedia = false;
   }
 
+  /// Normalizes a picked file extension (document picker, gallery, etc.).
+  String _extensionFromPlatformFile(PlatformFile file) {
+    final fromPicker = file.extension?.toLowerCase().trim();
+    if (fromPicker != null && fromPicker.isNotEmpty) {
+      return fromPicker;
+    }
+    final name = file.name;
+    if (name.contains('.')) {
+      return name.split('.').last.toLowerCase();
+    }
+    return '';
+  }
+
+  /// Builds [WebMediaModel] from a [PlatformFile].
+  ///
+  /// Reused by the document attachment picker so image/video sends match
+  /// [selectAssets] (size limits, bytes, video thumbnails).
+  Future<WebMediaModel?> webMediaModelFromPlatformFile(PlatformFile file) async {
+    final extension = _extensionFromPlatformFile(file);
+    final name = file.name;
+
+    var bytes = file.bytes;
+    if ((bytes == null || bytes.isEmpty) &&
+        !kIsWeb &&
+        (file.path ?? '').isNotEmpty) {
+      bytes = await File(file.path!).readAsBytes();
+    }
+
+    final length = bytes?.length ?? file.size;
+    final dataSize = IsmChatUtility.formatBytes(length);
+    if (!dataSize.size()) {
+      await IsmChatContextWidget.showDialogContext(
+        content: IsmChatAlertDialogBox(
+          title: IsmChatStrings.youCanNotSend,
+          cancelLabel: IsmChatStrings.okay,
+        ),
+      );
+      return null;
+    }
+
+    final platformFile = IsmchPlatformFile(
+      name: name,
+      size: length,
+      bytes: bytes,
+      path: file.path,
+      extension: extension,
+    );
+
+    if (IsmChatConstants.videoExtensions.contains(extension)) {
+      try {
+        final thumbnailBytes = await IsmChatBlob.getVideoThumbnailBytesWithPackage(
+          bytes ?? Uint8List(0),
+        );
+        platformFile.thumbnailBytes = thumbnailBytes ?? Uint8List(0);
+      } catch (_) {
+        platformFile.thumbnailBytes = Uint8List(0);
+      }
+      return WebMediaModel(
+        isVideo: true,
+        platformFile: platformFile,
+        dataSize: dataSize,
+      );
+    }
+
+    return WebMediaModel(
+      isVideo: false,
+      platformFile: platformFile,
+      dataSize: dataSize,
+    );
+  }
+
   /// Gets media from gallery or file picker.
   void getMedia() async {
     _cancelInFlightMediaProcessing();
