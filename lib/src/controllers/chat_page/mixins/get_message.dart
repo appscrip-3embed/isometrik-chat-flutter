@@ -504,28 +504,10 @@ mixin IsmChatPageGetMessageMixin on GetxController {
             IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context,
             _controller.conversation);
 
-        // controller.medialist is storing media i.e. Image, Video and Audio. //
-        _controller.conversationController.mediaList = _controller.messages
-            .where((e) => [
-                  IsmChatCustomMessageType.image,
-                  IsmChatCustomMessageType.video,
-                  IsmChatCustomMessageType.audio,
-                ].contains(e.customType))
-            .toList();
-
-        // controller.mediaListLinks is storing links //
-        _controller.conversationController.mediaListLinks = _controller.messages
-            .where((e) => [
-                  IsmChatCustomMessageType.link,
-                ].contains(e.customType))
-            .toList();
-
-        // controller.mediaListDocs is storing docs //
-        _controller.conversationController.mediaListDocs = _controller.messages
-            .where((e) => [
-                  IsmChatCustomMessageType.file,
-                ].contains(e.customType))
-            .toList();
+        syncConversationMediaTabLists(
+          _controller.conversationController,
+          _controller.messages,
+        );
 
         if (responeData.members != null) {
           _controller.groupMembers = responeData.members ?? [];

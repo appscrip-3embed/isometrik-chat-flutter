@@ -80,12 +80,22 @@ class _IsmChatImageMessageState extends State<IsmChatImageMessage> {
                       maxWidth: maxWidth,
                       maxHeight: maxHeight,
                     ),
-                    child: _MessageMediaImage(
-                      message: message,
-                      isSticker: isSticker,
-                      isGif: isGif,
-                      maxWidth: maxWidth,
-                      maxHeight: maxHeight,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final gridWidth =
+                            // constraints.maxWidth > 0
+                            //     ? constraints.maxWidth
+                            //     :
+                            maxWidth;
+                        return _MessageMediaImage(
+                          message: message,
+                          isSticker: isSticker,
+                          isGif: isGif,
+                          maxWidth: maxWidth,
+                          maxHeight: maxHeight,
+                          gridWidth: gridWidth,
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -199,6 +209,7 @@ class _MessageMediaImage extends StatelessWidget {
     required this.isGif,
     required this.maxWidth,
     required this.maxHeight,
+    required this.gridWidth,
   });
 
   final IsmChatMessageModel message;
@@ -206,6 +217,7 @@ class _MessageMediaImage extends StatelessWidget {
   final bool isGif;
   final double maxWidth;
   final double maxHeight;
+  final double gridWidth;
 
   /// GIF frame size from aspect ratio only — no fixed height.
   ///
@@ -227,6 +239,38 @@ class _MessageMediaImage extends StatelessWidget {
     if (height > maxHeight) {
       height = maxHeight;
       width = height * ar;
+    }
+    return Size(width, height);
+  }
+
+  /// Still image frame matched to one media-grid tile (see [IsmChatMediaGridLayout]).
+  ///
+  /// Returns null when aspect ratio is unknown — caller keeps legacy max-box layout.
+  static Size? _stillImageDisplaySize(
+    double gridWidth,
+    double maxWidth,
+    double maxHeight, {
+    double? aspectRatio,
+  }) {
+    if (aspectRatio == null || aspectRatio <= 0 || gridWidth <= 0) {
+      return null;
+    }
+    var size = IsmChatMediaGridLayout.singleStillImageDisplaySize(
+      gridWidth: gridWidth,
+      aspectRatio: aspectRatio,
+    );
+    if (size.width <= maxWidth && size.height <= maxHeight) {
+      return size;
+    }
+    var width = size.width;
+    var height = size.height;
+    if (width > maxWidth) {
+      width = maxWidth;
+      height = width / aspectRatio;
+    }
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * aspectRatio;
     }
     return Size(width, height);
   }
@@ -308,6 +352,15 @@ class _MessageMediaImage extends StatelessWidget {
             aspectRatio: attachment?.mediaAspectRatio,
           )
         : null;
+    final stillSize = !isSticker && !isGif
+        ? _stillImageDisplaySize(
+            gridWidth,
+            maxWidth,
+            maxHeight,
+            aspectRatio: attachment?.mediaAspectRatio,
+          )
+        : null;
+    final reservedSize = gifSize ?? stillSize;
     final placeholderUrl = isGif ? _gifPlaceholderUrl(attachment) : null;
 
     Widget child;
@@ -318,54 +371,54 @@ class _MessageMediaImage extends StatelessWidget {
         // Zero fade avoids a brief dual-layout during placeholder → image.
         fadeInDuration: Duration.zero,
         fadeOutDuration: Duration.zero,
-        width: gifSize?.width,
-        height: gifSize?.height,
-        memCacheWidth: gifSize?.width.round(),
-        memCacheHeight: gifSize?.height.round(),
+        width: reservedSize?.width,
+        height: reservedSize?.height,
+        memCacheWidth: reservedSize?.width.round(),
+        memCacheHeight: reservedSize?.height.round(),
         placeholder: (_, __) => _placeholderImage(
-          size: gifSize ?? Size(maxWidth, maxHeight),
+          size: reservedSize ?? Size(maxWidth, maxHeight),
           imageUrl: placeholderUrl,
           fit: fit,
         ),
-        errorWidget: (_, __, ___) => _mediaError(gifSize),
+        errorWidget: (_, __, ___) => _mediaError(reservedSize),
       );
     } else if (hasBytes) {
       child = Image.memory(
         bytes,
         fit: fit,
-        width: gifSize?.width,
-        height: gifSize?.height,
+        width: reservedSize?.width,
+        height: reservedSize?.height,
         gaplessPlayback: true,
       );
     } else if (hasLocalFile) {
       child = Image.file(
         File(mediaUrl),
         fit: fit,
-        width: gifSize?.width,
-        height: gifSize?.height,
+        width: reservedSize?.width,
+        height: reservedSize?.height,
         gaplessPlayback: true,
       );
     } else if (IsmChatResponsive.isWeb(context) && mediaUrl.isNotEmpty) {
       final webBytes = mediaUrl.strigToUnit8List;
       child = webBytes.isEmpty
-          ? _mediaError(gifSize)
+          ? _mediaError(reservedSize)
           : Image.memory(
               webBytes,
               fit: fit,
-              width: gifSize?.width,
-              height: gifSize?.height,
+              width: reservedSize?.width,
+              height: reservedSize?.height,
               gaplessPlayback: true,
             );
     } else {
-      child = _mediaError(gifSize);
+      child = _mediaError(reservedSize);
     }
 
     // Hard-lock the frame: StackFit.expand forces the image to the reserved
     // size so Android GIF decode cannot expand intrinsic layout.
-    final media = gifSize != null
+    final media = reservedSize != null
         ? SizedBox(
-            width: gifSize.width,
-            height: gifSize.height,
+            width: reservedSize.width,
+            height: reservedSize.height,
             child: Stack(
               fit: StackFit.expand,
               children: [child],
@@ -389,9 +442,9 @@ class _MessageMediaImage extends StatelessWidget {
     return null;
   }
 
-  Widget _mediaError(Size? gifSize) => Container(
-        width: gifSize?.width,
-        height: gifSize?.height,
+  Widget _mediaError(Size? reservedSize) => Container(
+        width: reservedSize?.width,
+        height: reservedSize?.height,
         alignment: Alignment.center,
         color: IsmChatColors.greyColor.applyIsmOpacity(0.15),
         child: const Icon(Icons.broken_image_outlined),

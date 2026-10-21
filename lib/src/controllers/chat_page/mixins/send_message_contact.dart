@@ -28,7 +28,7 @@ mixin IsmChatPageSendMessageContactMixin {
         conversationId: conversationId, userId: userId);
     final sentAt = DateTime.now().millisecondsSinceEpoch;
     final contactMessage = IsmChatMessageModel(
-      body: IsmChatStrings.contact,
+      body: '',
       conversationId: conversationId,
       senderInfo: _controller.currentUser,
       customType: _controller.isreplying

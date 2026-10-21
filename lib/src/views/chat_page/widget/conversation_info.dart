@@ -140,11 +140,14 @@ class _IsmChatConverstaionInfoViewState
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
         initState: (_) async {
-          conversationController.mediaList.clear();
-          conversationController.mediaListLinks.clear();
-          conversationController.mediaListDocs.clear();
-
           var controller = IsmChatUtility.chatPageController;
+
+          // Seed counts from messages already in memory (avoid empty lists if
+          // conversation-details API is skipped or still in flight).
+          syncConversationMediaTabLists(
+            conversationController,
+            controller.messages,
+          );
 
           // If conversation is provided, set it directly
           if (widget.conversation != null) {
@@ -180,11 +183,6 @@ class _IsmChatConverstaionInfoViewState
           final isDocumentAllowed = IsmChatProperties
               .chatPageProperties.attachments
               .contains(IsmChatAttachmentType.document);
-          final mediaLinksDocsCount = conversationController.mediaList.length +
-              conversationController.mediaListLinks.length +
-              (isDocumentAllowed
-                  ? conversationController.mediaListDocs.length
-                  : 0);
           return Scaffold(
             backgroundColor: groupTheme.scaffoldBackgroundColor,
             appBar: IsmChatAppBar(
@@ -509,20 +507,32 @@ class _IsmChatConverstaionInfoViewState
                                       style: groupTheme.sectionTitleTextStyle,
                                     ),
                                     const Spacer(),
-                                    Row(
-                                      children: [
-                                        Text(
-                                          '$mediaLinksDocsCount',
-                                          style: groupTheme.secondaryTextStyle,
-                                        ),
-                                        IsmChatDimens.boxWidth4,
-                                        Icon(
-                                          Icons.arrow_forward_ios,
-                                          color: groupTheme.actionIconColor,
-                                          size: IsmChatDimens.fifteen,
-                                        ),
-                                      ],
-                                    ),
+                                    Obx(() {
+                                      final mediaLinksDocsCount =
+                                          conversationController
+                                                  .mediaList.length +
+                                              conversationController
+                                                  .mediaListLinks.length +
+                                              (isDocumentAllowed
+                                                  ? conversationController
+                                                      .mediaListDocs.length
+                                                  : 0);
+                                      return Row(
+                                        children: [
+                                          Text(
+                                            '$mediaLinksDocsCount',
+                                            style:
+                                                groupTheme.secondaryTextStyle,
+                                          ),
+                                          IsmChatDimens.boxWidth4,
+                                          Icon(
+                                            Icons.arrow_forward_ios,
+                                            color: groupTheme.actionIconColor,
+                                            size: IsmChatDimens.fifteen,
+                                          ),
+                                        ],
+                                      );
+                                    }),
                                   ],
                                 ),
                               ),

@@ -24,15 +24,18 @@ mixin IsmChatPageMediaOperationsMixin on GetxController {
       isVideoAndImage: true,
     );
 
-    if (result.isEmpty) return;
+    final picked = IsmChatUtility.clampOutboundPickerSelection(
+      result.whereType<XFile>().toList(),
+    );
+    if (picked.isEmpty) return;
     if (IsmChatResponsive.isWeb(
         IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context)) {
       final generation = _controller.mediaProcessingGeneration;
       _controller
         ..isProcessingMedia = true
-        ..mediaAssetsTotal = result.where((x) => x != null).length;
+        ..mediaAssetsTotal = picked.length;
       IsmChatUtility.showLoader();
-      for (var x in result) {
+      for (var x in picked) {
         if (generation != _controller.mediaProcessingGeneration) {
           break;
         }
@@ -97,7 +100,7 @@ mixin IsmChatPageMediaOperationsMixin on GetxController {
     } else if (IsmChatResponsive.isMobile(
         IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context)) {
       await IsmChatRoute.goToRoute(IsmChatGalleryAssetsView(
-        mediaXFile: result,
+        mediaXFile: picked,
       ));
     }
   }
@@ -107,17 +110,17 @@ mixin IsmChatPageMediaOperationsMixin on GetxController {
     _controller.textEditingController.clear();
     _controller.webMedia.clear();
     _controller.assetsIndex = 0;
+    final clampedAssets = IsmChatUtility.clampOutboundPickerSelection(
+      assetList.whereType<XFile>().toList(),
+    );
     final generation = _controller.mediaProcessingGeneration;
     _controller
       ..isProcessingMedia = true
-      ..mediaAssetsTotal = assetList.where((file) => file != null).length;
+      ..mediaAssetsTotal = clampedAssets.length;
     try {
-      for (var file in assetList) {
+      for (var file in clampedAssets) {
         if (generation != _controller.mediaProcessingGeneration) {
           return;
-        }
-        if (file == null) {
-          continue;
         }
         final bytes = await file.readAsBytes();
       var name = '';

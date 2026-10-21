@@ -64,6 +64,29 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
     }
   }
 
+  List<IsmChatMessageModel> _mediaTabListFrom(
+    Iterable<IsmChatMessageModel> messages,
+  ) =>
+      expandMediaGalleryItems(
+        messages.where((e) => e.contributesToConversationMediaTab),
+        includeAudio: true,
+      );
+
+  List<IsmChatMessageModel> _docsTabListFrom(
+    Iterable<IsmChatMessageModel> messages,
+  ) =>
+      expandDocsGalleryItems(
+        messages.where((e) => e.contributesToConversationDocsTab),
+      );
+
+  void _applyMediaTabListsFromMessages(Iterable<IsmChatMessageModel> messages) {
+    mediaList = _mediaTabListFrom(messages);
+    mediaListLinks = messages
+        .where((e) => e.customType == IsmChatCustomMessageType.link)
+        .toList();
+    mediaListDocs = _docsTabListFrom(messages);
+  }
+
   /// Loads media messages from chat page controller if conversation is already loaded (fastest)
   void loadMessagesFromController() {
     if (IsmChatUtility.chatPageControllerRegistered) {
@@ -72,21 +95,7 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
               widget.conversationId &&
           chatController.messages.isNotEmpty) {
         // Use messages already loaded in memory
-        mediaList = chatController.messages
-            .where((e) => [
-                  IsmChatCustomMessageType.video,
-                  IsmChatCustomMessageType.image,
-                  IsmChatCustomMessageType.audio
-                ].contains(e.customType))
-            .toList();
-        mediaListLinks = chatController.messages
-            .where(
-                (e) => [IsmChatCustomMessageType.link].contains(e.customType))
-            .toList();
-        mediaListDocs = chatController.messages
-            .where(
-                (e) => [IsmChatCustomMessageType.file].contains(e.customType))
-            .toList();
+        _applyMediaTabListsFromMessages(chatController.messages);
         if (mounted) {
           setState(() {});
         }
@@ -106,25 +115,9 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
     var messages =
         await IsmChatConfig.dbWrapper?.getMessage(widget.conversationId);
     if (messages != null && messages.isNotEmpty) {
-      final filteredMedia = messages.values
-          .where((e) => [
-                IsmChatCustomMessageType.video,
-                IsmChatCustomMessageType.image,
-                IsmChatCustomMessageType.audio
-              ].contains(e.customType))
-          .toList();
-      final filteredLinks = messages.values
-          .where((e) => [IsmChatCustomMessageType.link].contains(e.customType))
-          .toList();
-      final filteredDocs = messages.values
-          .where((e) => [IsmChatCustomMessageType.file].contains(e.customType))
-          .toList();
-
       if (mounted) {
         setState(() {
-          mediaList = filteredMedia;
-          mediaListLinks = filteredLinks;
-          mediaListDocs = filteredDocs;
+          _applyMediaTabListsFromMessages(messages.values);
         });
       }
     } else {
@@ -149,28 +142,8 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
 
       if (allMessages.isNotEmpty && mounted) {
         // Filter messages by custom type
-        final filteredMediaList = allMessages
-            .where((e) => [
-                  IsmChatCustomMessageType.video,
-                  IsmChatCustomMessageType.image,
-                  IsmChatCustomMessageType.audio
-                ].contains(e.customType))
-            .toList();
-
-        final filteredLinkList = allMessages
-            .where(
-                (e) => [IsmChatCustomMessageType.link].contains(e.customType))
-            .toList();
-
-        final filteredDocList = allMessages
-            .where(
-                (e) => [IsmChatCustomMessageType.file].contains(e.customType))
-            .toList();
-
         setState(() {
-          mediaList = filteredMediaList;
-          mediaListLinks = filteredLinkList;
-          mediaListDocs = filteredDocList;
+          _applyMediaTabListsFromMessages(allMessages);
         });
       }
     } catch (e) {
@@ -182,12 +155,10 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
   Widget build(BuildContext context) => GetBuilder<IsmChatPageController>(
       tag: IsmChat.i.chatPageTag,
       builder: (controller) {
-        // Clear previous references to prevent memory leaks
-        // (Optional: assign empty lists before populating)
-        // This ensures no residual data persists across rebuilds
-        mediaList = [];
-        mediaListLinks = [];
-        mediaListDocs = [];
+        if (controller.conversation?.conversationId == widget.conversationId &&
+            controller.messages.isNotEmpty) {
+          _applyMediaTabListsFromMessages(controller.messages);
+        }
         final isDocumentAllowed = IsmChatProperties
             .chatPageProperties.attachments
             .contains(IsmChatAttachmentType.document);
@@ -310,12 +281,14 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
                     ListTile(
                       onTap: () async {
                         IsmChatUtility.showLoader();
-                        final chatController = IsmChatUtility.chatPageController;
-                        final targetConversationId = widget.conversationId.isNotEmpty
-                            ? widget.conversationId
-                            : conversationController.getConversationId(
-                                widget.user?.userId ?? '',
-                              );
+                        final chatController =
+                            IsmChatUtility.chatPageController;
+                        final targetConversationId =
+                            widget.conversationId.isNotEmpty
+                                ? widget.conversationId
+                                : conversationController.getConversationId(
+                                    widget.user?.userId ?? '',
+                                  );
                         final currentConversationId =
                             chatController.conversation?.conversationId ?? '';
 

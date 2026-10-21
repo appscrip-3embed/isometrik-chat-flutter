@@ -36,7 +36,7 @@ mixin IsmChatPageSendMessageLocationMixin {
         conversationId: conversationId, userId: userId);
     final sentAt = DateTime.now().millisecondsSinceEpoch;
     final locationMessage = IsmChatMessageModel(
-      body: IsmChatStrings.location,
+      body: '',
       conversationId: conversationId,
       senderInfo: _controller.currentUser,
       customType: _controller.isreplying

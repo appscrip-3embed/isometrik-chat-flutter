@@ -143,8 +143,14 @@ mixin IsmChatPageSendMessageMediaMixin {
     }
   }
 
-  /// Stages every picked item in the chat immediately, then uploads one by one.
-  /// Reserves timestamps up front so multi-select items stay in one grid.
+  /// Stages picked photos and videos, then uploads them.
+  ///
+  /// Web rule (`attachments.length === 1 ? customTypeFromMime : AttachmentMessage:Multiple`):
+  /// two or more files are **one** message with `customType` `AttachmentMessage:Multiple`.
+  /// Per-file type lives on each attachment (`mediaType` 0 image, 1 video). Do not split
+  /// that batch into separate Image/Video messages — later changes should keep this helper.
+  /// One file keeps Image, Video, or Gif. Replies stay one file per message because
+  /// reply uses `AttachmentMessage:Reply`.
   Future<void> _sendMediaList({
     required List<WebMediaModel> mediaList,
     Map<String, dynamic>? metaDataFromDelegate,
@@ -155,6 +161,15 @@ mixin IsmChatPageSendMessageMediaMixin {
       conversationId: conversationId,
       userId: userId,
     );
+
+    if (mediaList.length > 1 && !_controller.isreplying) {
+      await _sendMultipleMediaMessage(
+        mediaList: mediaList,
+        conversationId: resolvedConversationId,
+        metaDataFromDelegate: metaDataFromDelegate,
+      );
+      return;
+    }
 
     final batchSentAts = List.generate(
       mediaList.length,
@@ -176,8 +191,8 @@ mixin IsmChatPageSendMessageMediaMixin {
       final isAllowed = await IsmChatProperties
           .chatPageProperties.messageAllowedConfig
           .shouldAllowOutboundSend(
-        context: IsmChatConfig.kNavigatorKey.currentContext ??
-            IsmChatConfig.context,
+        context:
+            IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context,
         conversation: IsmChatUtility.chatPageController.conversation!,
         customType: mediaType,
         messageText: _controller.chatInputController.text.trim(),
@@ -258,6 +273,337 @@ mixin IsmChatPageSendMessageMediaMixin {
     }
   }
 
+  /// One AttachmentMessage:Multiple for a photo/video/gif batch.
+  ///
+  /// Uploads each file with the same presign flow as ismPostMediaUrl, then
+  /// calls sendMessage once. GIFs in the batch are images (mediaType 0);
+  /// a single GIF still uses sendGif.
+  Future<void> _sendMultipleMediaMessage({
+    required List<WebMediaModel> mediaList,
+    required String conversationId,
+    Map<String, dynamic>? metaDataFromDelegate,
+  }) async {
+    final caption = _captionFromMediaList(mediaList);
+    final isAllowed = await IsmChatProperties
+        .chatPageProperties.messageAllowedConfig
+        .shouldAllowOutboundSend(
+      context:
+          IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context,
+      conversation: IsmChatUtility.chatPageController.conversation!,
+      customType: IsmChatCustomMessageType.multipleAttachments,
+      messageText: caption,
+    );
+    if (!isAllowed) {
+      return;
+    }
+
+    final hadMediaCaption = mediaList.any(
+      (media) => media.caption?.trim().isNotEmpty == true,
+    );
+    if (!hadMediaCaption && caption.isNotEmpty) {
+      _controller.chatInputController.clear();
+    }
+
+    const multipleBody = 'AttachmentMessage:Multiple';
+    final body = caption.isNotEmpty ? caption.trim() : multipleBody;
+    final sentAt = _controller.nextUniqueMediaSentAt();
+    final localAttachments = <AttachmentModel>[];
+    for (var i = 0; i < mediaList.length; i++) {
+      localAttachments.add(
+        await _localAttachmentForPickedMedia(
+          media: mediaList[i],
+          sentAt: sentAt,
+          index: i,
+        ),
+      );
+    }
+
+    final mediaMessage = IsmChatMessageModel(
+      body: body,
+      conversationId: conversationId,
+      senderInfo: _controller.currentUser,
+      customType: IsmChatCustomMessageType.multipleAttachments,
+      attachments: localAttachments,
+      deliveredToAll: false,
+      messageId: '',
+      deviceId: IsmChatConfig.communicationConfig.projectConfig.deviceId,
+      messageType: IsmChatMessageType.normal,
+      messagingDisabled: false,
+      parentMessageId: '',
+      readByAll: false,
+      sentAt: sentAt,
+      sentByMe: true,
+      isUploading: true,
+      metaData: IsmChatMetaData(
+        messageSentAt: sentAt,
+        isDownloaded: true,
+        caption: IsmChatUtility.outboundAttachmentCaptionMeta(caption),
+        customMetaData: metaDataFromDelegate,
+      ),
+    );
+
+    _controller.messages.add(mediaMessage);
+    unawaited(_controller.scrollDown());
+
+    if (!_controller.isBroadcast) {
+      await IsmChatConfig.dbWrapper!
+          .saveMessage(mediaMessage, IsmChatDbBox.pending);
+      if (kIsWeb &&
+          IsmChatResponsive.isWeb(IsmChatConfig.kNavigatorKey.currentContext ??
+              IsmChatConfig.context)) {
+        _controller.updateLastMessagOnCurrentTime(mediaMessage);
+      }
+    }
+
+    final notificationTitle =
+        IsmChatConfig.communicationConfig.userConfig.userName ??
+            _controller.conversationController.userDetails?.userName ??
+            '';
+    final outgoingAttachments = <Map<String, dynamic>>[];
+    for (var i = 0; i < mediaList.length; i++) {
+      final map = await _uploadPickedMediaAttachment(
+        conversationId: conversationId,
+        media: mediaList[i],
+        local: localAttachments[i],
+      );
+      if (map == null) {
+        _markUploadFailed(sentAt);
+        return;
+      }
+      outgoingAttachments.add(map);
+      _replaceMultipleAttachment(
+        sentAt: sentAt,
+        index: i,
+        attachment: _attachmentFromOutgoingMap(
+          map,
+          fallback: localAttachments[i],
+        ),
+      );
+    }
+
+    await _controller.sendMessage(
+      body: body,
+      conversationId: conversationId,
+      createdAt: sentAt,
+      deviceId: mediaMessage.deviceId ?? '',
+      messageType: mediaMessage.messageType?.value ?? 0,
+      notificationBody: IsmChatStrings.sentImage,
+      notificationTitle: notificationTitle,
+      attachments: outgoingAttachments,
+      customType: IsmChatCustomMessageType.multipleAttachments.value,
+      metaData: mediaMessage.metaData,
+      isBroadcast: _controller.isBroadcast,
+    );
+    _clearMessageUploadingState(sentAt);
+  }
+
+  /// First preview caption, otherwise text still in the composer.
+  String _captionFromMediaList(List<WebMediaModel> mediaList) {
+    for (final media in mediaList) {
+      final resolved = IsmChatUtility.resolveOutboundMediaCaption(
+        mediaCaption: media.caption,
+      );
+      if (resolved.isNotEmpty) {
+        return resolved;
+      }
+    }
+    return IsmChatUtility.resolveOutboundMediaCaption(
+      composerText: _controller.chatInputController.text,
+    );
+  }
+
+  void _clearComposerIfUsedAsMediaCaption({
+    required String resolvedCaption,
+    String? mediaCaption,
+  }) {
+    final hadMediaCaption = mediaCaption?.trim().isNotEmpty == true;
+    if (!hadMediaCaption && resolvedCaption.isNotEmpty) {
+      _controller.chatInputController.clear();
+    }
+  }
+
+  /// Local row shown in the grid while this file is still uploading.
+  ///
+  /// GIFs picked with other files use image (mediaType 0). customType on
+  /// the message stays AttachmentMessage:Multiple.
+  Future<AttachmentModel> _localAttachmentForPickedMedia({
+    required WebMediaModel media,
+    required int sentAt,
+    required int index,
+  }) async {
+    final extension = media.platformFile.extension;
+    final mediaType =
+        media.isVideo ? IsmChatMediaType.video : IsmChatMediaType.image;
+    final bytes = media.platformFile.bytes ?? Uint8List(0);
+    final name = media.platformFile.name ?? 'media_$index';
+    final mediaId = '${sentAt}_$index';
+    final localPath = media.isVideo
+        ? (kIsWeb ? bytes.toString() : (media.platformFile.path ?? ''))
+        : await _resolveLocalMediaPath(
+            webMediaModel: media,
+            bytes: bytes,
+            nameWithExtension: name,
+          );
+    final thumbnailBytes = media.platformFile.thumbnailBytes;
+    final thumbnailUrl =
+        media.isVideo && thumbnailBytes != null && thumbnailBytes.isNotEmpty
+            ? thumbnailBytes.toString()
+            : localPath;
+
+    return AttachmentModel(
+      attachmentType: mediaType,
+      thumbnailUrl: thumbnailUrl,
+      size: media.platformFile.size,
+      name: name,
+      mimeType: mimeTypeForAttachmentExtension(
+        extension,
+        mediaType: mediaType,
+      ),
+      mediaUrl: localPath,
+      mediaId: mediaId,
+      bytes: bytes,
+      extension: extension,
+    );
+  }
+
+  /// Presign + upload for one file in a multi-attachment message.
+  ///
+  /// Same steps as ismPostMediaUrl (presigned URL, then the file bytes, then
+  /// a video thumbnail). Does not call sendMessage.
+  Future<Map<String, dynamic>?> _uploadPickedMediaAttachment({
+    required String conversationId,
+    required WebMediaModel media,
+    required AttachmentModel local,
+  }) async {
+    try {
+      final bytes = await _bytesForOutgoingMedia(media);
+      if (bytes.isEmpty) {
+        return null;
+      }
+      final mediaType = local.attachmentType ?? IsmChatMediaType.image;
+      final nameWithExtension = local.name ?? '';
+      final mediaId = local.mediaId ?? '';
+      final needsThumbnail = mediaType == IsmChatMediaType.video;
+
+      PresignedUrlModel? presignedUrlModel;
+      if (_controller.isBroadcast) {
+        presignedUrlModel = await _controller.commonController.getPresignedUrl(
+          isLoading: false,
+          mediaExtension: local.extension ?? '',
+          userIdentifier:
+              IsmChatConfig.communicationConfig.userConfig.userEmail ?? '',
+          bytes: bytes,
+        );
+      } else {
+        presignedUrlModel = await _controller.commonController.postMediaUrl(
+          conversationId: conversationId,
+          nameWithExtension: nameWithExtension,
+          mediaType: mediaType.value,
+          mediaId: mediaId,
+          bytes: bytes,
+          isLoading: false,
+        );
+      }
+
+      final mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
+      final resolvedMediaId =
+          _controller.isBroadcast ? mediaId : presignedUrlModel?.mediaId ?? '';
+      if (mediaUrlPath.isEmpty) {
+        return null;
+      }
+
+      var thumbnailUrlPath = mediaUrlPath;
+      if (needsThumbnail) {
+        final thumbnailBytes =
+            media.platformFile.thumbnailBytes ?? Uint8List(0);
+        PresignedUrlModel? thumbPresigned;
+        if (_controller.isBroadcast) {
+          thumbPresigned = await _controller.commonController.getPresignedUrl(
+            isLoading: false,
+            mediaExtension: 'png',
+            userIdentifier:
+                IsmChatConfig.communicationConfig.userConfig.userEmail ?? '',
+            bytes: thumbnailBytes,
+          );
+          thumbnailUrlPath = thumbPresigned?.mediaUrl ?? mediaUrlPath;
+        } else {
+          thumbPresigned = await _controller.commonController.postMediaUrl(
+            conversationId: conversationId,
+            nameWithExtension: '$mediaId.png',
+            mediaType: IsmChatMediaType.image.value,
+            mediaId: mediaId,
+            bytes: thumbnailBytes,
+            isLoading: false,
+            isUpdateThumbnail: true,
+          );
+          thumbnailUrlPath = thumbPresigned?.thumbnailUrl ?? '';
+          if (thumbnailUrlPath.isEmpty) {
+            thumbnailUrlPath = mediaUrlPath;
+          }
+        }
+      }
+
+      return AttachmentModel(
+        thumbnailUrl: thumbnailUrlPath,
+        size: local.size,
+        name: local.name,
+        mimeType: local.mimeType,
+        mediaUrl: mediaUrlPath,
+        mediaId: resolvedMediaId,
+        extension: local.extension,
+        attachmentType: mediaType,
+        stillUrl: thumbnailUrlPath,
+      ).toOutgoingMap();
+    } catch (e, st) {
+      IsmChatLog.error(e, st);
+      return null;
+    }
+  }
+
+  /// Keeps local preview fields when the upload map omits them.
+  AttachmentModel _attachmentFromOutgoingMap(
+    Map<String, dynamic> map, {
+    required AttachmentModel fallback,
+  }) {
+    final parsed = AttachmentModel.fromMap(map);
+    return parsed.copyWith(
+      bytes: fallback.bytes,
+      mimeType: (parsed.mimeType?.isNotEmpty == true)
+          ? parsed.mimeType
+          : fallback.mimeType,
+      extension: (parsed.extension?.isNotEmpty == true)
+          ? parsed.extension
+          : fallback.extension,
+      name: (parsed.name?.isNotEmpty == true) ? parsed.name : fallback.name,
+      attachmentType: parsed.attachmentType ?? fallback.attachmentType,
+    );
+  }
+
+  void _replaceMultipleAttachment({
+    required int sentAt,
+    required int index,
+    required AttachmentModel attachment,
+  }) {
+    final messageIndex = _controller.messages.indexWhere(
+      (message) => message.sentAt == sentAt,
+    );
+    if (messageIndex == -1) {
+      return;
+    }
+    final current = _controller.messages[messageIndex];
+    final list = List<AttachmentModel>.from(current.attachments ?? const []);
+    if (index < 0 || index >= list.length) {
+      return;
+    }
+    list[index] = attachment;
+    current.attachments = list;
+    _controller.messages[messageIndex] = current;
+    if (_controller.messages is RxList<IsmChatMessageModel>) {
+      (_controller.messages as RxList<IsmChatMessageModel>).refresh();
+    }
+    _controller.update();
+  }
+
   /// Sends a video message.
   ///
   /// [conversationId] - ID of the conversation
@@ -287,9 +633,18 @@ mixin IsmChatPageSendMessageMediaMixin {
     final mediaId = '$sentAt';
     final extension = webMediaModel.platformFile.extension;
     final localPath = webMediaModel.platformFile.path ?? '';
+    final caption = IsmChatUtility.resolveOutboundMediaCaption(
+      mediaCaption: webMediaModel.caption,
+      composerText: _controller.chatInputController.text,
+    );
+    _clearComposerIfUsedAsMediaCaption(
+      resolvedCaption: caption,
+      mediaCaption: webMediaModel.caption,
+    );
+    final body = IsmChatUtility.outboundAttachmentBody(caption);
 
     final videoMessage = IsmChatMessageModel(
-      body: IsmChatStrings.video,
+      body: body,
       conversationId: conversationId,
       senderInfo: _controller.currentUser,
       customType: _controller.isreplying
@@ -302,9 +657,8 @@ mixin IsmChatPageSendMessageMediaMixin {
           size: webMediaModel.platformFile.size ?? 0,
           name: nameWithExtension,
           mimeType: extension,
-          mediaUrl: kIsWeb
-              ? webMediaModel.platformFile.bytes.toString()
-              : localPath,
+          mediaUrl:
+              kIsWeb ? webMediaModel.platformFile.bytes.toString() : localPath,
           mediaId: mediaId,
           extension: extension,
         )
@@ -325,7 +679,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
-        caption: webMediaModel.caption,
+        caption: IsmChatUtility.outboundAttachmentCaptionMeta(caption),
         customMetaData: metaDataFromDelegate,
         replyMessage: _controller.isreplying
             ? IsmChatReplyMessageModel(
@@ -376,30 +730,7 @@ mixin IsmChatPageSendMessageMediaMixin {
     required WebMediaModel webMediaModel,
     required String conversationId,
   }) async {
-    Uint8List? bytes;
-    if (IsmChatResponsive.isMobile(IsmChatConfig.kNavigatorKey.currentContext ??
-            IsmChatConfig.context) &
-        !kIsWeb) {
-      final compressionQuality = _resolveVideoCompressionQuality();
-      if (compressionQuality != null) {
-        final mediaInfo = await VideoCompress.compressVideo(
-          webMediaModel.platformFile.path ?? '',
-          quality: compressionQuality,
-          deleteOrigin: false,
-        );
-
-        if (mediaInfo != null) {
-          final videoCompresFile = mediaInfo.file;
-          bytes = await videoCompresFile?.readAsBytes();
-        } else {
-          bytes = await _readVideoBytes(webMediaModel);
-        }
-      } else {
-        bytes = await _readVideoBytes(webMediaModel);
-      }
-    } else {
-      bytes = webMediaModel.platformFile.bytes;
-    }
+    final bytes = await _bytesForOutgoingMedia(webMediaModel);
 
     final index = _controller.messages.indexWhere(
       (message) => message.sentAt == sentAt,
@@ -420,7 +751,7 @@ mixin IsmChatPageSendMessageMediaMixin {
             '';
     await _controller.ismPostMediaUrl(
       imageAndFile: false,
-      bytes: bytes ?? Uint8List(0),
+      bytes: bytes,
       createdAt: sentAt,
       ismChatChatMessageModel: videoMessage,
       mediaId: mediaId,
@@ -460,8 +791,17 @@ mixin IsmChatPageSendMessageMediaMixin {
     final nameWithExtension = webMediaModel.platformFile.name;
     final mediaId = sentAt.toString();
     final extension = webMediaModel.platformFile.extension;
+    final caption = IsmChatUtility.resolveOutboundMediaCaption(
+      mediaCaption: webMediaModel.caption,
+      composerText: _controller.chatInputController.text,
+    );
+    _clearComposerIfUsedAsMediaCaption(
+      resolvedCaption: caption,
+      mediaCaption: webMediaModel.caption,
+    );
+    final body = IsmChatUtility.outboundAttachmentBody(caption);
     final imageMessage = IsmChatMessageModel(
-      body: IsmChatStrings.image,
+      body: body,
       conversationId: conversationId,
       senderInfo: _controller.currentUser,
       customType: _controller.isreplying
@@ -496,7 +836,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
-        caption: webMediaModel.caption,
+        caption: IsmChatUtility.outboundAttachmentCaptionMeta(caption),
         customMetaData: metaDataFromDelegate,
         replyMessage: _controller.isreplying
             ? IsmChatReplyMessageModel(
@@ -621,8 +961,9 @@ mixin IsmChatPageSendMessageMediaMixin {
         (nameWithExtension.contains('.')
             ? nameWithExtension.split('.').last
             : 'gif');
+    final wireBody = IsmChatUtility.outboundAttachmentBody(caption);
     final mediaMessage = IsmChatMessageModel(
-      body: body,
+      body: wireBody,
       conversationId: conversationId,
       senderInfo: _controller.currentUser,
       customType: _controller.isreplying
@@ -659,7 +1000,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
-        caption: caption,
+        caption: IsmChatUtility.outboundAttachmentCaptionMeta(caption),
         replyMessage: _controller.isreplying
             ? IsmChatReplyMessageModel(
                 forMessageType: IsmChatCustomMessageType.image,
@@ -700,7 +1041,7 @@ mixin IsmChatPageSendMessageMediaMixin {
     await _controller.sendMessage(
       metaData: mediaMessage.metaData,
       deviceId: mediaMessage.deviceId ?? '',
-      body: mediaMessage.body,
+      body: wireBody,
       customType: _resolveOutgoingCustomType(mediaMessage),
       createdAt: mediaMessage.sentAt,
       conversationId: mediaMessage.conversationId ?? '',
@@ -752,7 +1093,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       userId: userId,
       mediaUrl: imageUrl,
       mediaType: IsmChatMediaType.image,
-      body: IsmChatStrings.image,
+      body: IsmChatUtility.outboundAttachmentBody(caption),
       notificationBody: IsmChatStrings.sentImage,
       nameWithExtension: nameWithExtension,
       mediaId: mediaId,
@@ -1021,7 +1362,6 @@ mixin IsmChatPageSendMessageMediaMixin {
         userId: userId,
         webMediaModel: webMediaModel,
         mediaType: IsmChatMediaType.gif,
-        body: IsmChatStrings.gif,
         notificationBody: IsmChatStrings.sentGif,
         metaDataFromDelegate: metaDataFromDelegate,
         preAssignedSentAt: preAssignedSentAt,
@@ -1162,7 +1502,6 @@ mixin IsmChatPageSendMessageMediaMixin {
         userId: userId,
         webMediaModel: webMediaModel,
         mediaType: IsmChatMediaType.sticker,
-        body: IsmChatStrings.sticker,
         notificationBody: IsmChatStrings.sentSticker,
         metaDataFromDelegate: metaDataFromDelegate,
       );
@@ -1205,7 +1544,7 @@ mixin IsmChatPageSendMessageMediaMixin {
         mediaUrl: item.sendUrl,
         stillUrl: stillUrl,
         mediaType: mediaType,
-        body: isSticker ? IsmChatStrings.sticker : IsmChatStrings.gif,
+        body: '',
         notificationBody:
             isSticker ? IsmChatStrings.sentSticker : IsmChatStrings.sentGif,
         nameWithExtension: displayName,
@@ -1230,7 +1569,6 @@ mixin IsmChatPageSendMessageMediaMixin {
     required String userId,
     required WebMediaModel webMediaModel,
     required IsmChatMediaType mediaType,
-    required String body,
     required String notificationBody,
     Map<String, dynamic>? metaDataFromDelegate,
     int? preAssignedSentAt,
@@ -1256,6 +1594,15 @@ mixin IsmChatPageSendMessageMediaMixin {
     final forMessageType = mediaType == IsmChatMediaType.sticker
         ? IsmChatCustomMessageType.image
         : IsmChatCustomMessageType.image;
+    final caption = IsmChatUtility.resolveOutboundMediaCaption(
+      mediaCaption: webMediaModel.caption,
+      composerText: _controller.chatInputController.text,
+    );
+    _clearComposerIfUsedAsMediaCaption(
+      resolvedCaption: caption,
+      mediaCaption: webMediaModel.caption,
+    );
+    final body = IsmChatUtility.outboundAttachmentBody(caption);
 
     final visualMessage = IsmChatMessageModel(
       body: body,
@@ -1293,7 +1640,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
-        caption: webMediaModel.caption,
+        caption: IsmChatUtility.outboundAttachmentCaptionMeta(caption),
         customMetaData: metaDataFromDelegate,
         replyMessage: _controller.isreplying
             ? IsmChatReplyMessageModel(
@@ -1428,6 +1775,100 @@ VideoQuality _mapVideoCompressionQuality(
       return VideoQuality.Res1280x720Quality;
     case IsmChatVideoCompressionQuality.res1920x1080:
       return VideoQuality.Res1920x1080Quality;
+  }
+}
+
+/// Bytes uploaded for one picked file. Videos reuse the same compression
+/// path as a single video send. Images fall back to the file on disk when
+/// the picker did not keep bytes in memory.
+Future<Uint8List> _bytesForOutgoingMedia(WebMediaModel webMediaModel) async {
+  if (webMediaModel.isVideo) {
+    return _compressedOrRawVideoBytes(webMediaModel);
+  }
+  final cached = webMediaModel.platformFile.bytes;
+  if (cached != null && cached.isNotEmpty) {
+    return cached;
+  }
+  final path = webMediaModel.platformFile.path;
+  if (!kIsWeb && path != null && path.isNotEmpty) {
+    return File(path).readAsBytes();
+  }
+  return cached ?? Uint8List(0);
+}
+
+Future<Uint8List> _compressedOrRawVideoBytes(
+    WebMediaModel webMediaModel) async {
+  if (IsmChatResponsive.isMobile(
+          IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context) &
+      !kIsWeb) {
+    final compressionQuality = _resolveVideoCompressionQuality();
+    if (compressionQuality != null) {
+      final mediaInfo = await VideoCompress.compressVideo(
+        webMediaModel.platformFile.path ?? '',
+        quality: compressionQuality,
+        deleteOrigin: false,
+      );
+      if (mediaInfo != null) {
+        final compressed = await mediaInfo.file?.readAsBytes();
+        if (compressed != null && compressed.isNotEmpty) {
+          return compressed;
+        }
+      }
+    }
+    return (await _readVideoBytes(webMediaModel)) ?? Uint8List(0);
+  }
+  return webMediaModel.platformFile.bytes ?? Uint8List(0);
+}
+
+/// `mimeType` stored on each attachment. Web reads this next to `mediaType`
+/// (0 image, 1 video, 2 audio, 3 doc). Reuse this instead of sending the
+/// bare extension.
+String mimeTypeForAttachmentExtension(
+  String? extension, {
+  required IsmChatMediaType mediaType,
+}) {
+  final ext = (extension ?? '').toLowerCase().replaceAll('.', '');
+  switch (ext) {
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'heic':
+    case 'heif':
+      return 'image/heic';
+    case 'mp4':
+      return mediaType == IsmChatMediaType.audio ? 'audio/mp4' : 'video/mp4';
+    case 'mov':
+      return 'video/quicktime';
+    case 'webm':
+      return 'video/webm';
+    case 'mkv':
+      return 'video/x-matroska';
+    case 'mp3':
+      return 'audio/mpeg';
+    case 'm4a':
+    case 'aac':
+      return 'audio/mp4';
+    case 'wav':
+      return 'audio/wav';
+    case 'pdf':
+      return 'application/pdf';
+    default:
+      switch (mediaType) {
+        case IsmChatMediaType.video:
+          return 'video/mp4';
+        case IsmChatMediaType.audio:
+          return 'audio/mpeg';
+        case IsmChatMediaType.file:
+          return 'application/pdf';
+        default:
+          return 'image/jpeg';
+      }
   }
 }
 

@@ -169,6 +169,23 @@ class IsmChatMessageModel {
     return true;
   }
 
+  /// Resolves [customType] after [fromMap] (multi-attachment detection via body + attachments).
+  ///
+  /// Wire format: `customType` is `AttachmentMessage:Multiple` when there are
+  /// two or more files. `body` is the caption, or `AttachmentMessage:Multiple`
+  /// when there is no caption. Older payloads may still put that placeholder
+  /// in `body` while `customType` is the first file (for example `AttachmentMessage:Image`).
+  static IsmChatCustomMessageType resolveCustomType(IsmChatMessageModel model) {
+    if (model.isMultipleAttachmentsMessage) {
+      return IsmChatCustomMessageType.multipleAttachments;
+    }
+    final type = model.customType;
+    if (type != null && type != IsmChatCustomMessageType.text) {
+      return type;
+    }
+    return IsmChatCustomMessageType.withBody(model);
+  }
+
   factory IsmChatMessageModel.fromMap(Map<String, dynamic> map) {
     // Check if this is a broadcast message and get groupcastId from metaData for decryption
     final metaDataMap = map['metaData'] as Map<String, dynamic>?;
@@ -357,10 +374,7 @@ class IsmChatMessageModel {
     if (IsmChatConfig.configInitilized) {
       try {
         model = model.copyWith(
-          customType: model.customType != null &&
-                  model.customType != IsmChatCustomMessageType.text
-              ? model.customType
-              : IsmChatCustomMessageType.withBody(model),
+          customType: resolveCustomType(model),
           sentByMe: resolveSentByMe(model),
           isGroup: model.conversationDetails?.isNotEmpty == true
               ? model.conversationDetails!['isGroup']

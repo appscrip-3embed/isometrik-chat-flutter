@@ -351,6 +351,12 @@ extension LastMessageBody on LastMessageDetails {
         return 'Audio';
       case IsmChatCustomMessageType.file:
         return 'Document';
+      case IsmChatCustomMessageType.multipleAttachments:
+        final trimmed = body.trim();
+        if (trimmed.isNotEmpty && trimmed != 'AttachmentMessage:Multiple') {
+          return trimmed;
+        }
+        return 'Multiple Media';
       case IsmChatCustomMessageType.location:
         return 'Location';
       case IsmChatCustomMessageType.block:
@@ -436,6 +442,7 @@ extension LastMessageBody on LastMessageDetails {
         iconData = Icons.audiotrack_rounded;
         break;
       case IsmChatCustomMessageType.file:
+      case IsmChatCustomMessageType.multipleAttachments:
         iconData = Icons.description_rounded;
         break;
       case IsmChatCustomMessageType.location:
@@ -640,7 +647,8 @@ extension MentionMessage on IsmChatMessageModel {
       IsmChatCustomMessageType.video,
       IsmChatCustomMessageType.image,
       IsmChatCustomMessageType.audio,
-      IsmChatCustomMessageType.file
+      IsmChatCustomMessageType.file,
+      IsmChatCustomMessageType.multipleAttachments,
     ].contains(customType)) {
       menu.remove(IsmChatFocusMenuType.copy);
     }
@@ -677,6 +685,7 @@ extension MentionMessage on IsmChatMessageModel {
       IsmChatCustomMessageType.image,
       IsmChatCustomMessageType.video,
       IsmChatCustomMessageType.file,
+      IsmChatCustomMessageType.multipleAttachments,
     ].contains(customType)) {
       menu.remove(IsmChatFocusMenuType.save);
     }
@@ -817,6 +826,187 @@ extension MentionMessage on IsmChatMessageModel {
     return null;
   }
 
+  static const _multipleBody = 'AttachmentMessage:Multiple';
+
+  bool get isMultipleAttachmentsMessage =>
+      customType == IsmChatCustomMessageType.multipleAttachments ||
+      (attachments != null &&
+          attachments!.length > 1 &&
+          (body == _multipleBody || customType?.value == _multipleBody));
+
+  /// Caption shown under a multi-attachment bubble.
+  ///
+  /// Prefer [IsmChatMetaData.caption]. Web puts the caption in [body] and uses
+  /// [body] `AttachmentMessage:Multiple` only when there is no caption.
+  /// Single image/video with a caption also mirror it in [body]; otherwise
+  /// [body] is empty and the caption lives only in metadata when present.
+  String get multipleAttachmentCaption {
+    final fromMeta = metaData?.caption?.trim() ?? '';
+    if (!isMultipleAttachmentsMessage) {
+      return fromMeta;
+    }
+    if (fromMeta.isNotEmpty) {
+      return fromMeta;
+    }
+    final fromBody = body.trim();
+    if (fromBody.isEmpty || fromBody == _multipleBody) {
+      return '';
+    }
+    return fromBody;
+  }
+
+  /// Homogeneous layout for multipleAttachments messages.
+  ///
+  /// Null when the message mixes grid media with docs or audio. The bubble
+  /// partitions those by each attachment's resolved media type instead of
+  /// dropping files.
+  MultipleAttachmentLayout? get multipleAttachmentLayout {
+    final list = attachments;
+    if (list == null || list.isEmpty) {
+      return null;
+    }
+    final allDocs = list.every((a) => a.isDocumentAttachment);
+    final allGrid = list.every((a) => a.isGridMediaAttachment);
+    if (allDocs) {
+      return MultipleAttachmentLayout.documentList;
+    }
+    if (allGrid) {
+      return MultipleAttachmentLayout.mediaGrid;
+    }
+    return null;
+  }
+
+  /// One message per document for the conversation docs tab and [IsmDocsView].
+  ///
+  /// Reuse for multi-attachment document lists the same way as
+  /// [syntheticMessagesForGrid] for the media tab.
+  List<IsmChatMessageModel> get syntheticMessagesForDocs {
+    final list =
+        attachments?.where((attachment) => attachment.isDocumentAttachment);
+    if (list == null || list.isEmpty) {
+      return const [];
+    }
+    return list.map((attachment) {
+      return copyWith(
+        customType: IsmChatCustomMessageType.file,
+        attachments: [attachment],
+      );
+    }).toList();
+  }
+
+  /// One message per image/video (and gif/sticker) for [IsmChatMediaGridMessage].
+  ///
+  /// Docs and audio are omitted here so a mixed message does not paint them
+  /// as photos. Reuse this for the grid and the conversation media gallery.
+  List<IsmChatMessageModel> get syntheticMessagesForGrid {
+    final list =
+        attachments?.where((attachment) => attachment.isGridMediaAttachment);
+    if (list == null || list.isEmpty) {
+      return const [];
+    }
+    return list.map((attachment) {
+      final type = attachment.resolvedMediaType;
+      final customType = type == IsmChatMediaType.video
+          ? IsmChatCustomMessageType.video
+          : IsmChatCustomMessageType.image;
+      return copyWith(
+        customType: customType,
+        attachments: [attachment],
+      );
+    }).toList();
+  }
+
+  /// Per-item rows for conversation media tabs and the image/video preview pager.
+  ///
+  /// Use [includeAudio] for [IsmMediaView] / Group Info media tab; full-screen
+  /// swipe preview should pass `includeAudio: false`.
+  List<IsmChatMessageModel> toMediaGalleryItems({bool includeAudio = false}) {
+    final type = customType;
+    if (type == IsmChatCustomMessageType.image ||
+        type == IsmChatCustomMessageType.video) {
+      return [this];
+    }
+    if (includeAudio && type == IsmChatCustomMessageType.audio) {
+      return [this];
+    }
+    if (isMultipleAttachmentsMessage ||
+        type == IsmChatCustomMessageType.multipleAttachments) {
+      final gridItems = syntheticMessagesForGrid;
+      if (gridItems.isNotEmpty) {
+        return gridItems;
+      }
+    }
+    return const [];
+  }
+
+  /// Per-item rows for the conversation docs tab (one row per file).
+  List<IsmChatMessageModel> toDocsGalleryItems() {
+    if (customType == IsmChatCustomMessageType.file) {
+      return [this];
+    }
+    if (isMultipleAttachmentsMessage ||
+        customType == IsmChatCustomMessageType.multipleAttachments) {
+      return syntheticMessagesForDocs;
+    }
+    return const [];
+  }
+
+  /// Whether this chat message contributes to the conversation media tab list
+  /// before [expandMediaGalleryItems].
+  bool get contributesToConversationMediaTab {
+    if ([
+      IsmChatCustomMessageType.image,
+      IsmChatCustomMessageType.video,
+      IsmChatCustomMessageType.audio,
+    ].contains(customType)) {
+      return true;
+    }
+    if (isMultipleAttachmentsMessage ||
+        customType == IsmChatCustomMessageType.multipleAttachments) {
+      return syntheticMessagesForGrid.isNotEmpty;
+    }
+    return false;
+  }
+
+  /// Whether this message contributes to the docs tab in conversation media.
+  bool get contributesToConversationDocsTab => toDocsGalleryItems().isNotEmpty;
+
+  /// Matches the same gallery tile (parent message + attachment identity).
+  bool matchesMediaGalleryIdentity(IsmChatMessageModel other) {
+    if (!hasSameMediaGridIdentityAs(other)) {
+      return false;
+    }
+    final attachment = attachments?.firstOrNull;
+    final otherAttachment = other.attachments?.firstOrNull;
+    if (attachment == null || otherAttachment == null) {
+      return attachment == otherAttachment;
+    }
+    final idA = (attachment.mediaId ?? '').trim();
+    final idB = (otherAttachment.mediaId ?? '').trim();
+    if (idA.isNotEmpty && idB.isNotEmpty) {
+      return idA == idB;
+    }
+    final urlA = (attachment.mediaUrl ?? '').trim();
+    final urlB = (otherAttachment.mediaUrl ?? '').trim();
+    if (urlA.isNotEmpty && urlB.isNotEmpty) {
+      return urlA == urlB;
+    }
+    return false;
+  }
+
+  /// Conversation preview for multi-attachment messages.
+  String get multipleAttachmentsPreviewLabel {
+    final count = attachments?.length ?? 0;
+    final layout = multipleAttachmentLayout;
+    if (layout == MultipleAttachmentLayout.documentList) {
+      return count > 1 ? '$count Documents' : IsmChatStrings.document;
+    }
+    if (layout == MultipleAttachmentLayout.mediaGrid) {
+      return count > 1 ? '$count Photos' : IsmChatStrings.image;
+    }
+    return IsmChatStrings.document;
+  }
+
   bool get isGridDisplayableMedia =>
       customType == IsmChatCustomMessageType.video ||
       (isGridEligibleMedia && customType == IsmChatCustomMessageType.image);
@@ -845,6 +1035,75 @@ extension MentionMessage on IsmChatMessageModel {
     }
     return sentAt == other.sentAt && sentByMe == other.sentByMe;
   }
+}
+
+/// Flattens chat messages into one gallery row per image/video (and audio when requested).
+List<IsmChatMessageModel> expandMediaGalleryItems(
+  Iterable<IsmChatMessageModel> messages, {
+  bool includeAudio = false,
+}) {
+  final result = <IsmChatMessageModel>[];
+  for (final message in messages) {
+    result.addAll(message.toMediaGalleryItems(includeAudio: includeAudio));
+  }
+  return result;
+}
+
+/// Flattens chat messages into one docs-tab row per file attachment.
+List<IsmChatMessageModel> expandDocsGalleryItems(
+  Iterable<IsmChatMessageModel> messages,
+) {
+  final result = <IsmChatMessageModel>[];
+  for (final message in messages) {
+    result.addAll(message.toDocsGalleryItems());
+  }
+  return result;
+}
+
+/// Keeps [IsmChatConversationsController] media / links / docs lists in sync
+/// with the current message list (Group Info, contact info, media view).
+void syncConversationMediaTabLists(
+  IsmChatConversationsController conversationController,
+  Iterable<IsmChatMessageModel> messages,
+) {
+  conversationController.mediaList = expandMediaGalleryItems(
+    messages.where((e) => e.contributesToConversationMediaTab),
+    includeAudio: true,
+  );
+  conversationController.mediaListLinks = messages
+      .where((e) => e.customType == IsmChatCustomMessageType.link)
+      .toList();
+  conversationController.mediaListDocs = expandDocsGalleryItems(
+    messages.where((e) => e.contributesToConversationDocsTab),
+  );
+}
+
+/// Index of [tapped] in [gallery]; falls back to attachment identity matching.
+int indexInMediaGallery(
+  List<IsmChatMessageModel> gallery,
+  IsmChatMessageModel tapped, {
+  int? attachmentIndex,
+}) {
+  final direct = gallery.indexOf(tapped);
+  if (direct >= 0) {
+    return direct;
+  }
+
+  var target = tapped;
+  if (attachmentIndex != null &&
+      tapped.customType == IsmChatCustomMessageType.multipleAttachments) {
+    final synthetics = tapped.syntheticMessagesForGrid;
+    if (attachmentIndex >= 0 && attachmentIndex < synthetics.length) {
+      target = synthetics[attachmentIndex];
+    }
+  }
+
+  for (var i = 0; i < gallery.length; i++) {
+    if (gallery[i].matchesMediaGalleryIdentity(target)) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 /// Groups consecutive image/video messages for the chat grid UI.
@@ -1003,6 +1262,35 @@ extension IsmChatContactMetaDatExtension on IsmChatContactMetaDatModel {
   /// Opens the device contacts app to save this shared contact.
   Future<void> openExternalInsert() =>
       IsmChatUtility.openContactSaveScreen(toFlutterContact());
+}
+
+/// Attachment type helpers (API [mediaType] vs [attachmentType]).
+extension IsmChatAttachmentModelExtension on AttachmentModel {
+  IsmChatMediaType get resolvedMediaType =>
+      attachmentType ?? IsmChatMediaType.image;
+
+  bool get isDocumentAttachment => resolvedMediaType == IsmChatMediaType.file;
+
+  bool get isGridMediaAttachment {
+    final type = resolvedMediaType;
+    // GIF and sticker sit in the photo grid when they arrive inside
+    // AttachmentMessage:Multiple. A lone GIF/sticker message is unchanged.
+    return type == IsmChatMediaType.image ||
+        type == IsmChatMediaType.video ||
+        type == IsmChatMediaType.gif ||
+        type == IsmChatMediaType.sticker;
+  }
+
+  /// Uppercase label for document rows (e.g. PDF, TXT).
+  String get displayExtensionLabel {
+    final fromName = name?.split('.').last;
+    final ext = (extension?.isNotEmpty == true ? extension : fromName) ?? '';
+    final normalized = ext.toUpperCase();
+    if (normalized.isNotEmpty && normalized.length <= 6) {
+      return normalized;
+    }
+    return 'FILE';
+  }
 }
 
 /// GIF / sticker helpers based on [AttachmentModel.attachmentType].

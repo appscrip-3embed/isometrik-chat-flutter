@@ -3,10 +3,13 @@ const Map<String, String> kIsmChatLocaleEn = {
   'chats': 'Chats',
   'you': 'You',
   'all': 'All',
-  'noConversation': "You don't seem to have talked to anyone, so let your buddies know you're thinking about them.",
+  'noConversation':
+      "You don't seem to have talked to anyone, so let your buddies know you're thinking about them.",
   'noMatch': 'Oops! No Chat Conversation Found',
-  'noMessages': 'This is the beginning of your chat history. Start a conversation by typing a message below.',
-  'noInternet': "Oops! It looks like your internet connection is not working at the moment. Please check your network settings and make sure you're connected to a Wi-Fi network or cellular data.",
+  'noMessages':
+      'This is the beginning of your chat history. Start a conversation by typing a message below.',
+  'noInternet':
+      "Oops! It looks like your internet connection is not working at the moment. Please check your network settings and make sure you're connected to a Wi-Fi network or cellular data.",
   'errorLoadingPreview': 'Error loading link preview',
   'fetchingPreview': 'Fetching link preview',
   'errorLoadingImage': 'Error loading image',
@@ -55,13 +58,17 @@ const Map<String, String> kIsmChatLocaleEn = {
   'youBlockUser': 'You blocked this user.',
   'youareBlocked': 'You are blocked.',
   'cannotBlock': 'Action not allowed, the user has already blocked you',
-  'cannotBlockWhenAlreadyBlocked': "You're already blocked, you cannot block this user.",
+  'cannotBlockWhenAlreadyBlocked':
+      "You're already blocked, you cannot block this user.",
   'broadcastAlert': 'Select atleast two people',
   'micePermission': 'Please provide microphone access in order to send audio.',
-  'micePermissionBlock': 'The browser has disabled microphone access; please allow it to send audio.',
-  'cameraPermissionBlock': 'The browser has disabled camera access; please allow it to send photo and video.',
+  'micePermissionBlock':
+      'The browser has disabled microphone access; please allow it to send audio.',
+  'cameraPermissionBlock':
+      'The browser has disabled camera access; please allow it to send photo and video.',
   'contactsPermissionBlockedTitle': 'Contacts permission',
-  'contactsPermissionBlockedMessage': 'Contacts access is disabled. Please allow Contacts permission from Settings to share a contact.',
+  'contactsPermissionBlockedMessage':
+      'Contacts access is disabled. Please allow Contacts permission from Settings to share a contact.',
   'openSettings': 'Open Settings',
   'block': 'Block',
   'unblock': 'Unblock',
@@ -83,7 +90,8 @@ const Map<String, String> kIsmChatLocaleEn = {
   'archive': 'Archive',
   'deleteChat': 'Delete chat',
   'deleteGroup': 'Delete group',
-  'createGroupAlert': 'Select at least one user, add group name and choose one photo',
+  'createGroupAlert':
+      'Select at least one user, add group name and choose one photo',
   'youCreatedGroup': 'You created group',
   'admin': 'Admin',
   'add': 'Add',
@@ -109,10 +117,12 @@ const Map<String, String> kIsmChatLocaleEn = {
   'removeReaction': 'Tap to remove reaction',
   'alreadyAddedReaction': 'You have already added reaction',
   'remove': 'Remove',
-  'youAreOnlyAdmin': "You're the only admin of the group, make a group admin or a random person will be assigned as group admin",
+  'youAreOnlyAdmin':
+      "You're the only admin of the group, make a group admin or a random person will be assigned as group admin",
   'contactInfo': 'Contact Info',
   'userInfo': 'User Info',
-  'loremIpsum': 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod',
+  'loremIpsum':
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod',
   'demoDate': '25 Dec 2016',
   'mediaLinks': 'Media and Links ',
   'mediaLinksAndDocs': 'Media, Links and Docs',
@@ -133,7 +143,8 @@ const Map<String, String> kIsmChatLocaleEn = {
   'forwarded': 'Forwarded',
   'logoutMessage': 'Are you sure you want to logout',
   'removeGroupMessage': 'You have been removed out of the group...!',
-  'leftGroupMessage': 'You have left this group. You can view old messages but can no longer send messages.',
+  'leftGroupMessage':
+      'You have left this group. You can view old messages but can no longer send messages.',
   'userDeleteMessage': 'This user is currently unavailable for messaging...!',
   'gallery': 'Gallery',
   'camera': 'Camera',
@@ -182,6 +193,8 @@ const Map<String, String> kIsmChatLocaleEn = {
   'messageInfo': 'Message Info',
   'inviteToChat': 'Invite to',
   'youCanNotSend': 'You can not send media more than 20 MB.',
+  'maxPickerAttachmentsReached':
+      'You can select up to 5 attachments at a time.',
   'aboutMe': 'About',
   'defaultString': 'Default',
   'recipients': 'Recipients :',
