@@ -41,6 +41,39 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
   bool _showsMetaDataFullName(UserDetails? member) =>
       member != null && _metaDataFullName(member).isNotEmpty;
 
+  /// Conversation model for [IsmChatConversationCardProfileImage] (app
+  /// `conversationInfoAssets.profileImageBuilder`).
+  IsmChatConversationModel? _conversationForProfileImage(
+    IsmChatPageController chatController,
+  ) {
+    final conversationId = widget.conversationId;
+    if (conversationId.isNotEmpty) {
+      if (chatController.conversation?.conversationId == conversationId) {
+        return chatController.conversation;
+      }
+      final cached = conversationController.getConversation(conversationId);
+      if (cached != null) {
+        return cached;
+      }
+    }
+    if (widget.user == null) {
+      return null;
+    }
+    final targetConversationId = conversationId.isNotEmpty
+        ? conversationId
+        : conversationController.getConversationId(widget.user!.userId);
+    return IsmChatConversationModel(
+      messagingDisabled: false,
+      isGroup: false,
+      opponentDetails: widget.user,
+      unreadMessagesCount: 0,
+      lastMessageDetails: null,
+      lastMessageSentAt: 0,
+      membersCount: 1,
+      conversationId: targetConversationId,
+    );
+  }
+
   List<IsmChatMessageModel> mediaList = [];
   List<IsmChatMessageModel> mediaListLinks = [];
   List<IsmChatMessageModel> mediaListDocs = [];
@@ -193,9 +226,12 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
                   mainAxisSize: MainAxisSize.max,
                   children: [
                     IsmChatDimens.boxHeight16,
-                    IsmChatImage.profile(
-                      widget.user?.profileUrl ?? '',
+                    IsmChatConversationCardProfileImage(
+                      conversation: _conversationForProfileImage(controller),
                       dimensions: IsmChatDimens.oneHundredFifty,
+                      fallbackUrl: widget.user?.profileUrl ?? '',
+                      displayName:
+                          _memberDisplayName(widget.user).capitalizeFirst,
                     ),
                     IsmChatDimens.boxHeight5,
                     Text(

@@ -347,12 +347,13 @@ class _IsmChatConverstaionInfoViewState
                                     ),
                                   );
                                 },
-                                child: IsmChatImage.profile(
-                                  controller.conversation?.profileUrl ?? '',
+                                child: IsmChatConversationCardProfileImage(
+                                  conversation: controller.conversation,
                                   dimensions: IsmChatDimens.hundred,
-                                  name: controller.conversation?.chatName
-                                          .capitalizeFirst ??
-                                      '',
+                                  fallbackUrl:
+                                      controller.conversation?.profileUrl ?? '',
+                                  displayName: controller
+                                      .conversation?.chatName.capitalizeFirst,
                                 ),
                               ),
                               if (controller.conversation?.isGroup ?? false)
@@ -765,12 +766,20 @@ class _IsmChatConverstaionInfoViewState
                                     member.userName,
                                     style: groupTheme.listTileSubtitleTextStyle,
                                   ),
-                                  leading: IsmChatImage.profile(
-                                    member.profileUrl,
-                                    name: _memberDisplayName(member)
-                                            .capitalizeFirst ??
-                                        '',
-                                  ),
+                                  leading: IsmChatProperties
+                                          .conversationInfoAssets
+                                          .groupMemberProfileImageBuilder
+                                          ?.call(context, member) ??
+                                      IsmChatImage.profile(
+                                        IsmChatProperties
+                                                .conversationInfoAssets
+                                                .groupMemberProfileImageUrl
+                                                ?.call(context, member) ??
+                                            member.profileUrl,
+                                        name: _memberDisplayName(member)
+                                                .capitalizeFirst ??
+                                            '',
+                                      ),
                                 );
                               },
                             ),

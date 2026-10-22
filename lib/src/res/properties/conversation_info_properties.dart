@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
-/// App-overridable icons / widgets for conversation info screens
+/// App-overridable icons and profile widgets for conversation info screens
 /// ([IsmChatConverstaionInfoView], [IsmChatUserInfo]).
 ///
-/// Kept separate from [IsmChatPageProperties] so chat-page composer settings
-/// stay lean. Configure via [IsmChatProperties.conversationInfoProperties].
+/// Kept separate from [IsmChatPageProperties] and list
+/// [IsmChatCardProperties] so chat-page and conversation-list settings stay lean.
+/// Configure via [IsmChatProperties.conversationInfoAssets].
 ///
 /// Example:
 /// ```dart
-/// IsmChatProperties.conversationInfoProperties =
-///     IsmChatConversationInfoProperties(
+/// IsmChatProperties.conversationInfoAssets = IsmChatConversationInfoAssets(
+///   profileImageBuilder: (context, conversation, url) => MyHeroAvatar(...),
+///   groupMemberProfileImageBuilder: (context, member) => MyMemberAvatar(...),
 ///   clearChatIcon: SvgPicture.asset('assets/icons/clear_chat.svg'),
 ///   exitGroupIcon: SvgPicture.asset('assets/icons/exit_group.svg'),
 ///   deleteChatIcon: SvgPicture.asset('assets/icons/delete_chat.svg'),
@@ -21,6 +24,10 @@ import 'package:flutter/material.dart';
 /// ```
 class IsmChatConversationInfoAssets {
   IsmChatConversationInfoAssets({
+    this.profileImageBuilder,
+    this.profileImageUrl,
+    this.groupMemberProfileImageBuilder,
+    this.groupMemberProfileImageUrl,
     this.groupProfileEditIcon,
     this.conversationMediaIcon,
     this.clearChatIcon,
@@ -31,6 +38,24 @@ class IsmChatConversationInfoAssets {
     this.changeGroupTitleIcon,
     this.changeGroupImageIcon,
   });
+
+  /// Hero profile on group/conversation info and [IsmChatUserInfo].
+  ///
+  /// Size your widget for context (~100 group info, ~150 contact info).
+  /// If null, SDK uses [IsmChatImage.profile] with [profileImageUrl] when set.
+  final ConversationWidgetCallback? profileImageBuilder;
+
+  /// Optional URL override for the hero avatar default image.
+  final ConversationStringCallback? profileImageUrl;
+
+  /// Avatar for each row in the group participants list.
+  ///
+  /// If null, SDK uses [IsmChatImage.profile] with [groupMemberProfileImageUrl]
+  /// when set.
+  final UserDetailsWidgetCallback? groupMemberProfileImageBuilder;
+
+  /// Optional URL override for group member list default avatars.
+  final UserDetailsStringCallback? groupMemberProfileImageUrl;
 
   /// Edit badge on the group profile photo.
   ///
