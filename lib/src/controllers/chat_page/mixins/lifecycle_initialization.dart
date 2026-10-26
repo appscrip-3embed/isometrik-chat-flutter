@@ -183,8 +183,16 @@ mixin IsmChatPageLifecycleInitializationMixin on GetxController {
         .where((e) => e.keys.contains(_controller.conversation?.conversationId))
         .toList();
     if (asset.isNotEmpty) {
-      _controller.backgroundColor = asset.first.values.first.color!;
-      _controller.backgroundImage = asset.first.values.first.imageUrl!;
+      final background = asset.first.values.first;
+      if (background.isImage) {
+        _controller.backgroundColor = '';
+        final imageUrl = background.imageUrl ?? '';
+        _controller.backgroundImage =
+            imageUrl.isSupportedChatWallpaperUrl ? imageUrl : '';
+      } else {
+        _controller.backgroundColor = background.color ?? '';
+        _controller.backgroundImage = '';
+      }
     } else {
       _controller.backgroundColor = '';
       _controller.backgroundImage =

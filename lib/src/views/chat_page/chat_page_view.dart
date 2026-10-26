@@ -337,397 +337,421 @@ class _IsmChatPageView extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
-        builder: (controller) => DecoratedBox(
-          decoration: BoxDecoration(
-            color: controller.backgroundColor.isNotEmpty
-                ? controller.backgroundColor.toColor
-                : IsmChatColors.whiteColor,
-            image: controller.backgroundImage.isNotEmpty
-                ? DecorationImage(
-                    image: controller.backgroundImage.isValidUrl
-                        ? NetworkImage(controller.backgroundImage)
-                        : IsmChatProperties.chatPageProperties
-                                .backgroundImageUrl.isNullOrEmpty
-                            ? controller.backgroundImage.contains(
-                                    'packages/isometrik_chat_flutter/assets')
-                                ? AssetImage(controller.backgroundImage)
-                                    as ImageProvider
-                                : FileImage(
-                                    File(controller.backgroundImage),
-                                  )
-                            : AssetImage(controller.backgroundImage),
-                    fit: BoxFit.cover,
-                  )
-                : null,
-          ),
-          child: Scaffold(
-            drawerEnableOpenDragGesture: false,
-            backgroundColor:
-                IsmChatConfig.chatTheme.chatPageTheme?.backgroundColor ??
-                    Colors.transparent,
-            resizeToAvoidBottomInset: true,
-            // App bar: Shows selection mode or normal header
-            appBar: controller.isMessageSeleted
-                ? AppBar(
-                    systemOverlayStyle: IsmChatConfig.chatTheme
-                            .chatPageHeaderTheme?.systemUiOverlayStyle ??
-                        SystemUiOverlayStyle(
-                          statusBarBrightness: Brightness.dark,
-                          statusBarIconBrightness: Brightness.light,
-                          statusBarColor:
-                              IsmChatConfig.chatTheme.primaryColor ??
-                                  IsmChatColors.primaryColorLight,
-                        ),
-                    leading: IsmChatTapHandler(
-                      onTap: () async {
-                        controller.isMessageSeleted = false;
-                        controller.selectedMessage.clear();
-                      },
-                      child: Icon(
-                        IsmChatResponsive.isWeb(context)
-                            ? Icons.close_rounded
-                            : Icons.arrow_back_rounded,
-                      ),
-                    ),
-                    titleSpacing: IsmChatDimens.four,
-                    title: Text(
-                      '${controller.selectedMessage.length} Messages',
-                      style: IsmChatConfig
-                              .chatTheme.chatPageHeaderTheme?.titleStyle ??
-                          IsmChatStyles.w600White18,
-                    ),
-                    backgroundColor: IsmChatConfig
-                            .chatTheme.chatPageHeaderTheme?.backgroundColor ??
-                        IsmChatConfig.chatTheme.primaryColor,
-                    iconTheme: IconThemeData(
-                        color: IsmChatConfig
-                                .chatTheme.chatPageHeaderTheme?.iconColor ??
-                            IsmChatColors.whiteColor),
-                    actions: [
-                      // Delete button for selected messages
-                      IconButton(
-                        onPressed: () async {
-                          // Convert selected messages to map format
-                          var selectedMessage = <String, IsmChatMessageModel>{};
-                          for (var i = 0;
-                              i < controller.selectedMessage.length;
-                              i++) {
-                            final message = controller.selectedMessage[i];
-                            final messageId = message.messageId ?? '';
-                            final stableKey =
-                                messageId.isNotEmpty ? messageId : message.key;
-                            // Add index suffix to prevent key collisions for media
-                            // groups where multiple messages can share same timestamp key.
-                            selectedMessage['${stableKey}_$i'] = message;
-                          }
-                          // Check if all messages are from current user
-                          var messageSenderSide =
-                              controller.isAllMessagesFromMe();
-                          // Check if any message is deleted for everyone
-                          var messageDeletedForEveryone =
-                              controller.isAnyMessageDeletedForEveryone();
-                          // Show delete confirmation dialog
-                          controller.showDialogForDeleteMultipleMessage(
-                              messageSenderSide,
-                              messageDeletedForEveryone,
-                              selectedMessage);
+        builder: (controller) {
+          final hasImageWallpaper = controller.backgroundImage.isNotEmpty &&
+              controller.backgroundImage.isSupportedChatWallpaperUrl;
+          final hasColorWallpaper = controller.backgroundColor.isNotEmpty;
+          final hasConversationWallpaper =
+              hasImageWallpaper || hasColorWallpaper;
+
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: hasColorWallpaper
+                  ? controller.backgroundColor.toColor
+                  : hasImageWallpaper
+                      ? Colors.transparent
+                      : IsmChatColors.whiteColor,
+              image: hasImageWallpaper
+                  ? DecorationImage(
+                      image: controller.backgroundImage.isValidUrl
+                          ? NetworkImage(controller.backgroundImage)
+                          : IsmChatProperties.chatPageProperties
+                                  .backgroundImageUrl.isNullOrEmpty
+                              ? controller.backgroundImage.contains(
+                                      'packages/isometrik_chat_flutter/assets')
+                                  ? AssetImage(controller.backgroundImage)
+                                      as ImageProvider
+                                  : FileImage(
+                                      File(controller.backgroundImage),
+                                    )
+                              : AssetImage(controller.backgroundImage),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: Scaffold(
+              drawerEnableOpenDragGesture: false,
+              backgroundColor: hasConversationWallpaper
+                  ? Colors.transparent
+                  : IsmChatConfig.chatTheme.chatPageTheme?.backgroundColor ??
+                      Colors.transparent,
+              resizeToAvoidBottomInset: true,
+              // App bar: Shows selection mode or normal header
+              appBar: controller.isMessageSeleted
+                  ? AppBar(
+                      systemOverlayStyle: IsmChatConfig.chatTheme
+                              .chatPageHeaderTheme?.systemUiOverlayStyle ??
+                          SystemUiOverlayStyle(
+                            statusBarBrightness: Brightness.dark,
+                            statusBarIconBrightness: Brightness.light,
+                            statusBarColor:
+                                IsmChatConfig.chatTheme.primaryColor ??
+                                    IsmChatColors.primaryColorLight,
+                          ),
+                      leading: IsmChatTapHandler(
+                        onTap: () async {
+                          controller.isMessageSeleted = false;
+                          controller.selectedMessage.clear();
                         },
-                        icon: Icon(
-                          Icons.delete_rounded,
+                        child: Icon(
+                          IsmChatResponsive.isWeb(context)
+                              ? Icons.close_rounded
+                              : Icons.arrow_back_rounded,
+                        ),
+                      ),
+                      titleSpacing: IsmChatDimens.four,
+                      title: Text(
+                        '${controller.selectedMessage.length} Messages',
+                        style: IsmChatConfig
+                                .chatTheme.chatPageHeaderTheme?.titleStyle ??
+                            IsmChatStyles.w600White18,
+                      ),
+                      backgroundColor: IsmChatConfig
+                              .chatTheme.chatPageHeaderTheme?.backgroundColor ??
+                          IsmChatConfig.chatTheme.primaryColor,
+                      iconTheme: IconThemeData(
                           color: IsmChatConfig
                                   .chatTheme.chatPageHeaderTheme?.iconColor ??
-                              IsmChatColors.whiteColor,
+                              IsmChatColors.whiteColor),
+                      actions: [
+                        // Delete button for selected messages
+                        IconButton(
+                          onPressed: () async {
+                            // Convert selected messages to map format
+                            var selectedMessage =
+                                <String, IsmChatMessageModel>{};
+                            for (var i = 0;
+                                i < controller.selectedMessage.length;
+                                i++) {
+                              final message = controller.selectedMessage[i];
+                              final messageId = message.messageId ?? '';
+                              final stableKey = messageId.isNotEmpty
+                                  ? messageId
+                                  : message.key;
+                              // Add index suffix to prevent key collisions for media
+                              // groups where multiple messages can share same timestamp key.
+                              selectedMessage['${stableKey}_$i'] = message;
+                            }
+                            // Check if all messages are from current user
+                            var messageSenderSide =
+                                controller.isAllMessagesFromMe();
+                            // Check if any message is deleted for everyone
+                            var messageDeletedForEveryone =
+                                controller.isAnyMessageDeletedForEveryone();
+                            // Show delete confirmation dialog
+                            controller.showDialogForDeleteMultipleMessage(
+                                messageSenderSide,
+                                messageDeletedForEveryone,
+                                selectedMessage);
+                          },
+                          icon: Icon(
+                            Icons.delete_rounded,
+                            color: IsmChatConfig
+                                    .chatTheme.chatPageHeaderTheme?.iconColor ??
+                                IsmChatColors.whiteColor,
+                          ),
                         ),
-                      ),
-                    ],
-                  )
-                : IsmChatPageHeader(
-                    // Handle profile tap: Use custom callback, or navigate to conversation info
-                    onTap: IsmChatProperties
-                                .chatPageProperties.header?.onProfileTap !=
-                            null
-                        ? () => IsmChatProperties
-                            .chatPageProperties.header?.onProfileTap
-                            ?.call(controller.conversation)
-                        : IsmChatProperties.chatPageProperties.header
-                                    ?.profileImageBuilder !=
-                                null
-                            ? null
-                            : controller.isActionAllowed == false
-                                ? () {
-                                    // Navigate to conversation info if allowed
-                                    if (controller.isActionAllowed == false &&
-                                        controller.isBroadcast == false) {
-                                      // Don't navigate if user was removed from group
-                                      if (!(controller
-                                                  .conversation
-                                                  ?.lastMessageDetails
-                                                  ?.customType ==
-                                              IsmChatCustomMessageType
-                                                  .removeMember &&
-                                          controller
-                                                  .conversation
-                                                  ?.lastMessageDetails
-                                                  ?.userId ==
-                                              IsmChatConfig.communicationConfig
-                                                  .userConfig.userId)) {
-                                        if (IsmChatResponsive.isWeb(context)) {
-                                          IsmChatUtility.conversationController
-                                                  .isRenderChatPageaScreen =
-                                              IsRenderChatPageScreen
-                                                  .coversationInfoView;
-                                        } else {
-                                          IsmChatRoute.goToRoute(
-                                              const IsmChatConverstaionInfoView());
+                      ],
+                    )
+                  : IsmChatPageHeader(
+                      // Handle profile tap: Use custom callback, or navigate to conversation info
+                      onTap: IsmChatProperties
+                                  .chatPageProperties.header?.onProfileTap !=
+                              null
+                          ? () => IsmChatProperties
+                              .chatPageProperties.header?.onProfileTap
+                              ?.call(controller.conversation)
+                          : IsmChatProperties.chatPageProperties.header
+                                      ?.profileImageBuilder !=
+                                  null
+                              ? null
+                              : controller.isActionAllowed == false
+                                  ? () {
+                                      // Navigate to conversation info if allowed
+                                      if (controller.isActionAllowed == false &&
+                                          controller.isBroadcast == false) {
+                                        // Don't navigate if user was removed from group
+                                        if (!(controller
+                                                    .conversation
+                                                    ?.lastMessageDetails
+                                                    ?.customType ==
+                                                IsmChatCustomMessageType
+                                                    .removeMember &&
+                                            controller
+                                                    .conversation
+                                                    ?.lastMessageDetails
+                                                    ?.userId ==
+                                                IsmChatConfig
+                                                    .communicationConfig
+                                                    .userConfig
+                                                    .userId)) {
+                                          if (IsmChatResponsive.isWeb(
+                                              context)) {
+                                            IsmChatUtility
+                                                    .conversationController
+                                                    .isRenderChatPageaScreen =
+                                                IsRenderChatPageScreen
+                                                    .coversationInfoView;
+                                          } else {
+                                            IsmChatRoute.goToRoute(
+                                                const IsmChatConverstaionInfoView());
+                                          }
                                         }
                                       }
                                     }
-                                  }
-                                : null,
-                  ),
-            // Body content: Shows media preview, camera view, or main chat interface
-            body: IsmChatResponsive.isWeb(context) &&
-                    controller.webMedia.isNotEmpty
-                ? const WebMediaPreview()
-                : IsmChatResponsive.isWeb(context) && controller.isCameraView
-                    ? const IsmChatCameraView()
-                    : Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          Container(
-                            decoration: IsmChatConfig
-                                .chatTheme.chatPageTheme?.pageDecoration,
-                            height: MediaQuery.of(context).size.height,
-                            width: MediaQuery.of(context).size.width,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Messages list area
-                                Expanded(
-                                  child: controller.isMessagesLoading
-                                      ? const IsmChatLoadingDialog()
-                                      : GestureDetector(
-                                          // Close overlay when tapping on messages area
-                                          onTap: controller.hasOverlay
-                                              ? controller.closeOverlay
-                                              : null,
-                                          child: AbsorbPointer(
-                                            // Prevent interactions when overlay is shown
-                                            absorbing: controller.hasOverlay,
-                                            child: Stack(
-                                              alignment: Alignment.bottomLeft,
-                                              children: [
-                                                // Messages list or empty state
-                                                controller.messages.isNotEmpty
-                                                    ? Align(
-                                                        alignment:
-                                                            Alignment.topCenter,
-                                                        child: NotificationListener<
-                                                            ScrollNotification>(
-                                                          onNotification: controller
-                                                              .handleMessagesScrollNotification,
-                                                          child:
-                                                              ListView.builder(
-                                                            physics:
-                                                                const ClampingScrollPhysics(),
-                                                            // Shared controller must only attach to the
-                                                            // current (top) chat route. Stacked pages
-                                                            // underneath keep `null` so scroll/pagination
-                                                            // keep working after popping back.
-                                                            controller:
-                                                                attachMessagesScrollController
-                                                                    ? controller
-                                                                        .messagesScrollController
-                                                                    : null,
-                                                            scrollDirection:
-                                                                Axis.vertical,
-                                                            shrinkWrap: true,
-                                                            keyboardDismissBehavior:
-                                                                ScrollViewKeyboardDismissBehavior
-                                                                    .onDrag,
-                                                            padding: IsmChatDimens
-                                                                .edgeInsets4_8,
-                                                            reverse: true,
-                                                            addAutomaticKeepAlives:
-                                                                true,
-                                                            itemCount:
+                                  : null,
+                    ),
+              // Body content: Shows media preview, camera view, or main chat interface
+              body: IsmChatResponsive.isWeb(context) &&
+                      controller.webMedia.isNotEmpty
+                  ? const WebMediaPreview()
+                  : IsmChatResponsive.isWeb(context) && controller.isCameraView
+                      ? const IsmChatCameraView()
+                      : Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            Container(
+                              decoration: hasConversationWallpaper
+                                  ? null
+                                  : IsmChatConfig
+                                      .chatTheme.chatPageTheme?.pageDecoration,
+                              height: MediaQuery.of(context).size.height,
+                              width: MediaQuery.of(context).size.width,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Messages list area
+                                  Expanded(
+                                    child: controller.isMessagesLoading
+                                        ? const IsmChatLoadingDialog()
+                                        : GestureDetector(
+                                            // Close overlay when tapping on messages area
+                                            onTap: controller.hasOverlay
+                                                ? controller.closeOverlay
+                                                : null,
+                                            child: AbsorbPointer(
+                                              // Prevent interactions when overlay is shown
+                                              absorbing: controller.hasOverlay,
+                                              child: Stack(
+                                                alignment: Alignment.bottomLeft,
+                                                children: [
+                                                  // Messages list or empty state
+                                                  controller.messages.isNotEmpty
+                                                      ? Align(
+                                                          alignment: Alignment
+                                                              .topCenter,
+                                                          child: NotificationListener<
+                                                              ScrollNotification>(
+                                                            onNotification:
                                                                 controller
-                                                                    .messages
-                                                                    .length,
-                                                            itemBuilder: (_,
-                                                                    index) {
-                                                              if (!controller
-                                                                  .controllerIsRegister) {
-                                                                return IsmChatDimens
-                                                                    .box0;
-                                                              }
-                                                              final messages =
+                                                                    .handleMessagesScrollNotification,
+                                                            child: ListView
+                                                                .builder(
+                                                              physics:
+                                                                  const ClampingScrollPhysics(),
+                                                              // Shared controller must only attach to the
+                                                              // current (top) chat route. Stacked pages
+                                                              // underneath keep `null` so scroll/pagination
+                                                              // keep working after popping back.
+                                                              controller:
+                                                                  attachMessagesScrollController
+                                                                      ? controller
+                                                                          .messagesScrollController
+                                                                      : null,
+                                                              scrollDirection:
+                                                                  Axis.vertical,
+                                                              shrinkWrap: true,
+                                                              keyboardDismissBehavior:
+                                                                  ScrollViewKeyboardDismissBehavior
+                                                                      .onDrag,
+                                                              padding: IsmChatDimens
+                                                                  .edgeInsets4_8,
+                                                              reverse: true,
+                                                              addAutomaticKeepAlives:
+                                                                  true,
+                                                              itemCount:
                                                                   controller
-                                                                      .messages;
-                                                              final message = messages[
-                                                                  messages.length -
-                                                                      1 -
-                                                                      index];
-                                                              return IsmChatMessage(
-                                                                index,
-                                                                message,
-                                                                key: ValueKey(
-                                                                  message
-                                                                      .listWidgetKey,
-                                                                ),
-                                                              );
-                                                            },
+                                                                      .messages
+                                                                      .length,
+                                                              itemBuilder:
+                                                                  (_, index) {
+                                                                if (!controller
+                                                                    .controllerIsRegister) {
+                                                                  return IsmChatDimens
+                                                                      .box0;
+                                                                }
+                                                                final messages =
+                                                                    controller
+                                                                        .messages;
+                                                                final message =
+                                                                    messages[messages
+                                                                            .length -
+                                                                        1 -
+                                                                        index];
+                                                                return IsmChatMessage(
+                                                                  index,
+                                                                  message,
+                                                                  key: ValueKey(
+                                                                    message
+                                                                        .listWidgetKey,
+                                                                  ),
+                                                                );
+                                                              },
+                                                            ),
                                                           ),
-                                                        ),
-                                                      )
-                                                    : IsmChatProperties
-                                                            .chatPageProperties
-                                                            .placeholder ??
-                                                        IsmChatEmptyView(
-                                                          icon: const Icon(
-                                                            Icons.chat_outlined,
+                                                        )
+                                                      : IsmChatProperties
+                                                              .chatPageProperties
+                                                              .placeholder ??
+                                                          IsmChatEmptyView(
+                                                            icon: const Icon(
+                                                              Icons
+                                                                  .chat_outlined,
+                                                            ),
+                                                            text: IsmChatStrings
+                                                                .noMessages,
                                                           ),
-                                                          text: IsmChatStrings
-                                                              .noMessages,
-                                                        ),
-                                                // Mention user list overlay
-                                                Obx(() => Align(
-                                                      alignment:
-                                                          IsmChatResponsive
-                                                                  .isWeb(
-                                                                      context)
-                                                              ? Alignment
-                                                                  .bottomCenter
-                                                              : Alignment
-                                                                  .bottomLeft,
-                                                      child: controller
-                                                              .showMentionUserList
-                                                          ? const MentionUserList()
-                                                          : const SizedBox
-                                                              .shrink(),
-                                                    )),
-                                              ],
+                                                  // Mention user list overlay
+                                                  Obx(() => Align(
+                                                        alignment:
+                                                            IsmChatResponsive
+                                                                    .isWeb(
+                                                                        context)
+                                                                ? Alignment
+                                                                    .bottomCenter
+                                                                : Alignment
+                                                                    .bottomLeft,
+                                                        child: controller
+                                                                .showMentionUserList
+                                                            ? const MentionUserList()
+                                                            : const SizedBox
+                                                                .shrink(),
+                                                      )),
+                                                ],
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                ),
-                                // Message input restrictions and input field
-                                if (controller.conversation?.isGroup == true &&
-                                    (controller.isActionAllowed == true ||
-                                        controller.conversation
-                                                ?.hasCurrentUserLeftGroup ==
-                                            true ||
-                                        controller.conversation
-                                                ?.isLastMessageCurrentUserRemovedFromGroup ==
-                                            true)) ...[
-                                  _MessageNotAllowedWidget(
-                                    showMessage:
-                                        controller.isActionAllowed == true ||
-                                                controller
-                                                        .conversation
-                                                        ?.lastMessageDetails
-                                                        ?.customType ==
-                                                    IsmChatCustomMessageType
-                                                        .removeMember
-                                            ? IsmChatStrings.removeGroupMessage
-                                            : IsmChatStrings.leftGroupMessage,
-                                  )
-                                ] else if (IsmChatProperties
-                                            .chatPageProperties
-                                            .messageAllowedConfig
-                                            ?.isShowTextfiledConfig !=
-                                        null &&
-                                    !(IsmChatProperties
-                                            .chatPageProperties
-                                            .messageAllowedConfig
-                                            ?.isShowTextfiledConfig
-                                            ?.isShowMessageAllowed
-                                            .call(context,
-                                                controller.conversation) ==
-                                        true)) ...[
-                                  // Custom message restriction from properties
-                                  _MessageNotAllowedWidget(
-                                    showMessage: IsmChatProperties
-                                            .chatPageProperties
-                                            .messageAllowedConfig
-                                            ?.isShowTextfiledConfig
-                                            ?.shwoMessage
-                                            ?.call(context,
-                                                controller.conversation) ??
-                                        '',
-                                    messageWidget: IsmChatProperties
-                                        .chatPageProperties
-                                        .messageAllowedConfig
-                                        ?.isShowTextfiledConfig
-                                        ?.messageWidget
-                                        ?.call(
-                                            context, controller.conversation),
-                                  )
-                                ] else if (controller
-                                        .conversation?.isOpponentDetailsEmpty ==
-                                    true) ...[
-                                  // Opponent user has been deleted
-                                  _MessageNotAllowedWidget(
-                                    showMessage:
-                                        IsmChatStrings.userDeleteMessage,
-                                  )
-                                ] else ...[
-                                  _buildChatInputArea(
-                                    context,
-                                    controller,
+                                  ),
+                                  // Message input restrictions and input field
+                                  if (controller.conversation?.isGroup == true &&
+                                      (controller.isActionAllowed == true ||
+                                          controller.conversation
+                                                  ?.hasCurrentUserLeftGroup ==
+                                              true ||
+                                          controller.conversation
+                                                  ?.isLastMessageCurrentUserRemovedFromGroup ==
+                                              true)) ...[
+                                    _MessageNotAllowedWidget(
+                                      showMessage: controller.isActionAllowed ==
+                                                  true ||
+                                              controller
+                                                      .conversation
+                                                      ?.lastMessageDetails
+                                                      ?.customType ==
+                                                  IsmChatCustomMessageType
+                                                      .removeMember
+                                          ? IsmChatStrings.removeGroupMessage
+                                          : IsmChatStrings.leftGroupMessage,
+                                    )
+                                  ] else if (IsmChatProperties
+                                              .chatPageProperties
+                                              .messageAllowedConfig
+                                              ?.isShowTextfiledConfig !=
+                                          null &&
+                                      !(IsmChatProperties
+                                              .chatPageProperties
+                                              .messageAllowedConfig
+                                              ?.isShowTextfiledConfig
+                                              ?.isShowMessageAllowed
+                                              .call(context,
+                                                  controller.conversation) ==
+                                          true)) ...[
+                                    // Custom message restriction from properties
+                                    _MessageNotAllowedWidget(
+                                      showMessage: IsmChatProperties
+                                              .chatPageProperties
+                                              .messageAllowedConfig
+                                              ?.isShowTextfiledConfig
+                                              ?.shwoMessage
+                                              ?.call(context,
+                                                  controller.conversation) ??
+                                          '',
+                                      messageWidget: IsmChatProperties
+                                          .chatPageProperties
+                                          .messageAllowedConfig
+                                          ?.isShowTextfiledConfig
+                                          ?.messageWidget
+                                          ?.call(
+                                              context, controller.conversation),
+                                    )
+                                  ] else if (controller.conversation
+                                          ?.isOpponentDetailsEmpty ==
+                                      true) ...[
+                                    // Opponent user has been deleted
+                                    _MessageNotAllowedWidget(
+                                      showMessage:
+                                          IsmChatStrings.userDeleteMessage,
+                                    )
+                                  ] else ...[
+                                    _buildChatInputArea(
+                                      context,
+                                      controller,
+                                    ),
+                                  ],
+                                  // Emoji board (hidden when not shown)
+                                  Offstage(
+                                    offstage: !controller.showEmojiBoard,
+                                    child: const EmojiBoard(),
                                   ),
                                 ],
-                                // Emoji board (hidden when not shown)
-                                Offstage(
-                                  offstage: !controller.showEmojiBoard,
-                                  child: const EmojiBoard(),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                          // Scroll to bottom button (shown when there are unread messages)
-                          Obx(
-                            () => !controller.showDownSideButton
-                                ? IsmChatDimens.box0
-                                : Positioned(
-                                    // Sit above the compose bar + send button (right-aligned).
-                                    bottom: IsmChatResponsive.isMobile(context)
-                                        ? controller.isreplying
-                                            ? IsmChatDimens.oneHundredSeventy
-                                            : IsmChatDimens.oneHundredTwenty
-                                        : IsmChatDimens.oneHundredSeventy,
-                                    right: IsmChatDimens.eight,
-                                    child: IsmChatTapHandler(
-                                      onTap: controller.scrollDown,
-                                      child: Container(
-                                        margin: IsmChatDimens.edgeInsets4,
-                                        decoration: BoxDecoration(
-                                          color: IsmChatConfig
-                                              .chatTheme.backgroundColor
-                                              ?.applyIsmOpacity(0.5),
-                                          border: Border.all(
+                            // Scroll to bottom button (shown when there are unread messages)
+                            Obx(
+                              () => !controller.showDownSideButton
+                                  ? IsmChatDimens.box0
+                                  : Positioned(
+                                      // Sit above the compose bar + send button (right-aligned).
+                                      bottom: IsmChatResponsive.isMobile(
+                                              context)
+                                          ? controller.isreplying
+                                              ? IsmChatDimens.oneHundredSeventy
+                                              : IsmChatDimens.oneHundredTwenty
+                                          : IsmChatDimens.oneHundredSeventy,
+                                      right: IsmChatDimens.eight,
+                                      child: IsmChatTapHandler(
+                                        onTap: controller.scrollDown,
+                                        child: Container(
+                                          margin: IsmChatDimens.edgeInsets4,
+                                          decoration: BoxDecoration(
                                             color: IsmChatConfig
-                                                    .chatTheme.primaryColor ??
-                                                IsmChatColors.primaryColorLight,
-                                            width: 1.5,
+                                                .chatTheme.backgroundColor
+                                                ?.applyIsmOpacity(0.5),
+                                            border: Border.all(
+                                              color: IsmChatConfig
+                                                      .chatTheme.primaryColor ??
+                                                  IsmChatColors
+                                                      .primaryColorLight,
+                                              width: 1.5,
+                                            ),
+                                            shape: BoxShape.circle,
                                           ),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        padding: IsmChatDimens.edgeInsets8,
-                                        child: Icon(
-                                          Icons.expand_more_rounded,
-                                          color: IsmChatConfig
-                                              .chatTheme.primaryColor,
+                                          padding: IsmChatDimens.edgeInsets8,
+                                          child: Icon(
+                                            Icons.expand_more_rounded,
+                                            color: IsmChatConfig
+                                                .chatTheme.primaryColor,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                          ),
-                        ],
-                      ),
-          ).withUnfocusGestureDetctor(context),
-        ),
+                            ),
+                          ],
+                        ),
+            ).withUnfocusGestureDetctor(context),
+          );
+        },
       );
 }
 

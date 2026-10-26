@@ -40,6 +40,38 @@ extension MatchString on String {
 
   /// Checks if the string contains only alphabetic characters.
   bool get isAlphabet => RegExp(r'^[A-Za-z]+$').hasMatch(this);
+
+  /// True when this path/URL is safe to use as a chat wallpaper image provider.
+  ///
+  /// Local asset paths and file paths are allowed. Remote URLs without a file
+  /// extension are allowed (common for CDN / presigned media). Only known
+  /// document types (e.g. PDF) are rejected — they are not decodable as images.
+  bool get isSupportedChatWallpaperUrl {
+    if (!isValidUrl) {
+      return true;
+    }
+    final path = (Uri.tryParse(this)?.path ?? this).toLowerCase();
+    final segments = path.split('.');
+    if (segments.length < 2) {
+      return true;
+    }
+    const blockedExtensions = <String>{
+      'pdf',
+      'doc',
+      'docx',
+      'xls',
+      'xlsx',
+      'ppt',
+      'pptx',
+      'txt',
+      'zip',
+      'rar',
+      '7z',
+      'csv',
+    };
+    final extension = segments.last;
+    return !blockedExtensions.contains(extension);
+  }
 }
 
 /// Extension for String to get color from hex string.

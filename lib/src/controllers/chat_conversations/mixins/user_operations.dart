@@ -101,8 +101,9 @@ mixin IsmChatConversationsUserOperationsMixin on GetxController {
             final filePath = await IsmChatUtility.makeDirectoryWithUrl(
                 urlPath: assetList[indexOfAsset].values.first.imageUrl ?? '',
                 fileName: pathName);
+            final conversationId = assetList[indexOfAsset].keys.first;
             assetList[indexOfAsset] = {
-              '${assetList[indexOfAsset].keys}': IsmChatBackgroundModel(
+              conversationId: IsmChatBackgroundModel(
                 color: assetList[indexOfAsset].values.first.color,
                 isImage: assetList[indexOfAsset].values.first.isImage,
                 imageUrl: filePath.path,
@@ -211,9 +212,10 @@ mixin IsmChatConversationsUserOperationsMixin on GetxController {
     String mediaExtension,
     Uint8List bytes, [
     bool isLoading = false,
+    bool updateProfileImage = true,
   ]) async {
     final response = await _controller.commonController.getPresignedUrl(
-        isLoading: true,
+        isLoading: isLoading,
         userIdentifier: _controller.userDetails?.userIdentifier ?? '',
         mediaExtension: mediaExtension,
         bytes: bytes);
@@ -227,9 +229,13 @@ mixin IsmChatConversationsUserOperationsMixin on GetxController {
       isLoading: isLoading,
     );
     if (responseCode == 200) {
-      _controller.profileImage = response.mediaUrl ?? '';
+      final mediaUrl = response.mediaUrl ?? '';
+      if (updateProfileImage) {
+        _controller.profileImage = mediaUrl;
+      }
+      return mediaUrl;
     }
-    return _controller.profileImage;
+    return '';
   }
 
   /// Unblocks a user based on their opponent ID
