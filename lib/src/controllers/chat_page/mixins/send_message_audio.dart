@@ -58,7 +58,7 @@ mixin IsmChatPageSendMessageAudioMixin {
     }
 
     audioMessage = IsmChatMessageModel(
-      body: '',
+      body: 'Audio',
       conversationId: conversationId,
       customType: _controller.isreplying
           ? IsmChatCustomMessageType.reply
