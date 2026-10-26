@@ -641,7 +641,10 @@ mixin IsmChatPageSendMessageMediaMixin {
       resolvedCaption: caption,
       mediaCaption: webMediaModel.caption,
     );
-    final body = IsmChatUtility.outboundAttachmentBody(caption);
+    final body = IsmChatUtility.outboundAttachmentBody(
+      caption,
+      mediaType: IsmChatMediaType.video,
+    );
 
     final videoMessage = IsmChatMessageModel(
       body: body,
@@ -799,7 +802,10 @@ mixin IsmChatPageSendMessageMediaMixin {
       resolvedCaption: caption,
       mediaCaption: webMediaModel.caption,
     );
-    final body = IsmChatUtility.outboundAttachmentBody(caption);
+    final body = IsmChatUtility.outboundAttachmentBody(
+      caption,
+      mediaType: IsmChatMediaType.image,
+    );
     final imageMessage = IsmChatMessageModel(
       body: body,
       conversationId: conversationId,
@@ -961,7 +967,10 @@ mixin IsmChatPageSendMessageMediaMixin {
         (nameWithExtension.contains('.')
             ? nameWithExtension.split('.').last
             : 'gif');
-    final wireBody = IsmChatUtility.outboundAttachmentBody(caption);
+    final wireBody = IsmChatUtility.outboundAttachmentBody(
+      caption,
+      mediaType: mediaType,
+    );
     final mediaMessage = IsmChatMessageModel(
       body: wireBody,
       conversationId: conversationId,
@@ -1093,7 +1102,10 @@ mixin IsmChatPageSendMessageMediaMixin {
       userId: userId,
       mediaUrl: imageUrl,
       mediaType: IsmChatMediaType.image,
-      body: IsmChatUtility.outboundAttachmentBody(caption),
+      body: IsmChatUtility.outboundAttachmentBody(
+        caption,
+        mediaType: IsmChatMediaType.image,
+      ),
       notificationBody: IsmChatStrings.sentImage,
       nameWithExtension: nameWithExtension,
       mediaId: mediaId,
@@ -1544,7 +1556,10 @@ mixin IsmChatPageSendMessageMediaMixin {
         mediaUrl: item.sendUrl,
         stillUrl: stillUrl,
         mediaType: mediaType,
-        body: '',
+        body: IsmChatUtility.outboundAttachmentBody(
+          null,
+          mediaType: mediaType,
+        ),
         notificationBody:
             isSticker ? IsmChatStrings.sentSticker : IsmChatStrings.sentGif,
         nameWithExtension: displayName,
@@ -1602,7 +1617,10 @@ mixin IsmChatPageSendMessageMediaMixin {
       resolvedCaption: caption,
       mediaCaption: webMediaModel.caption,
     );
-    final body = IsmChatUtility.outboundAttachmentBody(caption);
+    final body = IsmChatUtility.outboundAttachmentBody(
+      caption,
+      mediaType: mediaType,
+    );
 
     final visualMessage = IsmChatMessageModel(
       body: body,

@@ -221,6 +221,41 @@ void main() {
       );
       expect(IsmChatUtility.outboundAttachmentBody(''), isEmpty);
       expect(
+        IsmChatUtility.outboundAttachmentBody(
+          '',
+          mediaType: IsmChatMediaType.gif,
+        ),
+        IsmChatStrings.gif,
+      );
+      expect(
+        IsmChatUtility.outboundAttachmentBody(
+          'note',
+          mediaType: IsmChatMediaType.sticker,
+        ),
+        'note',
+      );
+      expect(
+        IsmChatUtility.outboundAttachmentBody(
+          null,
+          mediaType: IsmChatMediaType.sticker,
+        ),
+        IsmChatStrings.sticker,
+      );
+      expect(
+        IsmChatUtility.outboundAttachmentBody(
+          '',
+          mediaType: IsmChatMediaType.video,
+        ),
+        IsmChatStrings.video,
+      );
+      expect(
+        IsmChatUtility.outboundAttachmentBody(
+          null,
+          mediaType: IsmChatMediaType.image,
+        ),
+        IsmChatStrings.image,
+      );
+      expect(
         IsmChatUtility.outboundAttachmentCaptionMeta('note'),
         'note',
       );

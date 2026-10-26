@@ -996,11 +996,35 @@ class IsmChatUtility {
   /// Outbound API `body` for attachment messages (image, video, doc, etc.).
   ///
   /// Image/video captions are duplicated in `body` and metadata `captionMessage`.
-  /// When there is no caption, send an empty `body` (not placeholder strings like
-  /// "Image"). Reuse from send mixins so web and mobile stay aligned.
-  static String outboundAttachmentBody(String? caption) {
+  /// When there is no caption, use a type-specific placeholder in `body` for
+  /// image, video, GIF, and sticker so conversation previews and reply strips
+  /// stay readable. Other attachment types without a caption use an empty
+  /// `body`. Reuse from send mixins so web and mobile stay aligned.
+  static String outboundAttachmentBody(
+    String? caption, {
+    IsmChatMediaType? mediaType,
+  }) {
     final trimmed = caption?.trim() ?? '';
-    return trimmed;
+    if (trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    return _outboundAttachmentPlaceholderBody(mediaType);
+  }
+
+  /// Wire `body` when an attachment has no caption (see [outboundAttachmentBody]).
+  static String _outboundAttachmentPlaceholderBody(IsmChatMediaType? mediaType) {
+    switch (mediaType) {
+      case IsmChatMediaType.image:
+        return IsmChatStrings.image;
+      case IsmChatMediaType.video:
+        return IsmChatStrings.video;
+      case IsmChatMediaType.gif:
+        return IsmChatStrings.gif;
+      case IsmChatMediaType.sticker:
+        return IsmChatStrings.sticker;
+      default:
+        return '';
+    }
   }
 
   /// Metadata `caption` / `captionMessage` for outbound attachment sends.
