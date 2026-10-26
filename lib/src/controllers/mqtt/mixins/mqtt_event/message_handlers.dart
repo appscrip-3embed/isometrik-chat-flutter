@@ -235,10 +235,7 @@ mixin IsmChatMqttEventMessageHandlersMixin {
       if (self is IsmChatMqttEventUtilitiesMixin) {
         (self as IsmChatMqttEventUtilitiesMixin).showPushNotification(
             title: notificationTitle,
-            body: _resolveNotificationBody(
-              message,
-              preferNotificationBody: true,
-            ),
+            body: notificationBody,
             data: notificationData);
       }
     } catch (_) {}
@@ -254,10 +251,14 @@ String _resolveNotificationBody(
       _decryptedNotificationBody(message),
     );
   }
+  final notification = message.notificationBody?.trim() ?? '';
+  final content = message.body.trim();
+  // MQTT often sends plaintext in [body] while [notificationBody] is empty.
+  // Prefer explicit notification copy when present (e.g. "Sent an image").
   if (preferNotificationBody) {
-    return message.notificationBody ?? '';
+    return notification.isNotEmpty ? notification : content;
   }
-  return message.body;
+  return content.isNotEmpty ? content : notification;
 }
 
 String _decryptedNotificationBody(IsmChatMessageModel message) {
