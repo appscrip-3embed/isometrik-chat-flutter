@@ -49,11 +49,10 @@ mixin IsmChatPageSendMessageDocumentMixin {
       return;
     }
 
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: ['pdf'],
-      withData: true,
     );
 
     if (result?.files.isNotEmpty ?? false) {
@@ -71,10 +70,10 @@ mixin IsmChatPageSendMessageDocumentMixin {
     required String conversationId,
     required PlatformFile file,
   }) async {
-    final bytes = file.bytes;
+    final bytes = await file.readAsBytes();
     final sizeMedia = kIsWeb
         ? IsmChatUtility.formatBytes(
-            int.parse((bytes?.length ?? 0).toString()),
+            int.parse(bytes.length.toString()),
           )
         : await IsmChatUtility.fileToSize(File(file.path ?? ''));
     if (!sizeMedia.size()) {
@@ -89,7 +88,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
 
     final sentAt = DateTime.now().millisecondsSinceEpoch;
     final mediaId = sentAt.toString();
-    final bytesForPdf = Uint8List.fromList(bytes ?? []);
+    final bytesForPdf = Uint8List.fromList(bytes);
     final document = kIsWeb
         ? await PdfDocument.openData(bytesForPdf)
         : await PdfDocument.openFile(file.path ?? '');
@@ -118,10 +117,10 @@ mixin IsmChatPageSendMessageDocumentMixin {
         AttachmentModel(
           attachmentType: IsmChatMediaType.file,
           thumbnailUrl: pdfImage?.bytes.toString(),
-          size: bytes?.length,
+          size: bytes.length,
           name: nameWithExtension,
           mimeType: file.extension,
-          mediaUrl: kIsWeb ? (bytes).toString() : file.path,
+          mediaUrl: kIsWeb ? bytes.toString() : file.path,
           mediaId: mediaId,
           extension: file.extension,
         )
