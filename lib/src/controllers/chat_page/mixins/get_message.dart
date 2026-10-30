@@ -367,28 +367,35 @@ mixin IsmChatPageGetMessageMixin on GetxController {
   void searchedMessages(String query, {bool fromScrolling = false}) async {
     if (query.trim().isEmpty) {
       _controller.searchMessages.clear();
+      _controller.isSearchMessagesLoading = false;
       return;
     }
     if (_controller.canCallCurrentApi) return;
     _controller.canCallCurrentApi = true;
+    _controller.isSearchMessagesLoading = true;
 
-    final messages = await _controller.viewModel.getChatMessages(
-      skip: !fromScrolling ? 0 : _controller.searchMessages.length.pagination(),
-      conversationId: _controller.conversation?.conversationId ?? '',
-      searchText: query,
-      isLoading: true,
-    );
+    try {
+      final messages = await _controller.viewModel.getChatMessages(
+        skip:
+            !fromScrolling ? 0 : _controller.searchMessages.length.pagination(),
+        conversationId: _controller.conversation?.conversationId ?? '',
+        searchText: query,
+        isLoading: false,
+      );
 
-    if (messages.isNotEmpty) {
-      if (fromScrolling) {
-        _controller.searchMessages.addAll(messages);
-      } else {
-        _controller.searchMessages = messages;
+      if (messages.isNotEmpty) {
+        if (fromScrolling) {
+          _controller.searchMessages.addAll(messages);
+        } else {
+          _controller.searchMessages = messages;
+        }
+      } else if (!fromScrolling) {
+        _controller.searchMessages.clear();
       }
-    } else if (!fromScrolling) {
-      _controller.searchMessages.clear();
+    } finally {
+      _controller.isSearchMessagesLoading = false;
+      _controller.canCallCurrentApi = false;
     }
-    _controller.canCallCurrentApi = false;
   }
 
   Future<void> getMessageDeliverTime(IsmChatMessageModel message) async {

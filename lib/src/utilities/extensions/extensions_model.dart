@@ -603,7 +603,10 @@ extension MentionMessage on IsmChatMessageModel {
     for (final segment in mentionList) {
       if (!segment.isLink) continue;
       final text = segment.text.trim();
-      if (!text.startsWith('http') && !text.startsWith('www')) continue;
+      final lowerText = text.toLowerCase();
+      if (!lowerText.startsWith('http') && !lowerText.startsWith('www')) {
+        continue;
+      }
       final uri = Uri.tryParse(text.convertToValidUrl);
       if (uri != null && uri.host.isNotEmpty) return true;
     }
@@ -630,7 +633,10 @@ extension MentionMessage on IsmChatMessageModel {
     for (final segment in mentionList) {
       if (!segment.isLink) continue;
       final text = segment.text.trim();
-      if (!text.startsWith('http') && !text.startsWith('www')) continue;
+      final lowerText = text.toLowerCase();
+      if (!lowerText.startsWith('http') && !lowerText.startsWith('www')) {
+        continue;
+      }
       final uri = Uri.tryParse(text.convertToValidUrl);
       if (uri != null && uri.host.isNotEmpty) return text;
     }

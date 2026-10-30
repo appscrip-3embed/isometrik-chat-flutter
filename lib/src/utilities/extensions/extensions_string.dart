@@ -23,8 +23,20 @@ extension MatchString on String {
   bool didMatch(String other) => toLowerCase().contains(other.toLowerCase());
 
   /// Converts a string to a valid URL by ensuring it starts with 'https://'.
-  String get convertToValidUrl =>
-      'https://${replaceAll('http://', '').replaceAll('https://', '')}';
+  ///
+  /// Strips an existing `http://` or `https://` prefix case-insensitively so
+  /// typed values like `HTTP://Example.com` are not turned into
+  /// `https://HTTP://Example.com`.
+  String get convertToValidUrl {
+    var remainder = trim();
+    final lower = remainder.toLowerCase();
+    if (lower.startsWith('https://')) {
+      remainder = remainder.substring('https://'.length);
+    } else if (lower.startsWith('http://')) {
+      remainder = remainder.substring('http://'.length);
+    }
+    return 'https://$remainder';
+  }
 
   /// Checks if the string contains a valid URL pattern.
   bool get isValidUrl =>

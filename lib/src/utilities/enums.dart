@@ -245,8 +245,8 @@ enum IsmChatCustomMessageType {
     // }
 
     if (message.mentionList.isNotEmpty && message.mentionList.first.isLink) {
-      if (message.mentionList.first.text.startsWith('http') ||
-          message.mentionList.first.text.startsWith('www')) {
+      final linkText = message.mentionList.first.text.toLowerCase();
+      if (linkText.startsWith('http') || linkText.startsWith('www')) {
         return IsmChatCustomMessageType.link;
       }
     }

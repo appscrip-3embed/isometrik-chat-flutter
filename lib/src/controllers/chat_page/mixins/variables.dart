@@ -415,6 +415,12 @@ mixin IsmChatPageVariablesMixin on GetxController {
   set searchMessages(List<IsmChatMessageModel> value) =>
       _searchMessages.value = value;
 
+  /// Inline loader for message search (avoids modal [IsmChatUtility.showLoader]).
+  final RxBool _isSearchMessagesLoading = false.obs;
+  bool get isSearchMessagesLoading => _isSearchMessagesLoading.value;
+  set isSearchMessagesLoading(bool value) =>
+      _isSearchMessagesLoading.value = value;
+
   final RxBool _isBroadcast = false.obs;
   bool get isBroadcast => _isBroadcast.value;
   set isBroadcast(bool value) => _isBroadcast.value = value;
