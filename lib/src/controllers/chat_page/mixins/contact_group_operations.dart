@@ -132,16 +132,31 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
       return;
     }
     var query = value.split('@').last;
+    final currentUserId =
+        IsmChatConfig.communicationConfig.userConfig.userId.trim();
     _controller.mentionSuggestions = _controller.groupMembers
+        .where((e) => e.userId.trim() != currentUserId)
         .where((e) => e.userName.toLowerCase().contains(query.toLowerCase()))
         .toList();
   }
 
   /// Updates the mention user in the input field.
   void updateMentionUser(String value) {
+    final member = _controller.groupMembers.firstWhereOrNull(
+      (e) => e.userName == value,
+    );
+    final currentUserId =
+        IsmChatConfig.communicationConfig.userConfig.userId.trim();
+    if (member != null && member.userId.trim() == currentUserId) {
+      _controller.showMentionUserList = false;
+      return;
+    }
     final tempList = _controller.chatInputController.text.split('@');
     final remainingText = tempList.sublist(0, tempList.length - 1).join('@');
-    final updatedText = '$remainingText@${value.capitalizeFirst} ';
+    final mentionLabel = member != null
+        ? mentionLabelForUser(member)
+        : value.capitalizeFirst!;
+    final updatedText = '$remainingText@$mentionLabel ';
     _controller.showMentionUserList = false;
     _controller.chatInputController.value =
         _controller.chatInputController.value.copyWith(
@@ -159,27 +174,25 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
       ..removeWhere((e) => e.trim().isEmpty);
 
     for (var x = 0; x < _controller.groupMembers.length; x++) {
-      final checkerLength =
-          _controller.groupMembers[x].userName.trim().split(' ').first.length;
-      if (mentionedList.isNotEmpty) {
-        final isMember = mentionedList.where(
-          (e) =>
-              checkerLength == e.trim().length &&
-              _controller.groupMembers[x].userName
-                  .trim()
-                  .toLowerCase()
-                  .contains(
-                    e.trim().substring(0, checkerLength).toLowerCase(),
-                  ),
-        );
-        if (isMember.isNotEmpty) {
+      final member = _controller.groupMembers[x];
+      final userName = member.userName.trim();
+      if (userName.isEmpty) continue;
+      if (member.userId.trim() ==
+          IsmChatConfig.communicationConfig.userConfig.userId.trim()) {
+        continue;
+      }
+
+      for (final segment in mentionedList) {
+        final seg = segment.trimLeft();
+        if (mentionSegmentMatchesMemberName(seg, userName)) {
           _controller.userMentionedList.add(
             MentionModel(
-              wordCount: _controller.groupMembers[x].userName.split(' ').length,
-              userId: _controller.groupMembers[x].userId,
+              wordCount: userName.split(RegExp(r'\s+')).length,
+              userId: member.userId,
               order: x,
             ),
           );
+          break;
         }
       }
     }

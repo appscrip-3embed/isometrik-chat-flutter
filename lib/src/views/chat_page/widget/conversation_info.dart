@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
-import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 /// Group / 1:1 conversation info. Colors from [IsmChatThemeResolver.groupInfoFromConfig].
 class IsmChatConverstaionInfoView extends StatefulWidget {
@@ -36,15 +35,9 @@ class IsmChatConverstaionInfoView extends StatefulWidget {
 class _IsmChatConverstaionInfoViewState
     extends State<IsmChatConverstaionInfoView> {
   final conversationController = IsmChatUtility.conversationController;
-  final ScrollController _scrollController = ScrollController();
   final FocusNode _participantsSearchFocusNode = FocusNode();
   final GlobalKey _participantsSearchKey = GlobalKey();
 
-  /// Pull-to-refresh controller — reuses [RefreshHeader] like conversation list /
-  /// broadcast views so Group Info stays visually consistent with the rest of the SDK.
-  final RefreshController _refreshController = RefreshController(
-    initialRefresh: false,
-  );
   bool _isUpdatingMute = false;
 
   @override
@@ -57,21 +50,13 @@ class _IsmChatConverstaionInfoViewState
   void dispose() {
     _participantsSearchFocusNode.removeListener(_handleParticipantsSearchFocus);
     _participantsSearchFocusNode.dispose();
-    _scrollController.dispose();
-    _refreshController.dispose();
     super.dispose();
   }
 
   /// Pull-to-refresh: hit conversation-details API so name, admins, members, etc. stay fresh.
-  /// Reusable entry point — keep Group Info refresh logic here rather than inlining in the widget tree.
+  /// Completion is handled by [IsmChatPullToRefresh] (owns its [RefreshController]).
   Future<void> _onPullToRefresh(IsmChatPageController controller) async {
-    try {
-      await controller.getConverstaionDetails();
-    } finally {
-      if (mounted) {
-        _refreshController.refreshCompleted();
-      }
-    }
+    await controller.getConverstaionDetails();
   }
 
   void _handleParticipantsSearchFocus() {
@@ -136,6 +121,22 @@ class _IsmChatConverstaionInfoViewState
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
   );
 
+  /// Same popup styling as [chat_page_header.dart] search / clear chat menu.
+  Color _popupMenuBackground(IsmChatGroupInfoTheme groupTheme) =>
+      IsmChatConfig.chatTheme.chatPageHeaderTheme?.popupBackgroundColor ??
+      groupTheme.surfaceBackgroundColor;
+
+  TextStyle _popupMenuLabelStyle(IsmChatGroupInfoTheme groupTheme) {
+    final header = IsmChatConfig.chatTheme.chatPageHeaderTheme;
+    if (header?.popupLableStyle != null) {
+      return header!.popupLableStyle!;
+    }
+    return groupTheme.bodyTextStyle.copyWith(
+      color: header?.popupLableColor ?? groupTheme.bodyTextStyle.color,
+      fontWeight: FontWeight.w400,
+    );
+  }
+
   @override
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
@@ -180,6 +181,8 @@ class _IsmChatConverstaionInfoViewState
         },
         builder: (controller) {
           final groupTheme = IsmChatThemeResolver.groupInfoFromConfig(context);
+          final headerTheme = IsmChatConfig.chatTheme.chatPageHeaderTheme;
+          final popupLabelStyle = _popupMenuLabelStyle(groupTheme);
           final isDocumentAllowed = IsmChatProperties
               .chatPageProperties.attachments
               .contains(IsmChatAttachmentType.document);
@@ -199,8 +202,7 @@ class _IsmChatConverstaionInfoViewState
                     ? IsmChatStrings.groupInfo
                     : IsmChatStrings.profileInfo,
                 style:
-                    IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
-                        IsmChatStyles.w600White18,
+                    headerTheme?.titleStyle ?? groupTheme.sectionTitleTextStyle,
               ),
               action: [
                 if (controller.conversation?.isGroup ?? false)
@@ -208,12 +210,13 @@ class _IsmChatConverstaionInfoViewState
                     padding: EdgeInsets.only(
                         right: IsmChatDimens.five, top: IsmChatDimens.two),
                     child: PopupMenuButton(
-                      color: IsmChatColors.whiteColor,
+                      color: _popupMenuBackground(groupTheme),
+                      shape: headerTheme?.popupShape,
+                      shadowColor: headerTheme?.popupshadowColor,
                       icon: Icon(
                         Icons.more_vert,
-                        color: IsmChatConfig
-                                .chatTheme.chatPageHeaderTheme?.iconColor ??
-                            IsmChatColors.whiteColor,
+                        color:
+                            headerTheme?.iconColor ?? groupTheme.menuIconColor,
                       ),
                       itemBuilder: (context) => [
                         PopupMenuItem(
@@ -224,10 +227,14 @@ class _IsmChatConverstaionInfoViewState
                                       .changeGroupTitleIcon ??
                                   Icon(
                                     Icons.edit,
-                                    color: groupTheme.menuIconColor,
+                                    color: headerTheme?.iconColor ??
+                                        groupTheme.menuIconColor,
                                   ),
                               IsmChatDimens.boxWidth8,
-                              Text(IsmChatStrings.changeGroupTitle)
+                              Text(
+                                IsmChatStrings.changeGroupTitle,
+                                style: popupLabelStyle,
+                              ),
                             ],
                           ),
                         ),
@@ -239,10 +246,14 @@ class _IsmChatConverstaionInfoViewState
                                       .changeGroupImageIcon ??
                                   Icon(
                                     Icons.photo,
-                                    color: groupTheme.menuIconColor,
+                                    color: headerTheme?.iconColor ??
+                                        groupTheme.menuIconColor,
                                   ),
                               IsmChatDimens.boxWidth8,
-                              Text(IsmChatStrings.changeGroupPhoto)
+                              Text(
+                                IsmChatStrings.changeGroupPhoto,
+                                style: popupLabelStyle,
+                              ),
                             ],
                           ),
                         ),
@@ -262,24 +273,21 @@ class _IsmChatConverstaionInfoViewState
             // Keep participants list visible while typing in search.
             resizeToAvoidBottomInset: true,
             body: SafeArea(
-              // Pull-to-refresh → [IsmChatPageController.getConverstaionDetails]
-              // so group name / admin / member changes show without leaving the page.
-              child: SmartRefresher(
-                controller: _refreshController,
-                enablePullDown: true,
+              // Pull-to-refresh → [IsmChatPageController.getConverstaionDetails].
+              // [SmartRefresher] needs a scrollable child; a fixed [Column] with a
+              // shrink-wrapped participants [ListView] overflowed on long groups
+              // (and when the search field opens the keyboard).
+              child: IsmChatPullToRefresh(
                 enablePullUp: false,
                 header: const RefreshHeader(),
-                // AlwaysScrollable so short Group Info content can still be pulled.
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: ClampingScrollPhysics(),
-                ),
+                physics: const ClampingScrollPhysics(),
                 onRefresh: () => _onPullToRefresh(controller),
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  child: Padding(
-                    padding: IsmChatDimens.edgeInsets16_0_16_0,
+                child: Padding(
+                  padding: IsmChatDimens.edgeInsets16_0_16_0,
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    physics: const ClampingScrollPhysics(),
                     child: Column(
                       children: [
                         IsmChatDimens.boxHeight16,
@@ -366,6 +374,7 @@ class _IsmChatConverstaionInfoViewState
                                       child: Icon(
                                         Icons.edit_outlined,
                                         size: IsmChatDimens.eighteen,
+                                        color: groupTheme.menuIconColor,
                                       ),
                                     )
                             ],
@@ -452,6 +461,7 @@ class _IsmChatConverstaionInfoViewState
                                                   controller.conversation
                                                       ?.resolvedOpponentDetails) ??
                                           '',
+                                      style: groupTheme.secondaryTextStyle,
                                     ),
                                   ],
                                 ),

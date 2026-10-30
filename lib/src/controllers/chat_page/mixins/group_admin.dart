@@ -194,6 +194,11 @@ mixin IsmChatGroupAdminMixin on GetxController {
       await _controller.getConverstaionDetails(
         isLoading: false,
       );
+      await _controller.getMessagesFromAPI(
+        lastMessageTimestamp: _controller.messages.isNotEmpty
+            ? _controller.messages.last.sentAt
+            : _controller.conversation?.lastMessageSentAt,
+      );
     }
   }
 
@@ -212,6 +217,11 @@ mixin IsmChatGroupAdminMixin on GetxController {
         timeOutInSec: 2);
     await _controller.getConverstaionDetails(
       isLoading: false,
+    );
+    await _controller.getMessagesFromAPI(
+      lastMessageTimestamp: _controller.messages.isNotEmpty
+          ? _controller.messages.last.sentAt
+          : _controller.conversation?.lastMessageSentAt,
     );
   }
 }

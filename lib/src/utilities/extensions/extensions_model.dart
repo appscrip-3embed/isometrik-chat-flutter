@@ -540,59 +540,326 @@ extension SdkCallBubbleMessage on IsmChatMessageModel {
   }
 }
 
-/// Member leave system messages are only visible to group admins.
+/// Group chat visibility for system rows (e.g. member leave banners).
 extension MemberLeaveVisibility on IsmChatMessageModel {
-  bool isVisibleInGroupChat(IsmChatConversationModel? conversation) {
-    if (customType != IsmChatCustomMessageType.memberLeave) return true;
-    if (conversation?.isGroup != true) return true;
-    return conversation!.isCurrentUserGroupAdmin;
+  /// All members see center banners including [IsmChatCustomMessageType.memberLeave].
+  bool isVisibleInGroupChat(IsmChatConversationModel? conversation) => true;
+}
+
+/// Label inserted after `@` when picking someone from the mention list.
+String mentionLabelForUser(UserDetails user) {
+  final display = user.displayName.trim();
+  if (display.isNotEmpty) return display;
+  return user.userName.trim();
+}
+
+/// Whether [userId] is the signed-in chat user.
+bool isCurrentChatUser(String userId) {
+  final id = userId.trim();
+  if (id.isEmpty) return false;
+  return id == IsmChatConfig.communicationConfig.userConfig.userId.trim();
+}
+
+bool _equalsIgnoreCase(String a, String b) =>
+    a.toLowerCase() == b.toLowerCase();
+
+/// End index in [body] (exclusive) if [name] matches text after `@` at [atIndex].
+int? _mentionNameEndAfterAt(String body, int atIndex, String name) {
+  if (atIndex >= body.length || body[atIndex] != '@') return null;
+  var pos = atIndex + 1;
+  final words = name.trim().split(RegExp(r'\s+'));
+  if (words.isEmpty || words.first.isEmpty) return null;
+
+  for (var wi = 0; wi < words.length; wi++) {
+    if (wi > 0) {
+      final wsStart = pos;
+      while (pos < body.length && body[pos] == ' ') {
+        pos++;
+      }
+      if (pos == wsStart) return null;
+    }
+    final word = words[wi];
+    if (pos + word.length > body.length) return null;
+    if (!_equalsIgnoreCase(body.substring(pos, pos + word.length), word)) {
+      return null;
+    }
+    pos += word.length;
   }
+  return pos;
+}
+
+/// End index in [body] (exclusive) after `@` when consuming [wordCount] words.
+int? _mentionWordCountEndAfterAt(String body, int atIndex, int wordCount) {
+  if (wordCount < 1 || atIndex >= body.length || body[atIndex] != '@') {
+    return null;
+  }
+  var pos = atIndex + 1;
+  for (var w = 0; w < wordCount; w++) {
+    if (w > 0) {
+      final wsStart = pos;
+      while (pos < body.length && body[pos] == ' ') {
+        pos++;
+      }
+      if (pos == wsStart) return null;
+    }
+    final wordStart = pos;
+    while (pos < body.length && body[pos] != ' ') {
+      pos++;
+    }
+    if (pos == wordStart) return null;
+  }
+  return pos;
+}
+
+List<String> _mentionNamesForUser(UserDetails user) {
+  final names = <String>[];
+  final userName = user.userName.trim();
+  if (userName.isNotEmpty) names.add(userName);
+  final display = user.displayName.trim();
+  if (display.isNotEmpty &&
+      display.toLowerCase() != userName.toLowerCase()) {
+    names.add(display);
+  }
+  return names;
+}
+
+/// True when [segmentAfterAt] (text after `@`) starts with [memberName].
+bool mentionSegmentMatchesMemberName(
+  String segmentAfterAt,
+  String memberName,
+) {
+  final name = memberName.trim();
+  if (name.isEmpty) return false;
+  final padded = '@$segmentAfterAt';
+  return _mentionNameEndAfterAt(padded, 0, name) != null;
+}
+
+List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
+  String text,
+  List<UserDetails> mentionCandidates,
+) {
+  final nonMentionLink = RegExp(
+    r'\bhttps?:\/\/\S+\b|\bwww\.\S+\b|\b\d{9,13}\b|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
+    caseSensitive: false,
+  );
+  final singleWordMention = RegExp(r'^@[A-Za-z0-9_.]+');
+
+  bool hasLinkAt(int index) =>
+      nonMentionLink.allMatches(text).any((m) => m.start == index);
+
+  int? mentionEndAt(int index) {
+    int? best;
+    for (final user in mentionCandidates) {
+      for (final name in _mentionNamesForUser(user)) {
+        final end = _mentionNameEndAfterAt(text, index, name);
+        if (end != null && (best == null || end > best)) best = end;
+      }
+      final wordCount = user.wordCount ?? 0;
+      if (wordCount > 1) {
+        final end = _mentionWordCountEndAfterAt(text, index, wordCount);
+        if (end != null && (best == null || end > best)) best = end;
+      }
+    }
+    return best;
+  }
+
+  bool isSelfMentionSpan(int start, int endExclusive) {
+    if (!IsmChatUtility.chatPageControllerRegistered) return false;
+    final currentId =
+        IsmChatConfig.communicationConfig.userConfig.userId.trim();
+    if (currentId.isEmpty) return false;
+    for (final member
+        in IsmChatUtility.chatPageController.groupMembers) {
+      if (member.userId.trim() != currentId) continue;
+      for (final name in _mentionNamesForUser(member)) {
+        if (_mentionNameEndAfterAt(text, start, name) == endExclusive) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  final segments = <LocalMentionAndLinkData>[];
+  var i = 0;
+  while (i < text.length) {
+    if (text[i] == '@') {
+      final end = mentionEndAt(i);
+      if (end != null &&
+          end > i + 1 &&
+          !isSelfMentionSpan(i, end)) {
+        segments.add(
+          LocalMentionAndLinkData(
+            text: text.substring(i, end),
+            isLink: true,
+          ),
+        );
+        i = end;
+        continue;
+      }
+      final fallback = singleWordMention.matchAsPrefix(text, i);
+      if (fallback != null && !isSelfMentionSpan(i, fallback.end)) {
+        segments.add(
+          LocalMentionAndLinkData(
+            text: fallback.group(0)!,
+            isLink: true,
+          ),
+        );
+        i = fallback.end;
+        continue;
+      }
+    }
+
+    RegExpMatch? linkAtI;
+    for (final m in nonMentionLink.allMatches(text)) {
+      if (m.start == i) {
+        linkAtI = m;
+        break;
+      }
+    }
+    if (linkAtI != null) {
+      segments.add(
+        LocalMentionAndLinkData(
+          text: linkAtI.group(0)!,
+          isLink: true,
+        ),
+      );
+      i = linkAtI.end;
+      continue;
+    }
+
+    var j = i + 1;
+    while (j < text.length) {
+      if (text[j] == '@' || hasLinkAt(j)) break;
+      j++;
+    }
+    segments.add(
+      LocalMentionAndLinkData(
+        text: text.substring(i, j),
+        isLink: false,
+      ),
+    );
+    i = j;
+  }
+  return segments;
 }
 
 /// Extension for IsmChatMessageModel to get mention list, focus menu, and styling.
 extension MentionMessage on IsmChatMessageModel {
+  List<UserDetails> _mentionLookupCandidates() {
+    final seen = <String>{};
+    final list = <UserDetails>[];
+
+    void add(UserDetails user) {
+      if (isCurrentChatUser(user.userId)) return;
+      final key = user.userId.trim().isNotEmpty
+          ? user.userId.trim()
+          : '${user.memberId ?? ''}|${user.userName}';
+      if (!seen.add(key)) return;
+      list.add(
+        user.userId.trim().isNotEmpty
+            ? user
+            : (user.memberId?.trim().isNotEmpty == true
+                ? user.copyWith(userId: user.memberId!.trim())
+                : user),
+      );
+    }
+
+    for (final user in mentionedUsers ?? const <UserDetails>[]) {
+      add(user);
+    }
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      for (final member in IsmChatUtility.chatPageController.groupMembers) {
+        add(member);
+      }
+    }
+
+    list.sort((a, b) {
+      final la = mentionLabelForUser(a).length;
+      final lb = mentionLabelForUser(b).length;
+      return lb.compareTo(la);
+    });
+    return list;
+  }
+
   /// Extracts mentions and links from the message body.
   List<LocalMentionAndLinkData> get mentionList {
     try {
-      final linkRegExp = RegExp(
-        r'(\bhttps?:\/\/\S+\b|\bwww\.\S+\b|\b\d{9,13}\b|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|@[A-Za-z0-9_]+)',
-        caseSensitive: false,
-      );
-      final matches = linkRegExp.allMatches(body);
-      var lastMatchEnd = 0;
-      var messageList = <LocalMentionAndLinkData>[];
-      for (var match in matches) {
-        if (match.start > lastMatchEnd) {
-          messageList.add(
-            LocalMentionAndLinkData(
-              text: body.substring(lastMatchEnd, match.start),
-              isLink: false,
-            ),
-          );
-        }
-
-        final linkText = match.group(0) ?? '';
-        messageList.add(
-          LocalMentionAndLinkData(
-            text: linkText,
-            isLink: true,
-          ),
-        );
-
-        lastMatchEnd = match.end;
-      }
-      if (lastMatchEnd < body.length) {
-        messageList.add(LocalMentionAndLinkData(
-          text: body.substring(lastMatchEnd),
-          isLink: false,
-        ));
-      }
-
-      return messageList;
+      if (body.isEmpty) return [];
+      return _buildMentionAndLinkSegments(body, _mentionLookupCandidates());
     } catch (e, st) {
       IsmChatLog.error(e, st);
       return [];
     }
+  }
+
+  /// Resolves a mentioned member for an @-segment handle (text after `@`).
+  ///
+  /// Uses [mentionedUsers] when present, then [IsmChatPageController.groupMembers]
+  /// with the same prefix rules as [IsmChatPageContactGroupOperationsMixin.getMentionedUserList].
+  UserDetails? resolveMentionedUser(String mentionHandle) {
+    final handle = mentionHandle.trim();
+    if (handle.isEmpty) return null;
+
+    bool matchesUser(String query, UserDetails user) {
+      final q = query.toLowerCase();
+      final userName = user.userName.trim().toLowerCase();
+      if (userName.isEmpty) return false;
+      if (userName == q || userName.startsWith('$q ')) return true;
+      if (userName.split(' ').first == q) return true;
+      if (userName.contains(q)) return true;
+      final firstName = user.metaData?.firstName?.trim().toLowerCase() ?? '';
+      if (firstName.isNotEmpty &&
+          (firstName == q || firstName.startsWith(q))) {
+        return true;
+      }
+      return false;
+    }
+
+    for (final user in mentionedUsers ?? const <UserDetails>[]) {
+      if (matchesUser(handle, user)) {
+        final resolved = _userDetailsWithResolvedId(user);
+        if (isCurrentChatUser(resolved.userId)) return null;
+        return resolved;
+      }
+    }
+
+    if (!IsmChatUtility.chatPageControllerRegistered) return null;
+    final members = IsmChatUtility.chatPageController.groupMembers;
+    for (final member in members) {
+      if (isCurrentChatUser(member.userId)) continue;
+      final userName = member.userName.trim();
+      if (userName.isEmpty) continue;
+      final firstWordLen = userName.split(' ').first.length;
+      if (firstWordLen == handle.length &&
+          userName.toLowerCase().contains(
+                handle.substring(0, firstWordLen).toLowerCase(),
+              )) {
+        return _userDetailsWithResolvedId(member);
+      }
+      if (mentionSegmentMatchesMemberName(handle, userName)) {
+        return _userDetailsWithResolvedId(member);
+      }
+      final display = member.displayName.trim();
+      if (display.isNotEmpty &&
+          mentionSegmentMatchesMemberName(handle, display)) {
+        return _userDetailsWithResolvedId(member);
+      }
+    }
+    for (final member in members) {
+      if (isCurrentChatUser(member.userId)) continue;
+      if (matchesUser(handle, member)) {
+        return _userDetailsWithResolvedId(member);
+      }
+    }
+    return null;
+  }
+
+  UserDetails _userDetailsWithResolvedId(UserDetails user) {
+    if (user.userId.trim().isNotEmpty) return user;
+    final memberId = user.memberId?.trim() ?? '';
+    if (memberId.isEmpty) return user;
+    return user.copyWith(userId: memberId);
   }
 
   /// Whether [body] includes a parseable http/https/www URL (not phone/email/@mention).

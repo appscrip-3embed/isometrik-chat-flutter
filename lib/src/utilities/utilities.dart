@@ -1,4 +1,5 @@
 export 'block_unblock_coordinator.dart';
+export 'group_system_message_coordinator.dart';
 export 'call_meeting_liveness.dart';
 export 'chat_confirmation_helper.dart';
 export 'chat_log.dart';

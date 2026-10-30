@@ -280,9 +280,10 @@ class MessageBubble extends StatelessWidget {
               Positioned(
                 bottom: _getTimeBottomPosition(controller),
                 right: IsmChatDimens.ten,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Row(
+                child: IgnorePointer(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Row(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: _message.sentByMe
                         ? MainAxisAlignment.end
@@ -359,6 +360,7 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
             ],
           ],
         ),
