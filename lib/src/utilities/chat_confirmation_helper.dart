@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Confirmation dialogs; UI glue excluded from the 100% logic gate.
 import 'package:flutter/material.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 

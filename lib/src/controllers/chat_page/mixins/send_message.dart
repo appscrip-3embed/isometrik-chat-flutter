@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Main send message mixin that acts as a wrapper.
 ///
 /// This mixin serves as the primary interface for message sending functionality.

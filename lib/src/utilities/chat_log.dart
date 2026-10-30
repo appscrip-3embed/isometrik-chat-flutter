@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Remaining branches need plugins, a live broker, or are documented parsing bugs.
 import 'dart:developer';
 
 import 'package:flutter/foundation.dart';

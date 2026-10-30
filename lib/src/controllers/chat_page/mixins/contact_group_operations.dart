@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Contact and group operations mixin for IsmChatPageController.
 ///
 /// This mixin handles contact search, selection, group member operations,

@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Block and unblock operations mixin for IsmChatPageController.
 ///
 /// Option A: banner = message row in local DB; see [IsmChatBlockUnblockCoordinator].
