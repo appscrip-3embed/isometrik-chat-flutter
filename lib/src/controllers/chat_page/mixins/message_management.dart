@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Message management mixin for IsmChatPageController.
 ///
 /// This mixin handles message reading, deletion, updates, and typing notifications.

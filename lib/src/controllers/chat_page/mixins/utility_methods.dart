@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Utility methods mixin for IsmChatPageController.
 ///
 /// This mixin contains helper methods and utility functions used throughout

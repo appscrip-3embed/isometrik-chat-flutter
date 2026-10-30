@@ -1,4 +1,6 @@
 part of '../chat_page_controller.dart';
+// coverage:ignore-file
+// Image picker, cropper, painter, gal and share_plus have no VM implementation.
 
 /// Media operations mixin for IsmChatPageController.
 ///

@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 

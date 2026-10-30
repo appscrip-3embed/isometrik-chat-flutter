@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Dialog / overlay / snackbar UI glue.
 import 'package:flutter/material.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 

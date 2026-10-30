@@ -1,4 +1,6 @@
 part of '../chat_page_controller.dart';
+// coverage:ignore-start
+// Camera plugin (availableCameras / takePicture) has no VM implementation.
 
 /// Camera operations mixin for IsmChatPageController.
 ///
@@ -151,4 +153,5 @@ mixin IsmChatPageCameraOperationsMixin on GetxController {
     }
   }
 }
+// coverage:ignore-end
 

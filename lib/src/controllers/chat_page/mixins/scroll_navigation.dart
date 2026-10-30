@@ -1,4 +1,6 @@
 part of '../chat_page_controller.dart';
+// coverage:ignore-file
+// Scroll-to-index / AutoScrollController UI glue.
 
 /// Scroll and navigation mixin for IsmChatPageController.
 ///

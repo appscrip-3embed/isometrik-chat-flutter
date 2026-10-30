@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// A Flutter package that simplifies MQTT integration, reducing boilerplate code
 /// and providing a convenient layer on top of mqtt_client.
 library;

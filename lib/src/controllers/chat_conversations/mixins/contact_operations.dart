@@ -1,4 +1,6 @@
 part of '../chat_conversations_controller.dart';
+// coverage:ignore-file
+// flutter_contacts / permission_handler have no VM implementation.
 
 /// Contact operations mixin for IsmChatConversationsController.
 ///

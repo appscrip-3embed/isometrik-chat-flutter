@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Camera / icon / unfocus UI helpers, out of the business-logic gate.
 /// Widget and UI-related extensions for the Isometrik Chat Flutter SDK.
 ///
 /// This file contains extensions on Flutter widgets and UI-related enums

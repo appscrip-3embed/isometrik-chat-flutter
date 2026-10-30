@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 mixin IsmChatGroupAdminMixin on GetxController {
   /// Gets the controller instance.
   /// 

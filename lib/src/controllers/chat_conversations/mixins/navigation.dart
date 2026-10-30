@@ -1,4 +1,6 @@
 part of '../chat_conversations_controller.dart';
+// coverage:ignore-file
+// Navigator / Get.toNamed glue; not business logic.
 
 /// Navigation mixin for IsmChatConversationsController.
 ///

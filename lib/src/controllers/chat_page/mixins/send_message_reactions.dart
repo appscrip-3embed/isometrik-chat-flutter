@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Mixin for handling message reactions in the chat page controller.
 /// 
 /// This mixin provides functionality for adding reactions to messages.

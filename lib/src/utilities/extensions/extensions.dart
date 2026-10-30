@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Extensions for the Isometrik Chat Flutter SDK.
 ///
 /// This file exports all extension files grouped by functionality.

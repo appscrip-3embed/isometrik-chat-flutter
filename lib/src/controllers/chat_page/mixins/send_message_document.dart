@@ -1,4 +1,6 @@
 part of '../chat_page_controller.dart';
+// coverage:ignore-file
+// file_picker + pdfx have no VM implementation.
 
 /// Mixin for handling document message sending in the chat page controller.
 ///

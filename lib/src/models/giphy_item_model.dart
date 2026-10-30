@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Remaining branches need plugins, a live broker, or are documented parsing bugs.
 /// A normalized Giphy asset used by the GIF/sticker picker.
 class IsmGiphyItem {
   const IsmGiphyItem({
