@@ -43,11 +43,16 @@ class MessageBubble extends StatelessWidget {
   /// One theme value covers every bubble type (text/audio/media/location/…).
   EdgeInsets _resolveBubblePadding(IsmChatPageController controller) {
     final groupedMessages = _getGroupedMediaMessages(controller);
-    final isGridMessage = groupedMessages != null && groupedMessages.isNotEmpty;
-    final hasCaption = groupedMessages != null &&
-        groupedMessages.any(
-          (msg) => msg.metaData?.caption?.isNotEmpty == true,
-        );
+    final isMultipleMediaGrid = _message.customType ==
+            IsmChatCustomMessageType.multipleAttachments &&
+        _message.multipleAttachmentLayout == MultipleAttachmentLayout.mediaGrid;
+    final isGridMessage = isMultipleMediaGrid ||
+        (groupedMessages != null && groupedMessages.isNotEmpty);
+    final hasCaption = (groupedMessages != null &&
+            groupedMessages.any(
+              (msg) => msg.multipleAttachmentCaption.isNotEmpty,
+            )) ||
+        _message.multipleAttachmentCaption.isNotEmpty;
     return IsmChatPageTheme.resolveBubblePadding(
       custom: IsmChatConfig.chatTheme.chatPageTheme?.messageBubblePadding,
       isMediaGrid: isGridMessage,
@@ -66,8 +71,9 @@ class MessageBubble extends StatelessWidget {
 
     if (isGridMessage) {
       final hasCaption = groupedMessages.any(
-        (msg) => msg.metaData?.caption?.isNotEmpty == true,
-      );
+            (msg) => msg.multipleAttachmentCaption.isNotEmpty,
+          ) ||
+          _message.multipleAttachmentCaption.isNotEmpty;
 
       if (hasCaption) {
         // Position time lower when caption is present
@@ -274,9 +280,10 @@ class MessageBubble extends StatelessWidget {
               Positioned(
                 bottom: _getTimeBottomPosition(controller),
                 right: IsmChatDimens.ten,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Row(
+                child: IgnorePointer(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Row(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: _message.sentByMe
                         ? MainAxisAlignment.end
@@ -353,6 +360,7 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
             ],
           ],
         ),

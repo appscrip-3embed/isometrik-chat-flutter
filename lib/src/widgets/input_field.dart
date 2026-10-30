@@ -24,6 +24,7 @@ class IsmChatInputField extends StatelessWidget {
     this.borderColor,
     this.borderRadius,
     this.isShowBorderColor = false,
+    this.onTapOutside,
     super.key,
   });
   final FocusNode? focusNode;
@@ -47,6 +48,7 @@ class IsmChatInputField extends StatelessWidget {
   final bool isShowBorderColor;
   final Color? borderColor;
   final double? borderRadius;
+  final TapRegionCallback? onTapOutside;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -146,6 +148,7 @@ class IsmChatInputField extends StatelessWidget {
           ),
           onChanged: onChanged,
           onFieldSubmitted: onFieldSubmitted,
+          onTapOutside: onTapOutside,
           enableSuggestions: false,
         ),
       );

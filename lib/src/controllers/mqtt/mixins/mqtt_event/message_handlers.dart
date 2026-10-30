@@ -66,67 +66,86 @@ mixin IsmChatMqttEventMessageHandlersMixin {
     // share the same members/name but have different conversationIds.
     if (conversation.conversationId != message.conversationId) return;
 
-    if (!hideMemberLeave) {
-      // To handle and show last message & unread count in conversation list
-      conversation = conversation.copyWith(
-        unreadMessagesCount: isOwnMessage
-            ? conversation.unreadMessagesCount
-            : IsmChatResponsive.isWeb(
-                    IsmChatConfig.kNavigatorKey.currentContext ??
-                        IsmChatConfig.context) &&
-                (IsmChatUtility.chatPageControllerRegistered &&
-                    IsmChatUtility
-                            .chatPageController.conversation?.conversationId ==
-                        message.conversationId)
-            ? 0
-            : (conversation.unreadMessagesCount ?? 0) + 1,
-        lastMessageDetails: conversation.lastMessageDetails?.copyWith(
-          sentByMe: message.sentByMe,
-          senderId: message.senderInfo?.userId ?? '',
-          showInConversation: true,
-          sentAt: message.sentAt,
-          senderName: message.senderInfo?.userName,
-          messageType: message.messageType?.value ?? 0,
-          messageId: message.messageId ?? '',
-          conversationId: message.conversationId ?? '',
-          body: message.body,
-          customType: message.customType,
-          action: message.action ?? '',
-          meetingId: message.meetingId,
-          meetingType: message.meetingType,
-          callDurations: message.callDurations,
-          deliverCount: 0,
-          deliveredTo: [],
-          readCount: 0,
-          readBy: [],
-          reactionType: '',
-        ),
-      );
-    }
-
-    if (message.conversationId == conversation.conversationId) {
-      final messages = Map<String, IsmChatMessageModel>.from(
-        conversation.messages ?? {},
-      );
-      final mergedMessages = IsmChatDBWrapper.mergeCallMessageIntoMap(
-        messages,
-        message,
-      );
-      conversation = conversation.copyWith(messages: mergedMessages);
-      await IsmChatConfig.dbWrapper?.saveConversation(conversation: conversation);
-    } else {
+    final conversationId = message.conversationId ?? '';
+    if (conversationId.isEmpty ||
+        conversation.conversationId != conversationId) {
       return;
     }
+    // Invalidate a DB reload that already started so it cannot paint a list
+    // that is missing this row. The queued save bumps the counter again.
+    if (IsmChatUtility.chatPageControllerRegistered &&
+        IsmChatUtility.chatPageController.conversation?.conversationId ==
+            conversationId) {
+      IsmChatUtility.chatPageController.bumpMessagesGeneration();
+    }
+    // Persist against the latest stored document. Delivery and read receipts
+    // edit this same conversation and must not overwrite this insert.
+    await IsmChatConfig.dbWrapper?.updateConversation(
+      conversationId: conversationId,
+      update: (latest) {
+        if (latest == null || latest.conversationId != conversationId) {
+          return null;
+        }
+        final base = latest;
+        var next = base;
+        if (!hideMemberLeave) {
+          final alreadyApplied = !isOwnMessage &&
+              next.lastMessageDetails?.messageId == message.messageId;
+          if (!alreadyApplied) {
+            next = next.copyWith(
+              unreadMessagesCount: isOwnMessage
+                  ? next.unreadMessagesCount
+                  : IsmChatResponsive.isWeb(
+                          IsmChatConfig.kNavigatorKey.currentContext ??
+                              IsmChatConfig.context) &&
+                      (IsmChatUtility.chatPageControllerRegistered &&
+                          IsmChatUtility.chatPageController.conversation
+                                  ?.conversationId ==
+                              conversationId)
+                  ? 0
+                  : (next.unreadMessagesCount ?? 0) + 1,
+              lastMessageDetails: next.lastMessageDetails?.copyWith(
+                sentByMe: message.sentByMe,
+                senderId: message.senderInfo?.userId ?? '',
+                showInConversation: true,
+                sentAt: message.sentAt,
+                senderName: message.senderInfo?.userName,
+                messageType: message.messageType?.value ?? 0,
+                messageId: message.messageId ?? '',
+                conversationId: conversationId,
+                body: message.body,
+                customType: message.customType,
+                action: message.action ?? '',
+                meetingId: message.meetingId,
+                meetingType: message.meetingType,
+                callDurations: message.callDurations,
+                deliverCount: 0,
+                deliveredTo: [],
+                readCount: 0,
+                readBy: [],
+                reactionType: '',
+              ),
+            );
+          }
+        }
+        final messages = Map<String, IsmChatMessageModel>.from(
+          next.messages ?? {},
+        );
+        return next.copyWith(
+          messages: IsmChatDBWrapper.mergeCallMessageIntoMap(messages, message),
+        );
+      },
+    );
     unawaited(IsmChatUtility.conversationController.getConversationsFromDB());
     if (isOwnMessage) {
       if (!IsmChatUtility.chatPageControllerRegistered) {
         return;
       }
       var chatController = IsmChatUtility.chatPageController;
-      if (chatController.conversation?.conversationId != message.conversationId) {
+      if (chatController.conversation?.conversationId != conversationId) {
         return;
       }
-      unawaited(chatController.getMessagesFromDB(message.conversationId ?? ''));
+      chatController.scheduleMessagesReload(conversationId);
       return;
     }
     final controller = Get.find<IsmChatMqttController>();
@@ -138,10 +157,10 @@ mixin IsmChatMqttEventMessageHandlersMixin {
       return;
     }
     var chatController = IsmChatUtility.chatPageController;
-    if (chatController.conversation?.conversationId != message.conversationId) {
+    if (chatController.conversation?.conversationId != conversationId) {
       return;
     }
-    unawaited(chatController.getMessagesFromDB(message.conversationId ?? ''));
+    chatController.scheduleMessagesReload(conversationId);
     // Opponent replied / messaged — refresh our sent-message ticks from server
     // in case the read MQTT event was dropped (e.g. shared debouncer race).
     unawaited(chatController.getMessageForStatus());
@@ -235,10 +254,7 @@ mixin IsmChatMqttEventMessageHandlersMixin {
       if (self is IsmChatMqttEventUtilitiesMixin) {
         (self as IsmChatMqttEventUtilitiesMixin).showPushNotification(
             title: notificationTitle,
-            body: _resolveNotificationBody(
-              message,
-              preferNotificationBody: true,
-            ),
+            body: notificationBody,
             data: notificationData);
       }
     } catch (_) {}
@@ -254,10 +270,14 @@ String _resolveNotificationBody(
       _decryptedNotificationBody(message),
     );
   }
+  final notification = message.notificationBody?.trim() ?? '';
+  final content = message.body.trim();
+  // MQTT often sends plaintext in [body] while [notificationBody] is empty.
+  // Prefer explicit notification copy when present (e.g. "Sent an image").
   if (preferNotificationBody) {
-    return message.notificationBody ?? '';
+    return notification.isNotEmpty ? notification : content;
   }
-  return message.body;
+  return content.isNotEmpty ? content : notification;
 }
 
 String _decryptedNotificationBody(IsmChatMessageModel message) {

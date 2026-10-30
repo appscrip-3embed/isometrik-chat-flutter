@@ -33,7 +33,7 @@ class IsmChatGroupInfoTheme {
         surfaceBackgroundColor: IsmChatColors.whiteColor,
         primaryTitleTextStyle: IsmChatStyles.w600Black27,
         secondaryTextStyle: IsmChatStyles.w500GreyLight17,
-        captionTextStyle: IsmChatStyles.w400Grey14,
+        captionTextStyle: IsmChatStyles.w400Grey12,
         metaTextStyle: IsmChatStyles.w400Black14,
         sectionTitleTextStyle: IsmChatStyles.w500Black16,
         bodyTextStyle: IsmChatStyles.w400Black16,

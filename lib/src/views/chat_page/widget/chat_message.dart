@@ -3,18 +3,23 @@ import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 class IsmChatMessage extends StatefulWidget {
+  /// Paints [message] as passed by the list.
+  ///
+  /// The chat list and [ValueKey] must stay on the same instance. Looking the
+  /// row up again with [index] shows the wrong message when a group burst
+  /// inserts or removes rows under a reverse list. Search results still resolve
+  /// by [index] because that list is built in the opposite order from the model
+  /// it passes in.
   IsmChatMessage(
     this.index,
     IsmChatMessageModel? message, {
     bool isIgnorTap = false,
     bool isFromSearchMessage = false,
     super.key,
-  })  : _message = IsmChatUtility.chatPageControllerRegistered
-            ? isFromSearchMessage
-                ? IsmChatUtility.chatPageController.searchMessages.reversed
-                    .toList()[index]
-                : IsmChatUtility.chatPageController.messages.reversed
-                    .toList()[index]
+  })  : _message = isFromSearchMessage &&
+                IsmChatUtility.chatPageControllerRegistered
+            ? IsmChatUtility.chatPageController.searchMessages.reversed
+                .toList()[index]
             : message,
         _isIgnorTap = isIgnorTap;
 

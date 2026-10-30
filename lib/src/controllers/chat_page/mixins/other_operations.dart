@@ -10,7 +10,8 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
 
   /// Starts the recording timer.
   void startTimer() {
-    _controller.forRecordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _controller.forRecordTimer =
+        Timer.periodic(const Duration(seconds: 1), (_) {
       var seconds = _controller.myDuration.inSeconds + 1;
       _controller.myDuration = Duration(seconds: seconds);
     });
@@ -24,7 +25,8 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
     final conversationId = _controller.conversation?.conversationId ?? '';
     if (conversationId.isEmpty) return;
     if (adminCount == 1 && isUserAdmin) {
-      final members = _controller.groupMembers.where((e) => !e.isAdmin).toList();
+      final members =
+          _controller.groupMembers.where((e) => !e.isAdmin).toList();
       final member = members[Random().nextInt(members.length)];
       await _controller.makeAdmin(member.userId, member.userName, false);
     }
@@ -77,7 +79,8 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
 
   /// Deletes a reaction from a message.
   Future<void> deleteReacton({required Reaction reaction}) async {
-    var response = await _controller.viewModel.deleteReacton(reaction: reaction);
+    var response =
+        await _controller.viewModel.deleteReacton(reaction: reaction);
     if (response != null && !response.hasError) {
       await _controller.conversationController.getChatConversations();
     }
@@ -114,6 +117,113 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
     }
   }
 
+  /// Handles @-mention taps in message bodies.
+  ///
+  /// Always opens the mentioned user's 1:1 chat (same rebind flow as
+  /// [IsmChatUserInfo] → Message). Does not open contact info.
+  Future<void> onMentionUserTapped(UserDetails userDetails) async {
+    await openDirectChatWithUser(userDetails);
+  }
+
+  /// Resolves the user for [@mentionText] on [message] and opens their DM.
+  Future<void> onMentionLinkTapped(
+    IsmChatMessageModel message,
+    String mentionText,
+  ) async {
+    if (!mentionText.startsWith('@')) return;
+    final user = message.resolveMentionedUser(mentionText.substring(1));
+    if (user == null) return;
+    final userId = user.userId.trim().isNotEmpty
+        ? user.userId.trim()
+        : (user.memberId?.trim() ?? '');
+    if (userId.isEmpty || isCurrentChatUser(userId)) return;
+    await openDirectChatWithUser(
+      user.userId.trim().isNotEmpty ? user : user.copyWith(userId: userId),
+    );
+  }
+
+  /// Switches the open chat route to a 1:1 conversation with [userDetails].
+  ///
+  /// Same rebind flow as [IsmChatUserInfo] → Message: updates the shared chat
+  /// route via [setRebindConversationId] + [startInit]. Does not call
+  /// [IsmChatConversationProperties.onChatTap] (that often pushes another chat
+  /// route and duplicates the screen with an empty history).
+  Future<void> openDirectChatWithUser(UserDetails userDetails) async {
+    final opponentId = userDetails.userId.trim().isNotEmpty
+        ? userDetails.userId.trim()
+        : (userDetails.memberId?.trim() ?? '');
+    if (opponentId.isEmpty) return;
+    final opponent = userDetails.userId.trim().isNotEmpty
+        ? userDetails
+        : userDetails.copyWith(userId: opponentId);
+
+    final conversationController = _controller.conversationController;
+    var targetConversationId =
+        conversationController.getConversationId(opponentId);
+    final currentConversationId =
+        _controller.conversation?.conversationId ?? '';
+
+    if (targetConversationId.isNotEmpty &&
+        targetConversationId == currentConversationId) {
+      return;
+    }
+
+    IsmChatUtility.showLoader();
+
+    IsmChatConversationModel? conversationModel;
+    if (targetConversationId.isNotEmpty) {
+      conversationModel =
+          await IsmChatConfig.dbWrapper?.getConversation(targetConversationId);
+      conversationModel ??=
+          conversationController.getConversation(targetConversationId);
+    }
+
+    if (targetConversationId.isEmpty || conversationModel == null) {
+      final local = await IsmChatConfig.dbWrapper?.getAllConversations();
+      for (final cached in local ?? const <IsmChatConversationModel>[]) {
+        if (cached.isGroup == true) continue;
+        if (cached.opponentDetails?.userId.trim() == opponentId) {
+          targetConversationId = cached.conversationId?.trim() ?? '';
+          conversationModel = cached;
+          break;
+        }
+      }
+    }
+
+    conversationModel ??= IsmChatConversationModel(
+      messagingDisabled: false,
+      isGroup: false,
+      opponentDetails: opponent,
+      unreadMessagesCount: 0,
+      lastMessageDetails: null,
+      lastMessageSentAt: 0,
+      membersCount: 1,
+      conversationId: targetConversationId,
+    );
+
+    if (targetConversationId != currentConversationId) {
+      await conversationController.updateLocalConversation(conversationModel);
+      _controller
+        ..setRebindConversationId(
+          targetConversationId.isNotEmpty
+              ? targetConversationId
+              : conversationModel.conversationId ?? '',
+        )
+        ..isMessagesLoading = true;
+    }
+
+    _controller.closeOverlay();
+
+    if (IsmChatResponsive.isWeb(
+        IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context)) {
+      conversationController.isRenderChatPageaScreen =
+          IsRenderChatPageScreen.none;
+    }
+
+    IsmChatUtility.closeLoader();
+    unawaited(Future.microtask(_controller.startInit));
+  }
+
   /// Checks if an audio encoder is supported.
   Future<bool> isEncoderSupported(AudioEncoder encoder) async {
     final isSupported = await _controller.recordVoice.isEncoderSupported(
@@ -144,7 +254,8 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
     if (await _controller.recordVoice.isPaused()) {
       await _controller.recordVoice.resume();
       _controller.isRecordPlay = true;
-      _controller.forRecordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _controller.forRecordTimer =
+          Timer.periodic(const Duration(seconds: 1), (_) {
         _controller.seconds++;
       });
     } else {
@@ -154,4 +265,3 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
     }
   }
 }
-

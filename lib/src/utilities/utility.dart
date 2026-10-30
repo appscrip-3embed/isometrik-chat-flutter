@@ -312,6 +312,17 @@ class IsmChatUtility {
     );
   }
 
+  /// Truncates multi-select picker results to [IsmChatConstants.maxOutboundPickerAttachments].
+  /// Reuse for gallery, document, or any future multi-attachment pickers.
+  static List<T> clampOutboundPickerSelection<T>(List<T> items) {
+    final max = IsmChatConstants.maxOutboundPickerAttachments;
+    if (items.length <= max) {
+      return items;
+    }
+    IsmChatUtility.showToast(IsmChatStrings.maxPickerAttachmentsReached);
+    return items.sublist(0, max);
+  }
+
   static Future<List<XFile?>> pickMedia(ImageSource source,
       {bool isVideoAndImage = false}) async {
     List<XFile?> result;
@@ -320,6 +331,7 @@ class IsmChatUtility {
       result = await ImagePicker().pickMultipleMedia(
         imageQuality: 25,
         requestFullMetadata: true,
+        limit: IsmChatConstants.maxOutboundPickerAttachments,
       );
     } else {
       result = [
@@ -980,6 +992,58 @@ class IsmChatUtility {
 
   static bool get chatPageControllerRegistered =>
       Get.isRegistered<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
+
+  /// Outbound API `body` for attachment messages (image, video, doc, etc.).
+  ///
+  /// Image/video captions are duplicated in `body` and metadata `captionMessage`.
+  /// When there is no caption, use a type-specific placeholder in `body` for
+  /// image, video, GIF, and sticker so conversation previews and reply strips
+  /// stay readable. Other attachment types without a caption use an empty
+  /// `body`. Reuse from send mixins so web and mobile stay aligned.
+  static String outboundAttachmentBody(
+    String? caption, {
+    IsmChatMediaType? mediaType,
+  }) {
+    final trimmed = caption?.trim() ?? '';
+    if (trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    return _outboundAttachmentPlaceholderBody(mediaType);
+  }
+
+  /// Wire `body` when an attachment has no caption (see [outboundAttachmentBody]).
+  static String _outboundAttachmentPlaceholderBody(IsmChatMediaType? mediaType) {
+    switch (mediaType) {
+      case IsmChatMediaType.image:
+        return IsmChatStrings.image;
+      case IsmChatMediaType.video:
+        return IsmChatStrings.video;
+      case IsmChatMediaType.gif:
+        return IsmChatStrings.gif;
+      case IsmChatMediaType.sticker:
+        return IsmChatStrings.sticker;
+      default:
+        return '';
+    }
+  }
+
+  /// Metadata `caption` / `captionMessage` for outbound attachment sends.
+  static String? outboundAttachmentCaptionMeta(String? caption) {
+    final trimmed = caption?.trim() ?? '';
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  /// Picks the first non-empty per-file caption, else composer text.
+  static String resolveOutboundMediaCaption({
+    String? mediaCaption,
+    String? composerText,
+  }) {
+    final fromMedia = mediaCaption?.trim() ?? '';
+    if (fromMedia.isNotEmpty) {
+      return fromMedia;
+    }
+    return composerText?.trim() ?? '';
+  }
 
   static bool isOnlyEmoji(String text) {
     final emojiRegex = RegExp(

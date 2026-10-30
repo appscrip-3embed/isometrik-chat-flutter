@@ -85,6 +85,14 @@ class IsmChatDBWrapper {
   /// is restored.
   late final CollectionBox<IsmChatMessageMap> pendingMessageBox;
 
+  /// In-flight read-modify-save chains, one per conversation and box.
+  ///
+  /// MQTT message insert, delivery, and read all edit the same Hive document.
+  /// A handler that read the document before another save finishes would write
+  /// that stale copy back and drop the newer message. Callers that change
+  /// messages should use [updateConversation] instead of get-then-save.
+  final Map<String, Future<void>> _conversationWriteQueues = {};
+
   Future<void> _createBox() async {
     var data = await Future.wait<dynamic>([
       Future.wait([
@@ -298,6 +306,68 @@ class IsmChatDBWrapper {
       IsmChatLog.error('$e $st');
       return false;
     }
+  }
+
+  /// Reads, edits, and saves one conversation without overlapping writers.
+  ///
+  /// [update] receives the conversation loaded inside the queue (`null` when
+  /// nothing is stored yet). Return the conversation to persist, or `null` to
+  /// leave storage unchanged. Returns the saved conversation, or `null` when
+  /// nothing was written.
+  ///
+  /// Reuse this for MQTT message insert, delivery, read, and status sync.
+  /// A direct [getConversation] followed by [saveConversation] can overwrite a
+  /// message that was inserted after the read started.
+  Future<IsmChatConversationModel?> updateConversation({
+    required String conversationId,
+    required FutureOr<IsmChatConversationModel?> Function(
+      IsmChatConversationModel? current,
+    ) update,
+    IsmChatDbBox dbBox = IsmChatDbBox.main,
+  }) async {
+    final id = conversationId.trim();
+    if (id.isEmpty) return null;
+
+    final queueKey = '${dbBox.name}:$id';
+    final previous = _conversationWriteQueues[queueKey] ?? Future<void>.value();
+    final gate = Completer<void>();
+    _conversationWriteQueues[queueKey] = gate.future;
+
+    // A failed earlier writer must not block every later message.
+    await previous.catchError((Object _) {});
+    try {
+      final current = await getConversation(id, dbBox: dbBox);
+      final next = await update(current);
+      if (next == null) return null;
+      final saved = await saveConversation(conversation: next, dbBox: dbBox);
+      if (!saved) return null;
+      _noteOpenChatMessagesSaved(id);
+      return next;
+    } finally {
+      if (!gate.isCompleted) {
+        gate.complete();
+      }
+      if (identical(_conversationWriteQueues[queueKey], gate.future)) {
+        // remove() returns the queued Future. Drop the entry synchronously;
+        // awaiting here would let the next writer replace the map entry first.
+        unawaited(
+          _conversationWriteQueues.remove(queueKey) ?? Future<void>.value(),
+        );
+      }
+    }
+  }
+
+  /// Tells the open chat that its stored message map just changed.
+  ///
+  /// The chat page records a generation before reading Hive and skips that
+  /// snapshot when a newer save landed during the read.
+  void _noteOpenChatMessagesSaved(String conversationId) {
+    if (!IsmChatUtility.chatPageControllerRegistered) return;
+    final controller = IsmChatUtility.chatPageController;
+    if ((controller.conversation?.conversationId ?? '') != conversationId) {
+      return;
+    }
+    controller.bumpMessagesGeneration();
   }
 
   /// Removes persisted block/unblock banner messages and refreshes last message.

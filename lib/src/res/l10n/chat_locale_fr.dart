@@ -181,6 +181,8 @@ const Map<String, String> kIsmChatLocaleFr = {
   'messageInfo': 'Infos du message',
   'inviteToChat': 'Inviter à',
   'youCanNotSend': 'Vous ne pouvez pas envoyer de média de plus de 20 Mo.',
+  'maxPickerAttachmentsReached':
+      'Vous pouvez sélectionner jusqu’à 5 pièces jointes à la fois.',
   'aboutMe': 'À propos',
   'defaultString': 'Par défaut',
   'recipients': 'Destinataires :',

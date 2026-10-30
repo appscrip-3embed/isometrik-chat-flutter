@@ -11,10 +11,14 @@ class IsmChatMediaGridMessage extends StatefulWidget {
     super.key,
     required this.messages,
     required this.sentByMe,
+    this.gridHostMessage,
   });
 
   final List<IsmChatMessageModel> messages;
   final bool sentByMe;
+
+  /// When set, grid taps open preview within this multi-attachment message.
+  final IsmChatMessageModel? gridHostMessage;
 
   @override
   State<IsmChatMediaGridMessage> createState() =>
@@ -45,7 +49,7 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
     }
 
     final totalCount = messages.length;
-    final crossAxisCount = 2; // Always use 2 columns for grid
+    final crossAxisCount = IsmChatMediaGridLayout.crossAxisCount;
 
     // Determine display count and remaining count based on total
     int displayCount;
@@ -72,11 +76,8 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
     // For 2-column, 1-row (2 images): use half aspect ratio to make height double
     // Smaller aspect ratio = taller images
     // Relationship: 1-row height = 2x (per-row height of 2-row grid)
-    final baseAspectRatio = 0.85; // Base aspect ratio for 2-row grid
-    final aspectRatio = displayCount == 2
-        ? baseAspectRatio /
-            2 // Half aspect ratio for 1-row (taller, height = 2x)
-        : baseAspectRatio; // Base aspect ratio for 2-row grid
+    final aspectRatio =
+        IsmChatMediaGridLayout.childAspectRatioForDisplayCount(displayCount);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -92,8 +93,8 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
             padding: EdgeInsets.zero,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 2,
-              mainAxisSpacing: 2,
+              crossAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
+              mainAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
               childAspectRatio: aspectRatio,
             ),
             itemCount: displayCount,
@@ -134,24 +135,33 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
 
               return IsmChatTapHandler(
                 onTap: () {
-                  if (IsmChatUtility.chatPageControllerRegistered) {
-                    // If tapping on the "+X" item, open preview starting from the next item
-                    IsmChatMessageModel messageToShow;
+                  if (!IsmChatUtility.chatPageControllerRegistered) {
+                    return;
+                  }
+                  final host = widget.gridHostMessage;
+                  if (host != null) {
+                    var previewIndex = index;
                     if (showRemainingCount) {
-                      if (totalCount == 3) {
-                        // For 3 items, "+1" is on index 1, so start from index 2
-                        messageToShow = messages[2];
-                      } else {
-                        // For 4+ items, "+X" is on index 3, so start from index 4
-                        messageToShow =
-                            messages.length > 4 ? messages[4] : message;
-                      }
-                    } else {
-                      messageToShow = message;
+                      previewIndex = totalCount == 3 ? 2 : 4;
                     }
                     IsmChatUtility.chatPageController
-                        .tapForMediaPreview(messageToShow);
+                        .tapForMediaPreviewAttachments(host, previewIndex);
+                    return;
                   }
+                  // If tapping on the "+X" item, open preview starting from the next item
+                  IsmChatMessageModel messageToShow;
+                  if (showRemainingCount) {
+                    if (totalCount == 3) {
+                      messageToShow = messages[2];
+                    } else {
+                      messageToShow =
+                          messages.length > 4 ? messages[4] : message;
+                    }
+                  } else {
+                    messageToShow = message;
+                  }
+                  IsmChatUtility.chatPageController
+                      .tapForMediaPreview(messageToShow);
                 },
                 onLongPress: () {
                   if (IsmChatUtility.chatPageControllerRegistered) {
@@ -234,7 +244,8 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
             },
           ),
         ),
-        // Show caption if any message has a caption
+        // Caption lives on the host message body for web multi-attachment
+        // sends, or on metaData.caption for older one-file grid groups.
         if (_hasCaption(messages))
           Padding(
             padding: const EdgeInsets.only(left: 4, right: 4, top: 0),
@@ -244,18 +255,27 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
     );
   }
 
-  bool _hasCaption(List<IsmChatMessageModel> messages) =>
-      messages.any((msg) => msg.metaData?.caption?.isNotEmpty == true);
+  bool _hasCaption(List<IsmChatMessageModel> messages) {
+    if (widget.gridHostMessage?.multipleAttachmentCaption.isNotEmpty == true) {
+      return true;
+    }
+    return messages.any((msg) => msg.multipleAttachmentCaption.isNotEmpty);
+  }
 
   Widget _buildCaption(BuildContext context) {
     final messages = widget.messages;
-    // Get the first message with a caption, or use the last message
-    final messageWithCaption = messages.firstWhere(
-      (msg) => msg.metaData?.caption?.isNotEmpty == true,
-      orElse: () => messages.last,
-    );
+    final host = widget.gridHostMessage;
+    final hostCaption = host?.multipleAttachmentCaption ?? '';
+    // Host caption covers AttachmentMessage:Multiple (body or metaData).
+    // Grouped single-file sends still store the caption on each tile.
+    final messageWithCaption = hostCaption.isNotEmpty
+        ? host!
+        : messages.firstWhere(
+            (msg) => msg.multipleAttachmentCaption.isNotEmpty,
+            orElse: () => messages.last,
+          );
 
-    final caption = messageWithCaption.metaData?.caption ?? '';
+    final caption = messageWithCaption.multipleAttachmentCaption;
     if (caption.isEmpty) {
       return const SizedBox.shrink();
     }

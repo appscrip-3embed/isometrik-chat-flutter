@@ -57,12 +57,313 @@ mixin IsmChatPageSendMessageDocumentMixin {
     );
 
     if (result?.files.isNotEmpty ?? false) {
-      for (final file in result!.files) {
+      final files = IsmChatUtility.clampOutboundPickerSelection(result!.files);
+      if (files.length == 1) {
         await _sendPickedDocumentFile(
           conversationId: resolvedConversationId,
+          file: files.first,
+        );
+      } else {
+        await _sendMultiplePickedDocuments(
+          conversationId: resolvedConversationId,
+          files: files,
+        );
+      }
+    }
+  }
+
+  /// Uploads several documents and sends one [AttachmentMessage:Multiple].
+  Future<void> _sendMultiplePickedDocuments({
+    required String conversationId,
+    required List<PlatformFile> files,
+  }) async {
+    if (_controller.isreplying) {
+      for (final file in files) {
+        await _sendPickedDocumentFile(
+          conversationId: conversationId,
           file: file,
         );
       }
+      return;
+    }
+
+    for (final file in files) {
+      final bytes = file.bytes;
+      final sizeMedia = kIsWeb
+          ? IsmChatUtility.formatBytes(
+              int.parse((bytes?.length ?? 0).toString()),
+            )
+          : await IsmChatUtility.fileToSize(File(file.path ?? ''));
+      if (!sizeMedia.size()) {
+        await IsmChatContextWidget.showDialogContext(
+          content: IsmChatAlertDialogBox(
+            title: IsmChatStrings.youCanNotSend,
+            cancelLabel: IsmChatStrings.okay,
+          ),
+        );
+        return;
+      }
+    }
+
+    final sentAt = DateTime.now().millisecondsSinceEpoch;
+    final localAttachments = <AttachmentModel>[];
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
+      final bytes = file.bytes;
+      final mediaId = '${sentAt}_$i';
+      localAttachments.add(
+        AttachmentModel(
+          attachmentType: IsmChatMediaType.file,
+          size: bytes?.length,
+          name: file.name,
+          // Real MIME, not the bare extension. Web reads mimeType with mediaType 3.
+          mimeType: mimeTypeForAttachmentExtension(
+            file.extension,
+            mediaType: IsmChatMediaType.file,
+          ),
+          mediaUrl: kIsWeb ? (bytes).toString() : file.path,
+          mediaId: mediaId,
+          extension: file.extension,
+        ),
+      );
+    }
+
+    // Same wire rule as photos: body is the caption, or this placeholder.
+    const multipleBody = 'AttachmentMessage:Multiple';
+    final caption = _controller.chatInputController.text.trim();
+    final body = caption.isNotEmpty ? caption : multipleBody;
+    if (caption.isNotEmpty) {
+      _controller.chatInputController.clear();
+    }
+    final documentMessage = IsmChatMessageModel(
+      body: body,
+      conversationId: conversationId,
+      senderInfo: _controller.currentUser,
+      customType: IsmChatCustomMessageType.multipleAttachments,
+      attachments: localAttachments,
+      deliveredToAll: false,
+      messageId: '',
+      deviceId: IsmChatConfig.communicationConfig.projectConfig.deviceId,
+      messageType: IsmChatMessageType.normal,
+      messagingDisabled: false,
+      parentMessageId: '',
+      readByAll: false,
+      sentAt: sentAt,
+      sentByMe: true,
+      isUploading: true,
+      metaData: IsmChatMetaData(
+        messageSentAt: sentAt,
+        isDownloaded: true,
+        caption: caption.isEmpty ? null : caption,
+      ),
+    );
+
+    _controller.messages.add(documentMessage);
+    unawaited(_controller.scrollDown());
+
+    if (!_controller.isBroadcast) {
+      await IsmChatConfig.dbWrapper!
+          .saveMessage(documentMessage, IsmChatDbBox.pending);
+      if (kIsWeb &&
+          IsmChatResponsive.isWeb(IsmChatConfig.kNavigatorKey.currentContext ??
+              IsmChatConfig.context)) {
+        _controller.updateLastMessagOnCurrentTime(documentMessage);
+      }
+    }
+
+    final notificationTitle =
+        IsmChatConfig.communicationConfig.userConfig.userName ??
+            _controller.conversationController.userDetails?.userName ??
+            '';
+
+    final outgoingAttachments = <Map<String, dynamic>>[];
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
+      final map = await _uploadDocumentAttachmentMap(
+        conversationId: conversationId,
+        file: file,
+        mediaId: localAttachments[i].mediaId ?? '${sentAt}_$i',
+      );
+      if (map == null) {
+        _markMultipleDocumentUploadFailed(sentAt);
+        return;
+      }
+      outgoingAttachments.add(map);
+    }
+
+    await _controller.sendMessage(
+      body: body,
+      conversationId: conversationId,
+      createdAt: sentAt,
+      deviceId: documentMessage.deviceId ?? '',
+      messageType: documentMessage.messageType?.value ?? 0,
+      notificationBody: IsmChatStrings.sentDoc,
+      notificationTitle: notificationTitle,
+      attachments: outgoingAttachments,
+      customType: IsmChatCustomMessageType.multipleAttachments.value,
+      metaData: documentMessage.metaData,
+      isBroadcast: _controller.isBroadcast,
+    );
+    _clearMultipleDocumentUploadState(sentAt);
+  }
+
+  void _clearMultipleDocumentUploadState(int createdAt) {
+    final index = _controller.messages.indexWhere(
+      (message) => message.sentAt == createdAt,
+    );
+    if (index == -1) {
+      return;
+    }
+    final current = _controller.messages[index];
+    if (current.isUploading != true) {
+      return;
+    }
+    current.isUploading = false;
+    _controller.messages[index] = current;
+    if (_controller.messages is RxList<IsmChatMessageModel>) {
+      (_controller.messages as RxList<IsmChatMessageModel>).refresh();
+    }
+    _controller.update();
+  }
+
+  void _markMultipleDocumentUploadFailed(int createdAt) {
+    final index = _controller.messages.indexWhere(
+      (message) => message.sentAt == createdAt,
+    );
+    if (index == -1) {
+      return;
+    }
+    final current = _controller.messages[index];
+    current
+      ..isUploading = false
+      ..isInvalidMessage = true
+      ..messageId = '';
+    _controller.messages[index] = current;
+    if (_controller.messages is RxList<IsmChatMessageModel>) {
+      (_controller.messages as RxList<IsmChatMessageModel>).refresh();
+    }
+    _controller.update();
+  }
+
+  /// Presigned upload for one document; returns API attachment map.
+  Future<Map<String, dynamic>?> _uploadDocumentAttachmentMap({
+    required String conversationId,
+    required PlatformFile file,
+    required String mediaId,
+  }) async {
+    try {
+      final bytes = file.bytes ?? Uint8List(0);
+      final bytesForPdf = Uint8List.fromList(bytes);
+      final document = kIsWeb
+          ? await PdfDocument.openData(bytesForPdf)
+          : await PdfDocument.openFile(file.path ?? '');
+      final page = await document.getPage(1);
+      final pdfImage = await page.render(
+        width: page.width,
+        height: page.height,
+        backgroundColor: '#ffffff',
+      );
+      await page.close();
+      await document.close();
+
+      final thumbnailBytes = pdfImage?.bytes ?? Uint8List(0);
+      final thumbnailNameWithExtension = pdfImage?.format.toString() ?? 'png';
+      final nameWithExtension = file.name;
+
+      PresignedUrlModel? presignedUrlModel;
+      if (_controller.isBroadcast) {
+        presignedUrlModel = await _controller.commonController.getPresignedUrl(
+          isLoading: false,
+          mediaExtension: file.extension ?? 'pdf',
+          userIdentifier:
+              IsmChatConfig.communicationConfig.userConfig.userEmail ?? '',
+          bytes: bytesForPdf,
+        );
+      } else {
+        presignedUrlModel = await _controller.commonController.postMediaUrl(
+          conversationId: conversationId,
+          nameWithExtension: nameWithExtension,
+          mediaType: IsmChatMediaType.file.value,
+          mediaId: mediaId,
+          bytes: bytesForPdf,
+          isLoading: false,
+        );
+      }
+
+      var mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
+      final resolvedMediaId =
+          _controller.isBroadcast ? mediaId : presignedUrlModel?.mediaId ?? '';
+
+      if (mediaUrlPath.isEmpty) {
+        return null;
+      }
+
+      final mediaResponse =
+          await _controller.commonController.updatePresignedUrl(
+        presignedUrl: _controller.isBroadcast
+            ? presignedUrlModel?.presignedUrl
+            : presignedUrlModel?.mediaPresignedUrl,
+        bytes: bytesForPdf,
+        isLoading: false,
+      );
+      if (mediaResponse != 200) {
+        return null;
+      }
+
+      var thumbnailUrlPath = '';
+      PresignedUrlModel? thumbPresigned;
+      if (_controller.isBroadcast) {
+        thumbPresigned = await _controller.commonController.getPresignedUrl(
+          isLoading: false,
+          mediaExtension: thumbnailNameWithExtension.split('.').last,
+          userIdentifier:
+              IsmChatConfig.communicationConfig.userConfig.userEmail ?? '',
+          bytes: thumbnailBytes,
+        );
+        thumbnailUrlPath = thumbPresigned?.mediaUrl ?? '';
+      } else {
+        thumbPresigned = await _controller.commonController.postMediaUrl(
+          conversationId: conversationId,
+          nameWithExtension: thumbnailNameWithExtension,
+          mediaType: IsmChatMediaType.image.value,
+          mediaId: mediaId,
+          bytes: thumbnailBytes,
+          isLoading: false,
+          isUpdateThumbnail: true,
+        );
+        thumbnailUrlPath = thumbPresigned?.thumbnailUrl ?? '';
+      }
+
+      if (thumbnailUrlPath.isNotEmpty) {
+        await _controller.commonController.updatePresignedUrl(
+          presignedUrl: _controller.isBroadcast
+              ? thumbPresigned?.presignedUrl
+              : thumbPresigned?.thumbnailPresignedUrl,
+          bytes: thumbnailBytes,
+          isLoading: false,
+        );
+      }
+
+      return {
+        'mediaId': resolvedMediaId,
+        'mediaUrl': mediaUrlPath,
+        'thumbnailUrl':
+            thumbnailUrlPath.isNotEmpty ? thumbnailUrlPath : mediaUrlPath,
+        'mediaType': IsmChatMediaType.file.value,
+        'nameWithExtension': nameWithExtension,
+        'name': nameWithExtension,
+        'mimeType': mimeTypeForAttachmentExtension(
+          file.extension,
+          mediaType: IsmChatMediaType.file,
+        ),
+        'extension': file.extension ?? 'pdf',
+        'size': bytes.length,
+        // 3 = doc. 0 is image and must not be sent for a document.
+        'attachmentType': IsmChatMediaType.file.value,
+      };
+    } catch (e, st) {
+      IsmChatLog.error(e, st);
+      return null;
     }
   }
 
@@ -108,7 +409,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
     final nameWithExtension = file.name;
 
     final documentMessage = IsmChatMessageModel(
-      body: IsmChatStrings.document,
+      body: nameWithExtension,
       conversationId: conversationId,
       senderInfo: _controller.currentUser,
       customType: _controller.isreplying

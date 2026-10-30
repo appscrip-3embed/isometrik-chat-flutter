@@ -351,6 +351,12 @@ extension LastMessageBody on LastMessageDetails {
         return 'Audio';
       case IsmChatCustomMessageType.file:
         return 'Document';
+      case IsmChatCustomMessageType.multipleAttachments:
+        final trimmed = body.trim();
+        if (trimmed.isNotEmpty && trimmed != 'AttachmentMessage:Multiple') {
+          return trimmed;
+        }
+        return 'Multiple Media';
       case IsmChatCustomMessageType.location:
         return 'Location';
       case IsmChatCustomMessageType.block:
@@ -436,6 +442,7 @@ extension LastMessageBody on LastMessageDetails {
         iconData = Icons.audiotrack_rounded;
         break;
       case IsmChatCustomMessageType.file:
+      case IsmChatCustomMessageType.multipleAttachments:
         iconData = Icons.description_rounded;
         break;
       case IsmChatCustomMessageType.location:
@@ -533,59 +540,326 @@ extension SdkCallBubbleMessage on IsmChatMessageModel {
   }
 }
 
-/// Member leave system messages are only visible to group admins.
+/// Group chat visibility for system rows (e.g. member leave banners).
 extension MemberLeaveVisibility on IsmChatMessageModel {
-  bool isVisibleInGroupChat(IsmChatConversationModel? conversation) {
-    if (customType != IsmChatCustomMessageType.memberLeave) return true;
-    if (conversation?.isGroup != true) return true;
-    return conversation!.isCurrentUserGroupAdmin;
+  /// All members see center banners including [IsmChatCustomMessageType.memberLeave].
+  bool isVisibleInGroupChat(IsmChatConversationModel? conversation) => true;
+}
+
+/// Label inserted after `@` when picking someone from the mention list.
+String mentionLabelForUser(UserDetails user) {
+  final display = user.displayName.trim();
+  if (display.isNotEmpty) return display;
+  return user.userName.trim();
+}
+
+/// Whether [userId] is the signed-in chat user.
+bool isCurrentChatUser(String userId) {
+  final id = userId.trim();
+  if (id.isEmpty) return false;
+  return id == IsmChatConfig.communicationConfig.userConfig.userId.trim();
+}
+
+bool _equalsIgnoreCase(String a, String b) =>
+    a.toLowerCase() == b.toLowerCase();
+
+/// End index in [body] (exclusive) if [name] matches text after `@` at [atIndex].
+int? _mentionNameEndAfterAt(String body, int atIndex, String name) {
+  if (atIndex >= body.length || body[atIndex] != '@') return null;
+  var pos = atIndex + 1;
+  final words = name.trim().split(RegExp(r'\s+'));
+  if (words.isEmpty || words.first.isEmpty) return null;
+
+  for (var wi = 0; wi < words.length; wi++) {
+    if (wi > 0) {
+      final wsStart = pos;
+      while (pos < body.length && body[pos] == ' ') {
+        pos++;
+      }
+      if (pos == wsStart) return null;
+    }
+    final word = words[wi];
+    if (pos + word.length > body.length) return null;
+    if (!_equalsIgnoreCase(body.substring(pos, pos + word.length), word)) {
+      return null;
+    }
+    pos += word.length;
   }
+  return pos;
+}
+
+/// End index in [body] (exclusive) after `@` when consuming [wordCount] words.
+int? _mentionWordCountEndAfterAt(String body, int atIndex, int wordCount) {
+  if (wordCount < 1 || atIndex >= body.length || body[atIndex] != '@') {
+    return null;
+  }
+  var pos = atIndex + 1;
+  for (var w = 0; w < wordCount; w++) {
+    if (w > 0) {
+      final wsStart = pos;
+      while (pos < body.length && body[pos] == ' ') {
+        pos++;
+      }
+      if (pos == wsStart) return null;
+    }
+    final wordStart = pos;
+    while (pos < body.length && body[pos] != ' ') {
+      pos++;
+    }
+    if (pos == wordStart) return null;
+  }
+  return pos;
+}
+
+List<String> _mentionNamesForUser(UserDetails user) {
+  final names = <String>[];
+  final userName = user.userName.trim();
+  if (userName.isNotEmpty) names.add(userName);
+  final display = user.displayName.trim();
+  if (display.isNotEmpty &&
+      display.toLowerCase() != userName.toLowerCase()) {
+    names.add(display);
+  }
+  return names;
+}
+
+/// True when [segmentAfterAt] (text after `@`) starts with [memberName].
+bool mentionSegmentMatchesMemberName(
+  String segmentAfterAt,
+  String memberName,
+) {
+  final name = memberName.trim();
+  if (name.isEmpty) return false;
+  final padded = '@$segmentAfterAt';
+  return _mentionNameEndAfterAt(padded, 0, name) != null;
+}
+
+List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
+  String text,
+  List<UserDetails> mentionCandidates,
+) {
+  final nonMentionLink = RegExp(
+    r'\bhttps?:\/\/\S+\b|\bwww\.\S+\b|\b\d{9,13}\b|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
+    caseSensitive: false,
+  );
+  final singleWordMention = RegExp(r'^@[A-Za-z0-9_.]+');
+
+  bool hasLinkAt(int index) =>
+      nonMentionLink.allMatches(text).any((m) => m.start == index);
+
+  int? mentionEndAt(int index) {
+    int? best;
+    for (final user in mentionCandidates) {
+      for (final name in _mentionNamesForUser(user)) {
+        final end = _mentionNameEndAfterAt(text, index, name);
+        if (end != null && (best == null || end > best)) best = end;
+      }
+      final wordCount = user.wordCount ?? 0;
+      if (wordCount > 1) {
+        final end = _mentionWordCountEndAfterAt(text, index, wordCount);
+        if (end != null && (best == null || end > best)) best = end;
+      }
+    }
+    return best;
+  }
+
+  bool isSelfMentionSpan(int start, int endExclusive) {
+    if (!IsmChatUtility.chatPageControllerRegistered) return false;
+    final currentId =
+        IsmChatConfig.communicationConfig.userConfig.userId.trim();
+    if (currentId.isEmpty) return false;
+    for (final member
+        in IsmChatUtility.chatPageController.groupMembers) {
+      if (member.userId.trim() != currentId) continue;
+      for (final name in _mentionNamesForUser(member)) {
+        if (_mentionNameEndAfterAt(text, start, name) == endExclusive) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  final segments = <LocalMentionAndLinkData>[];
+  var i = 0;
+  while (i < text.length) {
+    if (text[i] == '@') {
+      final end = mentionEndAt(i);
+      if (end != null &&
+          end > i + 1 &&
+          !isSelfMentionSpan(i, end)) {
+        segments.add(
+          LocalMentionAndLinkData(
+            text: text.substring(i, end),
+            isLink: true,
+          ),
+        );
+        i = end;
+        continue;
+      }
+      final fallback = singleWordMention.matchAsPrefix(text, i);
+      if (fallback != null && !isSelfMentionSpan(i, fallback.end)) {
+        segments.add(
+          LocalMentionAndLinkData(
+            text: fallback.group(0)!,
+            isLink: true,
+          ),
+        );
+        i = fallback.end;
+        continue;
+      }
+    }
+
+    RegExpMatch? linkAtI;
+    for (final m in nonMentionLink.allMatches(text)) {
+      if (m.start == i) {
+        linkAtI = m;
+        break;
+      }
+    }
+    if (linkAtI != null) {
+      segments.add(
+        LocalMentionAndLinkData(
+          text: linkAtI.group(0)!,
+          isLink: true,
+        ),
+      );
+      i = linkAtI.end;
+      continue;
+    }
+
+    var j = i + 1;
+    while (j < text.length) {
+      if (text[j] == '@' || hasLinkAt(j)) break;
+      j++;
+    }
+    segments.add(
+      LocalMentionAndLinkData(
+        text: text.substring(i, j),
+        isLink: false,
+      ),
+    );
+    i = j;
+  }
+  return segments;
 }
 
 /// Extension for IsmChatMessageModel to get mention list, focus menu, and styling.
 extension MentionMessage on IsmChatMessageModel {
+  List<UserDetails> _mentionLookupCandidates() {
+    final seen = <String>{};
+    final list = <UserDetails>[];
+
+    void add(UserDetails user) {
+      if (isCurrentChatUser(user.userId)) return;
+      final key = user.userId.trim().isNotEmpty
+          ? user.userId.trim()
+          : '${user.memberId ?? ''}|${user.userName}';
+      if (!seen.add(key)) return;
+      list.add(
+        user.userId.trim().isNotEmpty
+            ? user
+            : (user.memberId?.trim().isNotEmpty == true
+                ? user.copyWith(userId: user.memberId!.trim())
+                : user),
+      );
+    }
+
+    for (final user in mentionedUsers ?? const <UserDetails>[]) {
+      add(user);
+    }
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      for (final member in IsmChatUtility.chatPageController.groupMembers) {
+        add(member);
+      }
+    }
+
+    list.sort((a, b) {
+      final la = mentionLabelForUser(a).length;
+      final lb = mentionLabelForUser(b).length;
+      return lb.compareTo(la);
+    });
+    return list;
+  }
+
   /// Extracts mentions and links from the message body.
   List<LocalMentionAndLinkData> get mentionList {
     try {
-      final linkRegExp = RegExp(
-        r'(\bhttps?:\/\/\S+\b|\bwww\.\S+\b|\b\d{9,13}\b|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|@[A-Za-z0-9_]+)',
-        caseSensitive: false,
-      );
-      final matches = linkRegExp.allMatches(body);
-      var lastMatchEnd = 0;
-      var messageList = <LocalMentionAndLinkData>[];
-      for (var match in matches) {
-        if (match.start > lastMatchEnd) {
-          messageList.add(
-            LocalMentionAndLinkData(
-              text: body.substring(lastMatchEnd, match.start),
-              isLink: false,
-            ),
-          );
-        }
-
-        final linkText = match.group(0) ?? '';
-        messageList.add(
-          LocalMentionAndLinkData(
-            text: linkText,
-            isLink: true,
-          ),
-        );
-
-        lastMatchEnd = match.end;
-      }
-      if (lastMatchEnd < body.length) {
-        messageList.add(LocalMentionAndLinkData(
-          text: body.substring(lastMatchEnd),
-          isLink: false,
-        ));
-      }
-
-      return messageList;
+      if (body.isEmpty) return [];
+      return _buildMentionAndLinkSegments(body, _mentionLookupCandidates());
     } catch (e, st) {
       IsmChatLog.error(e, st);
       return [];
     }
+  }
+
+  /// Resolves a mentioned member for an @-segment handle (text after `@`).
+  ///
+  /// Uses [mentionedUsers] when present, then [IsmChatPageController.groupMembers]
+  /// with the same prefix rules as [IsmChatPageContactGroupOperationsMixin.getMentionedUserList].
+  UserDetails? resolveMentionedUser(String mentionHandle) {
+    final handle = mentionHandle.trim();
+    if (handle.isEmpty) return null;
+
+    bool matchesUser(String query, UserDetails user) {
+      final q = query.toLowerCase();
+      final userName = user.userName.trim().toLowerCase();
+      if (userName.isEmpty) return false;
+      if (userName == q || userName.startsWith('$q ')) return true;
+      if (userName.split(' ').first == q) return true;
+      if (userName.contains(q)) return true;
+      final firstName = user.metaData?.firstName?.trim().toLowerCase() ?? '';
+      if (firstName.isNotEmpty &&
+          (firstName == q || firstName.startsWith(q))) {
+        return true;
+      }
+      return false;
+    }
+
+    for (final user in mentionedUsers ?? const <UserDetails>[]) {
+      if (matchesUser(handle, user)) {
+        final resolved = _userDetailsWithResolvedId(user);
+        if (isCurrentChatUser(resolved.userId)) return null;
+        return resolved;
+      }
+    }
+
+    if (!IsmChatUtility.chatPageControllerRegistered) return null;
+    final members = IsmChatUtility.chatPageController.groupMembers;
+    for (final member in members) {
+      if (isCurrentChatUser(member.userId)) continue;
+      final userName = member.userName.trim();
+      if (userName.isEmpty) continue;
+      final firstWordLen = userName.split(' ').first.length;
+      if (firstWordLen == handle.length &&
+          userName.toLowerCase().contains(
+                handle.substring(0, firstWordLen).toLowerCase(),
+              )) {
+        return _userDetailsWithResolvedId(member);
+      }
+      if (mentionSegmentMatchesMemberName(handle, userName)) {
+        return _userDetailsWithResolvedId(member);
+      }
+      final display = member.displayName.trim();
+      if (display.isNotEmpty &&
+          mentionSegmentMatchesMemberName(handle, display)) {
+        return _userDetailsWithResolvedId(member);
+      }
+    }
+    for (final member in members) {
+      if (isCurrentChatUser(member.userId)) continue;
+      if (matchesUser(handle, member)) {
+        return _userDetailsWithResolvedId(member);
+      }
+    }
+    return null;
+  }
+
+  UserDetails _userDetailsWithResolvedId(UserDetails user) {
+    if (user.userId.trim().isNotEmpty) return user;
+    final memberId = user.memberId?.trim() ?? '';
+    if (memberId.isEmpty) return user;
+    return user.copyWith(userId: memberId);
   }
 
   /// Whether [body] includes a parseable http/https/www URL (not phone/email/@mention).
@@ -596,7 +870,10 @@ extension MentionMessage on IsmChatMessageModel {
     for (final segment in mentionList) {
       if (!segment.isLink) continue;
       final text = segment.text.trim();
-      if (!text.startsWith('http') && !text.startsWith('www')) continue;
+      final lowerText = text.toLowerCase();
+      if (!lowerText.startsWith('http') && !lowerText.startsWith('www')) {
+        continue;
+      }
       final uri = Uri.tryParse(text.convertToValidUrl);
       if (uri != null && uri.host.isNotEmpty) return true;
     }
@@ -623,7 +900,10 @@ extension MentionMessage on IsmChatMessageModel {
     for (final segment in mentionList) {
       if (!segment.isLink) continue;
       final text = segment.text.trim();
-      if (!text.startsWith('http') && !text.startsWith('www')) continue;
+      final lowerText = text.toLowerCase();
+      if (!lowerText.startsWith('http') && !lowerText.startsWith('www')) {
+        continue;
+      }
       final uri = Uri.tryParse(text.convertToValidUrl);
       if (uri != null && uri.host.isNotEmpty) return text;
     }
@@ -640,7 +920,8 @@ extension MentionMessage on IsmChatMessageModel {
       IsmChatCustomMessageType.video,
       IsmChatCustomMessageType.image,
       IsmChatCustomMessageType.audio,
-      IsmChatCustomMessageType.file
+      IsmChatCustomMessageType.file,
+      IsmChatCustomMessageType.multipleAttachments,
     ].contains(customType)) {
       menu.remove(IsmChatFocusMenuType.copy);
     }
@@ -677,6 +958,7 @@ extension MentionMessage on IsmChatMessageModel {
       IsmChatCustomMessageType.image,
       IsmChatCustomMessageType.video,
       IsmChatCustomMessageType.file,
+      IsmChatCustomMessageType.multipleAttachments,
     ].contains(customType)) {
       menu.remove(IsmChatFocusMenuType.save);
     }
@@ -817,6 +1099,187 @@ extension MentionMessage on IsmChatMessageModel {
     return null;
   }
 
+  static const _multipleBody = 'AttachmentMessage:Multiple';
+
+  bool get isMultipleAttachmentsMessage =>
+      customType == IsmChatCustomMessageType.multipleAttachments ||
+      (attachments != null &&
+          attachments!.length > 1 &&
+          (body == _multipleBody || customType?.value == _multipleBody));
+
+  /// Caption shown under a multi-attachment bubble.
+  ///
+  /// Prefer [IsmChatMetaData.caption]. Web puts the caption in [body] and uses
+  /// [body] `AttachmentMessage:Multiple` only when there is no caption.
+  /// Single image/video with a caption also mirror it in [body]; otherwise
+  /// [body] is empty and the caption lives only in metadata when present.
+  String get multipleAttachmentCaption {
+    final fromMeta = metaData?.caption?.trim() ?? '';
+    if (!isMultipleAttachmentsMessage) {
+      return fromMeta;
+    }
+    if (fromMeta.isNotEmpty) {
+      return fromMeta;
+    }
+    final fromBody = body.trim();
+    if (fromBody.isEmpty || fromBody == _multipleBody) {
+      return '';
+    }
+    return fromBody;
+  }
+
+  /// Homogeneous layout for multipleAttachments messages.
+  ///
+  /// Null when the message mixes grid media with docs or audio. The bubble
+  /// partitions those by each attachment's resolved media type instead of
+  /// dropping files.
+  MultipleAttachmentLayout? get multipleAttachmentLayout {
+    final list = attachments;
+    if (list == null || list.isEmpty) {
+      return null;
+    }
+    final allDocs = list.every((a) => a.isDocumentAttachment);
+    final allGrid = list.every((a) => a.isGridMediaAttachment);
+    if (allDocs) {
+      return MultipleAttachmentLayout.documentList;
+    }
+    if (allGrid) {
+      return MultipleAttachmentLayout.mediaGrid;
+    }
+    return null;
+  }
+
+  /// One message per document for the conversation docs tab and [IsmDocsView].
+  ///
+  /// Reuse for multi-attachment document lists the same way as
+  /// [syntheticMessagesForGrid] for the media tab.
+  List<IsmChatMessageModel> get syntheticMessagesForDocs {
+    final list =
+        attachments?.where((attachment) => attachment.isDocumentAttachment);
+    if (list == null || list.isEmpty) {
+      return const [];
+    }
+    return list.map((attachment) {
+      return copyWith(
+        customType: IsmChatCustomMessageType.file,
+        attachments: [attachment],
+      );
+    }).toList();
+  }
+
+  /// One message per image/video (and gif/sticker) for [IsmChatMediaGridMessage].
+  ///
+  /// Docs and audio are omitted here so a mixed message does not paint them
+  /// as photos. Reuse this for the grid and the conversation media gallery.
+  List<IsmChatMessageModel> get syntheticMessagesForGrid {
+    final list =
+        attachments?.where((attachment) => attachment.isGridMediaAttachment);
+    if (list == null || list.isEmpty) {
+      return const [];
+    }
+    return list.map((attachment) {
+      final type = attachment.resolvedMediaType;
+      final customType = type == IsmChatMediaType.video
+          ? IsmChatCustomMessageType.video
+          : IsmChatCustomMessageType.image;
+      return copyWith(
+        customType: customType,
+        attachments: [attachment],
+      );
+    }).toList();
+  }
+
+  /// Per-item rows for conversation media tabs and the image/video preview pager.
+  ///
+  /// Use [includeAudio] for [IsmMediaView] / Group Info media tab; full-screen
+  /// swipe preview should pass `includeAudio: false`.
+  List<IsmChatMessageModel> toMediaGalleryItems({bool includeAudio = false}) {
+    final type = customType;
+    if (type == IsmChatCustomMessageType.image ||
+        type == IsmChatCustomMessageType.video) {
+      return [this];
+    }
+    if (includeAudio && type == IsmChatCustomMessageType.audio) {
+      return [this];
+    }
+    if (isMultipleAttachmentsMessage ||
+        type == IsmChatCustomMessageType.multipleAttachments) {
+      final gridItems = syntheticMessagesForGrid;
+      if (gridItems.isNotEmpty) {
+        return gridItems;
+      }
+    }
+    return const [];
+  }
+
+  /// Per-item rows for the conversation docs tab (one row per file).
+  List<IsmChatMessageModel> toDocsGalleryItems() {
+    if (customType == IsmChatCustomMessageType.file) {
+      return [this];
+    }
+    if (isMultipleAttachmentsMessage ||
+        customType == IsmChatCustomMessageType.multipleAttachments) {
+      return syntheticMessagesForDocs;
+    }
+    return const [];
+  }
+
+  /// Whether this chat message contributes to the conversation media tab list
+  /// before [expandMediaGalleryItems].
+  bool get contributesToConversationMediaTab {
+    if ([
+      IsmChatCustomMessageType.image,
+      IsmChatCustomMessageType.video,
+      IsmChatCustomMessageType.audio,
+    ].contains(customType)) {
+      return true;
+    }
+    if (isMultipleAttachmentsMessage ||
+        customType == IsmChatCustomMessageType.multipleAttachments) {
+      return syntheticMessagesForGrid.isNotEmpty;
+    }
+    return false;
+  }
+
+  /// Whether this message contributes to the docs tab in conversation media.
+  bool get contributesToConversationDocsTab => toDocsGalleryItems().isNotEmpty;
+
+  /// Matches the same gallery tile (parent message + attachment identity).
+  bool matchesMediaGalleryIdentity(IsmChatMessageModel other) {
+    if (!hasSameMediaGridIdentityAs(other)) {
+      return false;
+    }
+    final attachment = attachments?.firstOrNull;
+    final otherAttachment = other.attachments?.firstOrNull;
+    if (attachment == null || otherAttachment == null) {
+      return attachment == otherAttachment;
+    }
+    final idA = (attachment.mediaId ?? '').trim();
+    final idB = (otherAttachment.mediaId ?? '').trim();
+    if (idA.isNotEmpty && idB.isNotEmpty) {
+      return idA == idB;
+    }
+    final urlA = (attachment.mediaUrl ?? '').trim();
+    final urlB = (otherAttachment.mediaUrl ?? '').trim();
+    if (urlA.isNotEmpty && urlB.isNotEmpty) {
+      return urlA == urlB;
+    }
+    return false;
+  }
+
+  /// Conversation preview for multi-attachment messages.
+  String get multipleAttachmentsPreviewLabel {
+    final count = attachments?.length ?? 0;
+    final layout = multipleAttachmentLayout;
+    if (layout == MultipleAttachmentLayout.documentList) {
+      return count > 1 ? '$count Documents' : IsmChatStrings.document;
+    }
+    if (layout == MultipleAttachmentLayout.mediaGrid) {
+      return count > 1 ? '$count Photos' : IsmChatStrings.image;
+    }
+    return IsmChatStrings.document;
+  }
+
   bool get isGridDisplayableMedia =>
       customType == IsmChatCustomMessageType.video ||
       (isGridEligibleMedia && customType == IsmChatCustomMessageType.image);
@@ -845,6 +1308,75 @@ extension MentionMessage on IsmChatMessageModel {
     }
     return sentAt == other.sentAt && sentByMe == other.sentByMe;
   }
+}
+
+/// Flattens chat messages into one gallery row per image/video (and audio when requested).
+List<IsmChatMessageModel> expandMediaGalleryItems(
+  Iterable<IsmChatMessageModel> messages, {
+  bool includeAudio = false,
+}) {
+  final result = <IsmChatMessageModel>[];
+  for (final message in messages) {
+    result.addAll(message.toMediaGalleryItems(includeAudio: includeAudio));
+  }
+  return result;
+}
+
+/// Flattens chat messages into one docs-tab row per file attachment.
+List<IsmChatMessageModel> expandDocsGalleryItems(
+  Iterable<IsmChatMessageModel> messages,
+) {
+  final result = <IsmChatMessageModel>[];
+  for (final message in messages) {
+    result.addAll(message.toDocsGalleryItems());
+  }
+  return result;
+}
+
+/// Keeps [IsmChatConversationsController] media / links / docs lists in sync
+/// with the current message list (Group Info, contact info, media view).
+void syncConversationMediaTabLists(
+  IsmChatConversationsController conversationController,
+  Iterable<IsmChatMessageModel> messages,
+) {
+  conversationController.mediaList = expandMediaGalleryItems(
+    messages.where((e) => e.contributesToConversationMediaTab),
+    includeAudio: true,
+  );
+  conversationController.mediaListLinks = messages
+      .where((e) => e.customType == IsmChatCustomMessageType.link)
+      .toList();
+  conversationController.mediaListDocs = expandDocsGalleryItems(
+    messages.where((e) => e.contributesToConversationDocsTab),
+  );
+}
+
+/// Index of [tapped] in [gallery]; falls back to attachment identity matching.
+int indexInMediaGallery(
+  List<IsmChatMessageModel> gallery,
+  IsmChatMessageModel tapped, {
+  int? attachmentIndex,
+}) {
+  final direct = gallery.indexOf(tapped);
+  if (direct >= 0) {
+    return direct;
+  }
+
+  var target = tapped;
+  if (attachmentIndex != null &&
+      tapped.customType == IsmChatCustomMessageType.multipleAttachments) {
+    final synthetics = tapped.syntheticMessagesForGrid;
+    if (attachmentIndex >= 0 && attachmentIndex < synthetics.length) {
+      target = synthetics[attachmentIndex];
+    }
+  }
+
+  for (var i = 0; i < gallery.length; i++) {
+    if (gallery[i].matchesMediaGalleryIdentity(target)) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 /// Groups consecutive image/video messages for the chat grid UI.
@@ -1003,6 +1535,35 @@ extension IsmChatContactMetaDatExtension on IsmChatContactMetaDatModel {
   /// Opens the device contacts app to save this shared contact.
   Future<void> openExternalInsert() =>
       IsmChatUtility.openContactSaveScreen(toFlutterContact());
+}
+
+/// Attachment type helpers (API [mediaType] vs [attachmentType]).
+extension IsmChatAttachmentModelExtension on AttachmentModel {
+  IsmChatMediaType get resolvedMediaType =>
+      attachmentType ?? IsmChatMediaType.image;
+
+  bool get isDocumentAttachment => resolvedMediaType == IsmChatMediaType.file;
+
+  bool get isGridMediaAttachment {
+    final type = resolvedMediaType;
+    // GIF and sticker sit in the photo grid when they arrive inside
+    // AttachmentMessage:Multiple. A lone GIF/sticker message is unchanged.
+    return type == IsmChatMediaType.image ||
+        type == IsmChatMediaType.video ||
+        type == IsmChatMediaType.gif ||
+        type == IsmChatMediaType.sticker;
+  }
+
+  /// Uppercase label for document rows (e.g. PDF, TXT).
+  String get displayExtensionLabel {
+    final fromName = name?.split('.').last;
+    final ext = (extension?.isNotEmpty == true ? extension : fromName) ?? '';
+    final normalized = ext.toUpperCase();
+    if (normalized.isNotEmpty && normalized.length <= 6) {
+      return normalized;
+    }
+    return 'FILE';
+  }
 }
 
 /// GIF / sticker helpers based on [AttachmentModel.attachmentType].

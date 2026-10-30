@@ -210,6 +210,8 @@ class IsmChatStrings {
   static String get messageInfo => IsmChatL10n.get('messageInfo');
   static String get inviteToChat => IsmChatL10n.get('inviteToChat');
   static String get youCanNotSend => IsmChatL10n.get('youCanNotSend');
+  static String get maxPickerAttachmentsReached =>
+      IsmChatL10n.get('maxPickerAttachmentsReached');
   static String get aboutMe => IsmChatL10n.get('aboutMe');
   static String get recipients => IsmChatL10n.get('recipients');
   static String get addrecipient => IsmChatL10n.get('addrecipient');

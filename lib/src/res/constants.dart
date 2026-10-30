@@ -30,6 +30,9 @@ class IsmChatConstants {
 
   static const int attachmentShowLine = 3;
 
+  /// Max images/videos/documents per picker session (gallery + file picker).
+  static const int maxOutboundPickerAttachments = 5;
+
   static const String profileUrl =
       'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png';
 

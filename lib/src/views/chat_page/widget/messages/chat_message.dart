@@ -14,6 +14,9 @@ class IsmChatMessageWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.isMultipleAttachmentsMessage) {
+      return IsmChatMultipleAttachmentsMessage(message);
+    }
     switch (messageType) {
       case IsmChatCustomMessageType.text:
       case IsmChatCustomMessageType.bulkAction:
@@ -30,6 +33,8 @@ class IsmChatMessageWrapper extends StatelessWidget {
         return IsmChatAudioMessage(message);
       case IsmChatCustomMessageType.file:
         return IsmChatFileMessage(message);
+      case IsmChatCustomMessageType.multipleAttachments:
+        return IsmChatMultipleAttachmentsMessage(message);
       case IsmChatCustomMessageType.location:
         return IsmChatLocationMessage(message);
       case IsmChatCustomMessageType.block:
@@ -114,6 +119,9 @@ class IsmChatMessageWrapperWithMetaData extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.isMultipleAttachmentsMessage) {
+      return IsmChatMultipleAttachmentsMessage(message);
+    }
     switch (replayMessageCustomType) {
       case IsmChatCustomMessageType.text:
       case IsmChatCustomMessageType.bulkAction:
@@ -130,6 +138,8 @@ class IsmChatMessageWrapperWithMetaData extends StatelessWidget {
         return IsmChatAudioMessage(message);
       case IsmChatCustomMessageType.file:
         return IsmChatFileMessage(message);
+      case IsmChatCustomMessageType.multipleAttachments:
+        return IsmChatMultipleAttachmentsMessage(message);
       case IsmChatCustomMessageType.location:
         return IsmChatLocationMessage(message);
       case IsmChatCustomMessageType.block:

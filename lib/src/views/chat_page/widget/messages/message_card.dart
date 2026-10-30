@@ -163,7 +163,9 @@ class _MessageCardState extends State<MessageCard>
                             if (widget.message.customType ==
                                     IsmChatCustomMessageType.video ||
                                 widget.message.customType ==
-                                    IsmChatCustomMessageType.image) {
+                                    IsmChatCustomMessageType.image ||
+                                widget.message.customType ==
+                                    IsmChatCustomMessageType.multipleAttachments) {
                               return;
                             }
                             controller.onMessageTap(

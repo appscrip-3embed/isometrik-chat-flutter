@@ -105,6 +105,13 @@ class LastMessageDetails {
               IsmChatCustomMessageType.contact
           ? IsmChatStrings.contact
           : details.body,
+      // customType AttachmentMessage:Multiple stays multiple even when body
+      // is a caption. The body placeholder still covers older payloads.
+      customType: details.customType ==
+                  IsmChatCustomMessageType.multipleAttachments ||
+              details.body == 'AttachmentMessage:Multiple'
+          ? IsmChatCustomMessageType.multipleAttachments
+          : details.customType,
       sentByMe: details.senderId.isNotEmpty
           ? details.senderId ==
               IsmChatConfig.communicationConfig.userConfig.userId

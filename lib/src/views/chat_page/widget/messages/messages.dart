@@ -16,6 +16,7 @@ export 'image_message.dart';
 export 'link_message.dart';
 export 'location_message.dart';
 export 'media_grid_message.dart';
+export 'multiple_attachments_message.dart';
 export 'member_leave_and_join.dart';
 export 'message_bubble.dart';
 export 'message_card.dart';

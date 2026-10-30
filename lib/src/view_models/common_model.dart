@@ -357,43 +357,32 @@ class IsmChatCommonViewModel {
   List<IsmChatMessageModel> _parseMessagesWithDate(
     List<IsmChatMessageModel> messages,
   ) {
-    var result = <List<IsmChatMessageModel>>[];
-    var list1 = <IsmChatMessageModel>[];
-    var allMessages = <IsmChatMessageModel>[];
-    var dummyList = <int>[];
+    if (messages.isEmpty) {
+      return [];
+    }
 
-    for (var x = 0; x < messages.length; x++) {
-      if (!dummyList.contains(messages[x].sentAt)) {
-        dummyList.add(messages[x].sentAt);
-        if (x == 0) {
-          list1.add(messages[x]);
-        } else if (DateTime.fromMillisecondsSinceEpoch(messages[x - 1].sentAt)
-            .isSameDay(
-                DateTime.fromMillisecondsSinceEpoch(messages[x].sentAt))) {
-          list1.add(messages[x]);
-        } else {
-          result.add([...list1]);
-          list1
-            ..clear()
-            ..add(messages[x]);
-        }
-        if (x == messages.length - 1 && list1.isNotEmpty) {
-          result.add([...list1]);
-        }
+    final dayGroups = <List<IsmChatMessageModel>>[];
+    var currentGroup = <IsmChatMessageModel>[messages.first];
+
+    for (var index = 1; index < messages.length; index++) {
+      final previous = messages[index - 1];
+      final current = messages[index];
+      final sameDay = DateTime.fromMillisecondsSinceEpoch(previous.sentAt)
+          .isSameDay(DateTime.fromMillisecondsSinceEpoch(current.sentAt));
+      if (sameDay) {
+        currentGroup.add(current);
+      } else {
+        dayGroups.add(currentGroup);
+        currentGroup = [current];
       }
     }
-    if (result.isEmpty && list1.isNotEmpty) {
-      result.add([...list1]);
-    }
+    dayGroups.add(currentGroup);
 
-    for (var message in result) {
+    final allMessages = <IsmChatMessageModel>[];
+    for (final group in dayGroups) {
       allMessages
-        ..add(
-          IsmChatMessageModel.fromDate(
-            message.first.sentAt,
-          ),
-        )
-        ..addAll(message);
+        ..add(IsmChatMessageModel.fromDate(group.first.sentAt))
+        ..addAll(group);
     }
     return allMessages;
   }

@@ -26,45 +26,53 @@ mixin IsmChatMqttEventMessageStatusMixin {
           List<IsmChatMqttActionModel>.from(vars.deliverdActions);
       vars.ismChatDeliveredDebounce.run(() async {
         for (final action in actionsData) {
-          var conversation = await IsmChatConfig.dbWrapper
-              ?.getConversation(action.conversationId ?? '');
-          final message = conversation?.messages?.values
-              .cast<IsmChatMessageModel?>()
-              .firstWhere(
-                (e) => e?.messageId == action.messageId,
-                orElse: () => null,
+          final conversationId = action.conversationId ?? '';
+          // Read and write inside the per-conversation queue so a delivery
+          // receipt cannot save a snapshot that is missing a message inserted
+          // while this handler was waiting.
+          final updated = await IsmChatConfig.dbWrapper?.updateConversation(
+            conversationId: conversationId,
+            update: (conversation) {
+              if (conversation == null) return null;
+              final located = _storedMessage(
+                conversation.messages,
+                action.messageId,
               );
-          if (message != null) {
-            final isDelivered = message.deliveredTo
-                ?.any((e) => e.userId == action.userDetails?.userId);
-            if (isDelivered != true) {
-              message.deliveredTo?.add(
-                MessageStatus(
-                  userId: action.userDetails?.userId ?? '',
-                  timestamp: action.sentAt,
+              if (located == null) return null;
+              final message = located.message;
+              final isDelivered = message.deliveredTo
+                  ?.any((e) => e.userId == action.userDetails?.userId);
+              if (isDelivered != true) {
+                message.deliveredTo?.add(
+                  MessageStatus(
+                    userId: action.userDetails?.userId ?? '',
+                    timestamp: action.sentAt,
+                  ),
+                );
+              }
+              message.deliveredToAll = message.deliveredTo?.length ==
+                  _othersToAckCount(conversation);
+              // Keep the key the row was stored under. [message.key] can
+              // differ when metadata has no messageSentAt.
+              located.messages[located.storageKey] = message;
+              return conversation.copyWith(
+                messages: located.messages,
+                lastMessageDetails: conversation.lastMessageDetails?.copyWith(
+                  deliverCount: message.deliveredTo?.length,
+                  deliveredTo: message.deliveredTo,
                 ),
               );
-            }
-            message.deliveredToAll =
-                message.deliveredTo?.length == _othersToAckCount(conversation);
-            conversation?.messages?[message.key] = message;
-            conversation = conversation?.copyWith(
-              lastMessageDetails: conversation.lastMessageDetails?.copyWith(
-                deliverCount: message.deliveredTo?.length,
-                deliveredTo: message.deliveredTo,
-              ),
-            );
-            await IsmChatConfig.dbWrapper
-                ?.saveConversation(conversation: conversation!);
-            if (IsmChatUtility.chatPageControllerRegistered) {
-              await IsmChatUtility.chatPageController
-                  .getMessagesFromDB(action.conversationId ?? '');
-              IsmChatUtility.chatPageController.update();
-            }
-            if (IsmChatUtility.conversationControllerRegistered) {
-              unawaited(IsmChatUtility.conversationController
-                  .getConversationsFromDB());
-            }
+            },
+          );
+          if (updated != null && IsmChatUtility.chatPageControllerRegistered) {
+            await IsmChatUtility.chatPageController
+                .getMessagesFromDB(conversationId);
+            IsmChatUtility.chatPageController.update();
+          }
+          if (updated != null &&
+              IsmChatUtility.conversationControllerRegistered) {
+            unawaited(IsmChatUtility.conversationController
+                .getConversationsFromDB());
           }
           vars.deliverdActions.remove(action);
         }
@@ -88,63 +96,66 @@ mixin IsmChatMqttEventMessageStatusMixin {
       vars.ismChatReadDebounce.run(() async {
         final actionsData = List<IsmChatMqttActionModel>.from(vars.readActions);
         for (var action in actionsData) {
-          var conversation = await IsmChatConfig.dbWrapper
-              ?.getConversation(action.conversationId ?? '');
-          final message = conversation?.messages?.values
-              .cast<IsmChatMessageModel?>()
-              .firstWhere(
-                (e) => e?.messageId == action.messageId,
-                orElse: () => null,
+          final conversationId = action.conversationId ?? '';
+          final updated = await IsmChatConfig.dbWrapper?.updateConversation(
+            conversationId: conversationId,
+            update: (conversation) {
+              if (conversation == null) return null;
+              final located = _storedMessage(
+                conversation.messages,
+                action.messageId,
               );
-          if (message != null) {
-            final isRead = message.readBy
-                ?.any((e) => e.userId == action.userDetails?.userId);
-            final isDelivered = message.deliveredTo
-                ?.any((e) => e.userId == action.userDetails?.userId);
-            if (isDelivered != true) {
-              message.deliveredTo?.add(
-                MessageStatus(
-                  userId: action.userDetails?.userId ?? '',
-                  timestamp: action.sentAt,
+              if (located == null) return null;
+              final message = located.message;
+              final isRead = message.readBy
+                  ?.any((e) => e.userId == action.userDetails?.userId);
+              final isDelivered = message.deliveredTo
+                  ?.any((e) => e.userId == action.userDetails?.userId);
+              if (isDelivered != true) {
+                message.deliveredTo?.add(
+                  MessageStatus(
+                    userId: action.userDetails?.userId ?? '',
+                    timestamp: action.sentAt,
+                  ),
+                );
+              }
+              if (isRead != true) {
+                message.readBy?.add(
+                  MessageStatus(
+                    userId: action.userDetails?.userId ?? '',
+                    timestamp: action.sentAt,
+                  ),
+                );
+              }
+              message.readByAll =
+                  message.readBy?.length == _othersToAckCount(conversation);
+              // If readByAll is true, deliveredToAll must also be true
+              // (you can't read a message that hasn't been delivered)
+              if (message.readByAll == true) {
+                message.deliveredToAll = true;
+              } else {
+                message.deliveredToAll = message.deliveredTo?.length ==
+                    _othersToAckCount(conversation);
+              }
+              located.messages[located.storageKey] = message;
+              return conversation.copyWith(
+                messages: located.messages,
+                lastMessageDetails: conversation.lastMessageDetails?.copyWith(
+                  readCount: message.readBy?.length,
+                  readBy: message.readBy,
                 ),
               );
-            }
-            if (isRead != true) {
-              message.readBy?.add(
-                MessageStatus(
-                  userId: action.userDetails?.userId ?? '',
-                  timestamp: action.sentAt,
-                ),
-              );
-            }
-            message.readByAll =
-                message.readBy?.length == _othersToAckCount(conversation);
-            // If readByAll is true, deliveredToAll must also be true
-            // (you can't read a message that hasn't been delivered)
-            if (message.readByAll == true) {
-              message.deliveredToAll = true;
-            } else {
-              message.deliveredToAll =
-                  message.deliveredTo?.length == _othersToAckCount(conversation);
-            }
-            conversation?.messages?[message.key] = message;
-            conversation = conversation?.copyWith(
-              lastMessageDetails: conversation.lastMessageDetails?.copyWith(
-                readCount: message.readBy?.length,
-                readBy: message.readBy,
-              ),
-            );
-            await IsmChatConfig.dbWrapper
-                ?.saveConversation(conversation: conversation!);
-            if (IsmChatUtility.chatPageControllerRegistered) {
-              await IsmChatUtility.chatPageController
-                  .getMessagesFromDB(action.conversationId ?? '');
-              IsmChatUtility.chatPageController.update();
-            }
-            if (IsmChatUtility.conversationControllerRegistered) {
-              unawaited(IsmChatUtility.conversationController
-                  .getConversationsFromDB());
-            }
+            },
+          );
+          if (updated != null && IsmChatUtility.chatPageControllerRegistered) {
+            await IsmChatUtility.chatPageController
+                .getMessagesFromDB(conversationId);
+            IsmChatUtility.chatPageController.update();
+          }
+          if (updated != null &&
+              IsmChatUtility.conversationControllerRegistered) {
+            unawaited(IsmChatUtility.conversationController
+                .getConversationsFromDB());
           }
           vars.readActions.remove(action);
         }
@@ -160,15 +171,23 @@ mixin IsmChatMqttEventMessageStatusMixin {
     if (self is IsmChatMqttEventUtilitiesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
       if (utils.isSenderMe(actionModel.userDetails?.userId)) return;
-      var conversation = await IsmChatConfig.dbWrapper
-          ?.getConversation(actionModel.conversationId ?? '');
-      if (conversation != null) {
-        final allMessages = conversation.messages ?? {};
-        final modifiedMessages = {};
-        for (var message in allMessages.values) {
-          if (message.deliveredToAll == true && message.readByAll == true) {
-            modifiedMessages.addEntries({message.key: message}.entries);
-          } else {
+      final conversationId = actionModel.conversationId ?? '';
+      // Group chats emit this event for a whole page of messages. Reuse each
+      // row's existing map key. Keying by metaData.messageSentAt collapses
+      // every incoming message onto "0" (MQTT metadata omits that field) and
+      // the next DB reload deletes them from the screen.
+      await IsmChatConfig.dbWrapper?.updateConversation(
+        conversationId: conversationId,
+        update: (conversation) {
+          if (conversation == null) return null;
+          final allMessages = conversation.messages ?? {};
+          final modifiedMessages = <String, IsmChatMessageModel>{};
+          for (final entry in allMessages.entries) {
+            final message = entry.value;
+            if (message.deliveredToAll == true && message.readByAll == true) {
+              modifiedMessages[entry.key] = message;
+              continue;
+            }
             final isDelivered = message.deliveredTo
                 ?.any((e) => e.userId == actionModel.userDetails?.userId);
             final isRead = message.readBy
@@ -198,8 +217,8 @@ mixin IsmChatMqttEventMessageStatusMixin {
 
             final readByAllValue =
                 modified.readBy?.length == _othersToAckCount(conversation);
-            final deliveredToAllValue =
-                modified.deliveredTo?.length == _othersToAckCount(conversation);
+            final deliveredToAllValue = modified.deliveredTo?.length ==
+                _othersToAckCount(conversation);
 
             modified = modified.copyWith(
               readByAll: readByAllValue,
@@ -208,28 +227,27 @@ mixin IsmChatMqttEventMessageStatusMixin {
               deliveredToAll: readByAllValue ? true : deliveredToAllValue,
             );
 
-            modifiedMessages.addEntries(
-                {'${modified.metaData?.messageSentAt}': modified}.entries);
+            modifiedMessages[entry.key] = modified;
           }
-        }
-        final meesages = IsmChatMessages.from(modifiedMessages);
-        conversation = conversation.copyWith(
-          messages: meesages,
-          lastMessageDetails: conversation.lastMessageDetails?.copyWith(
-            deliverCount: meesages.isEmpty
-                ? 1
-                : meesages.values.last.deliveredTo?.length ?? 0,
-            readCount:
-                meesages.isEmpty ? 1 : meesages.values.last.readBy?.length ?? 0,
-            readBy: meesages.isEmpty ? [] : meesages.values.last.readBy,
-            deliveredTo:
-                meesages.isEmpty ? [] : meesages.values.last.deliveredTo,
-          ),
-        );
-
-        await IsmChatConfig.dbWrapper
-            ?.saveConversation(conversation: conversation);
-      }
+          return conversation.copyWith(
+            messages: modifiedMessages,
+            lastMessageDetails: conversation.lastMessageDetails?.copyWith(
+              deliverCount: modifiedMessages.isEmpty
+                  ? 1
+                  : modifiedMessages.values.last.deliveredTo?.length ?? 0,
+              readCount: modifiedMessages.isEmpty
+                  ? 1
+                  : modifiedMessages.values.last.readBy?.length ?? 0,
+              readBy: modifiedMessages.isEmpty
+                  ? []
+                  : modifiedMessages.values.last.readBy,
+              deliveredTo: modifiedMessages.isEmpty
+                  ? []
+                  : modifiedMessages.values.last.deliveredTo,
+            ),
+          );
+        },
+      );
       if (IsmChatUtility.chatPageControllerRegistered) {
         var controller = IsmChatUtility.chatPageController;
         if (controller.conversation?.conversationId ==
@@ -253,28 +271,29 @@ mixin IsmChatMqttEventMessageStatusMixin {
     if (self is IsmChatMqttEventUtilitiesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
       if (utils.isSenderMe(actionModel.userDetails?.userId)) return;
-      var conversation = await IsmChatConfig.dbWrapper
-          ?.getConversation(actionModel.conversationId ?? '');
-      final allMessages = conversation?.messages;
-      if (allMessages == null) return;
-      if (actionModel.messageIds?.isNotEmpty == true) {
-        for (final x in actionModel.messageIds ?? []) {
-          final message = allMessages.values
-              .cast<IsmChatMessageModel?>()
-              .firstWhere((e) => e?.messageId == x, orElse: () => null);
-          if (message != null) {
-            allMessages[message.key] = message.copyWith(
+      final conversationId = actionModel.conversationId ?? '';
+      await IsmChatConfig.dbWrapper?.updateConversation(
+        conversationId: conversationId,
+        update: (conversation) {
+          if (conversation == null) return null;
+          final allMessages =
+              Map<String, IsmChatMessageModel>.from(conversation.messages ?? {});
+          if (allMessages.isEmpty) return null;
+          if (actionModel.messageIds?.isNotEmpty != true) return null;
+          var changed = false;
+          for (final messageId in actionModel.messageIds ?? []) {
+            final located = _storedMessage(allMessages, messageId);
+            if (located == null) continue;
+            located.messages[located.storageKey] = located.message.copyWith(
               customType: IsmChatCustomMessageType.deletedForEveryone,
               reactions: [],
             );
+            changed = true;
           }
-        }
-      }
-      if (conversation != null) {
-        conversation = conversation.copyWith(messages: allMessages);
-        await IsmChatConfig.dbWrapper
-            ?.saveConversation(conversation: conversation);
-      }
+          if (!changed) return null;
+          return conversation.copyWith(messages: allMessages);
+        },
+      );
 
       if (IsmChatUtility.chatPageControllerRegistered) {
         final controller = IsmChatUtility.chatPageController;
@@ -302,4 +321,30 @@ int _othersToAckCount(IsmChatConversationModel? conversation) {
     return (conversation?.membersCount ?? 0) - 1;
   }
   return 1;
+}
+
+/// One stored row, addressed by the key already used in the conversation map.
+///
+/// Receipt handlers must write back to [storageKey]. Replacing the row under
+/// the message timestamp key drops it when that key does not match the key
+/// used at insert time.
+class _StoredMessage {
+  _StoredMessage(this.messages, this.storageKey, this.message);
+
+  final Map<String, IsmChatMessageModel> messages;
+  final String storageKey;
+  final IsmChatMessageModel message;
+}
+
+_StoredMessage? _storedMessage(
+  Map<String, IsmChatMessageModel>? source,
+  String? messageId,
+) {
+  if (source == null || messageId == null || messageId.isEmpty) return null;
+  for (final entry in source.entries) {
+    if (entry.value.messageId == messageId) {
+      return _StoredMessage(source, entry.key, entry.value);
+    }
+  }
+  return null;
 }

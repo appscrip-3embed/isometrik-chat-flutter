@@ -106,8 +106,7 @@ class IsmChatConversationProperties {
   /// Example:
   /// ```dart
   /// cardElementBuilders: IsmChatCardProperties(
-  ///   titleStyle: TextStyle(fontSize: 18),
-  ///   subtitleStyle: TextStyle(fontSize: 14),
+  ///   profileImageBuilder: (context, conversation, url) => MyAvatar(...),
   /// ),
   /// ```
   final IsmChatCardProperties? cardElementBuilders;

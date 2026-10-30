@@ -165,6 +165,16 @@ class IsmChatThemeResolver {
         custom: IsmChatConfig.chatTheme.chatPageTheme?.textFiledTheme,
       );
 
+  /// Message search bar ([IsmChatSearchMessgae]).
+  /// Uses [IsmChatPageTheme.searchTextFiledTheme] when set, else composer theme.
+  static IsmChatTextFiledTheme searchTextFieldFromConfig(
+          BuildContext context) =>
+      textField(
+        context,
+        custom: IsmChatConfig.chatTheme.chatPageTheme?.searchTextFiledTheme ??
+            IsmChatConfig.chatTheme.chatPageTheme?.textFiledTheme,
+      );
+
   static IsmChatReactionTheme reaction(
     BuildContext context, {
     IsmChatReactionTheme? custom,

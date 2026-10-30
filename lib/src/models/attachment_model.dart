@@ -46,10 +46,19 @@ class AttachmentModel {
         mediaHeight: _parseDimension(map['mediaHeight'] ?? map['height']),
         // Prefer base64 (see [toMap]); still accepts legacy list-string form.
         bytes: _parseBytes(map['bytes']),
-        attachmentType: map['attachmentType'] == null
-            ? IsmChatMediaType.image
-            : IsmChatMediaType.fromMap(map['attachmentType'] as int),
+        attachmentType: _resolveMediaTypeFromMap(map),
       );
+
+  /// API may send both [mediaType] and [attachmentType]; prefer [mediaType].
+  static IsmChatMediaType _resolveMediaTypeFromMap(Map<String, dynamic> map) {
+    if (map['mediaType'] != null) {
+      return IsmChatMediaType.fromMap(map['mediaType'] as int);
+    }
+    if (map['attachmentType'] != null) {
+      return IsmChatMediaType.fromMap(map['attachmentType'] as int);
+    }
+    return IsmChatMediaType.image;
+  }
 
   factory AttachmentModel.fromJson(String source) =>
       AttachmentModel.fromMap(json.decode(source) as Map<String, dynamic>);
@@ -200,6 +209,8 @@ class AttachmentModel {
         // Base64 preserves binary; see [_encodeBytes] / [_parseBytes].
         'bytes': _encodeBytes(bytes),
         'attachmentType': attachmentType?.value,
+        'mediaType': attachmentType?.value,
+        if (name != null && name!.isNotEmpty) 'nameWithExtension': name,
       }.removeNullValues();
 
   /// Builds the attachment object expected by the send-message API.

@@ -331,7 +331,46 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
           ? '${replayMessage?.meetingType == 0 ? 'Voice' : 'Video'} call'
           : 'Missed ${replayMessage?.meetingType == 0 ? 'voice' : 'video'} call';
     } else {
-      return replayMessage?.body ?? '';
+      final body = replayMessage?.body.trim() ?? '';
+      if (body.isNotEmpty) {
+        return body;
+      }
+      final caption = replayMessage?.metaData?.caption?.trim() ?? '';
+      if (caption.isNotEmpty) {
+        return caption;
+      }
+      return _replyPreviewBodyForEmptyAttachment(replayMessage);
+    }
+  }
+
+  /// Reply strip label when the wire [body] is empty (attachment placeholders).
+  String _replyPreviewBodyForEmptyAttachment(IsmChatMessageModel? message) {
+    if (message == null) {
+      return '';
+    }
+    if (message.isGifMessage) {
+      return IsmChatStrings.gif;
+    }
+    if (message.isStickerMessage) {
+      return IsmChatStrings.sticker;
+    }
+    switch (message.customType) {
+      case IsmChatCustomMessageType.image:
+        return IsmChatStrings.image;
+      case IsmChatCustomMessageType.video:
+        return IsmChatStrings.video;
+      case IsmChatCustomMessageType.audio:
+        return 'Audio';
+      case IsmChatCustomMessageType.file:
+        return IsmChatStrings.document;
+      case IsmChatCustomMessageType.location:
+        return IsmChatStrings.location;
+      case IsmChatCustomMessageType.contact:
+        return IsmChatStrings.contact;
+      case IsmChatCustomMessageType.multipleAttachments:
+        return message.multipleAttachmentsPreviewLabel;
+      default:
+        return '';
     }
   }
 
@@ -342,6 +381,7 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
     switch (customType) {
       case IsmChatCustomMessageType.audio:
       case IsmChatCustomMessageType.file:
+      case IsmChatCustomMessageType.multipleAttachments:
         return replayMessage.attachments?.first.name;
       case IsmChatCustomMessageType.contact:
         return replayMessage.metaData?.contacts?.first.contactIdentifier;
@@ -378,78 +418,142 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
     }
   }
 
+  /// Opens a single file attachment (document row download / file message).
+  Future<void> openFileAttachment(AttachmentModel attachment) async {
+    var localPath = attachment.mediaUrl;
+    if (localPath == null || localPath.isEmpty) {
+      return;
+    }
+    try {
+      if (!kIsWeb) {
+        final path = await IsmChatUtility.makeDirectoryWithUrl(
+          urlPath: attachment.mediaUrl ?? '',
+          fileName: attachment.name ?? '',
+        );
+
+        if (path.path.isNotEmpty) {
+          localPath = path.path;
+        }
+      }
+
+      if (kIsWeb) {
+        if (localPath.isValidUrl) {
+          IsmChatBlob.fileDownloadWithUrl(localPath);
+        } else {
+          IsmChatBlob.fileDownloadWithBytes(
+            localPath.strigToUnit8List,
+            downloadName: attachment.name,
+          );
+        }
+      } else {
+        await OpenFilex.open(localPath);
+      }
+    } catch (e) {
+      IsmChatLog.error('$e');
+    }
+  }
+
+  bool _isMessageBlurredForMediaPreview(IsmChatMessageModel item) =>
+      IsmChatProperties.chatPageProperties.isShowMessageBlur
+              ?.call(
+                IsmChatConfig.kNavigatorKey.currentContext ??
+                    IsmChatConfig.context,
+                item,
+              )
+              .shouldBlured ??
+          false;
+
+  /// All image/video items in the current chat for swipe preview (no audio).
+  List<IsmChatMessageModel> _conversationImageVideoGallery() =>
+      expandMediaGalleryItems(
+        _controller.messages,
+        includeAudio: false,
+      ).where((item) => !_isMessageBlurredForMediaPreview(item)).toList();
+
+  Future<void> _openGalleryForMessage(
+    IsmChatMessageModel message, {
+    int? attachmentIndex,
+  }) async {
+    final mediaList = _conversationImageVideoGallery();
+    if (mediaList.isEmpty) {
+      return;
+    }
+    final selectedIndex = indexInMediaGallery(
+      mediaList,
+      message,
+      attachmentIndex: attachmentIndex,
+    );
+    if (selectedIndex < 0) {
+      return;
+    }
+    final previewMeta = mediaList[selectedIndex];
+    await _openMediaPreviewList(
+      mediaList: mediaList,
+      selectedIndex: selectedIndex,
+      message: previewMeta,
+    );
+  }
+
+  /// Media preview for tiles inside one [multipleAttachments] message.
+  void tapForMediaPreviewAttachments(
+    IsmChatMessageModel parent,
+    int attachmentIndex,
+  ) async {
+    if (attachmentIndex < 0) {
+      return;
+    }
+    await _openGalleryForMessage(
+      parent,
+      attachmentIndex: attachmentIndex,
+    );
+  }
+
+  Future<void> _openMediaPreviewList({
+    required List<IsmChatMessageModel> mediaList,
+    required int selectedIndex,
+    required IsmChatMessageModel message,
+  }) async {
+    if (IsmChatResponsive.isWeb(
+        IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context)) {
+      await IsmChatRoute.goToRoute(IsmWebMessageMediaPreview(
+        previewData: {
+          'mediaIndex': selectedIndex,
+          'messageData': mediaList,
+          'mediaUserName': message.chatName,
+          'initiated': message.sentByMe,
+          'mediaTime': message.sentAt,
+        },
+      ));
+    } else {
+      await IsmChatRoute.goToRoute(IsmMediaPreview(
+        mediaIndex: selectedIndex,
+        messageData: mediaList,
+        mediaUserName: message.chatName,
+        initiated: message.sentByMe,
+        mediaTime: message.sentAt,
+      ));
+    }
+  }
+
   /// Taps for media preview from a message.
   void tapForMediaPreview(IsmChatMessageModel message) async {
     if ([IsmChatCustomMessageType.image, IsmChatCustomMessageType.video]
         .contains(message.customType)) {
-      final mediaList = _controller.messages
-          .where((item) =>
-              [IsmChatCustomMessageType.image, IsmChatCustomMessageType.video]
-                  .contains(item.customType) &&
-              !(IsmChatProperties.chatPageProperties.isShowMessageBlur
-                      ?.call(
-                          IsmChatConfig.kNavigatorKey.currentContext ??
-                              IsmChatConfig.context,
-                          item)
-                      .shouldBlured ??
-                  false))
-          .toList();
-      if (mediaList.isNotEmpty) {
-        final selectedMediaIndex = mediaList.indexOf(message);
-        if (IsmChatResponsive.isWeb(
-            IsmChatConfig.kNavigatorKey.currentContext ??
-                IsmChatConfig.context)) {
-          {
-            await IsmChatRoute.goToRoute(IsmWebMessageMediaPreview(
-              previewData: {
-                'mediaIndex': selectedMediaIndex,
-                'messageData': mediaList,
-                'mediaUserName': message.chatName,
-                'initiated': message.sentByMe,
-                'mediaTime': message.sentAt,
-              },
-            ));
-          }
-        } else {
-          await IsmChatRoute.goToRoute(IsmMediaPreview(
-            mediaIndex: selectedMediaIndex,
-            messageData: mediaList,
-            mediaUserName: message.chatName,
-            initiated: message.sentByMe,
-            mediaTime: message.sentAt,
-          ));
-        }
-      }
+      await _openGalleryForMessage(message);
     } else if (message.customType == IsmChatCustomMessageType.file) {
-      var localPath = message.attachments?.first.mediaUrl;
-      if (localPath == null) {
+      final attachment = message.attachments?.firstOrNull;
+      if (attachment == null) {
         return;
       }
-      try {
-        if (!kIsWeb) {
-          final path = await IsmChatUtility.makeDirectoryWithUrl(
-              urlPath: message.attachments?.first.mediaUrl ?? '',
-              fileName: message.attachments?.first.name ?? '');
-
-          if (path.path.isNotEmpty) {
-            localPath = path.path;
-          }
-        }
-
-        if (kIsWeb) {
-          if (localPath.isValidUrl) {
-            IsmChatBlob.fileDownloadWithUrl(localPath);
-          } else {
-            IsmChatBlob.fileDownloadWithBytes(
-              localPath.strigToUnit8List,
-              downloadName: message.attachments?.first.name,
-            );
-          }
-        } else {
-          await OpenFilex.open(localPath);
-        }
-      } catch (e) {
-        IsmChatLog.error('$e');
+      await openFileAttachment(attachment);
+    } else if (message.customType ==
+        IsmChatCustomMessageType.multipleAttachments) {
+      final layout = message.multipleAttachmentLayout;
+      if (layout == MultipleAttachmentLayout.mediaGrid) {
+        await _openGalleryForMessage(message, attachmentIndex: 0);
+      } else if (layout == MultipleAttachmentLayout.documentList) {
+        // Each document row handles its own tap; avoid opening the first file only.
+        return;
       }
     } else if (message.customType == IsmChatCustomMessageType.audio) {
       await IsmChatContextWidget.showDialogContext(
@@ -468,44 +572,11 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
 
   /// Taps for media preview from message metadata (reply).
   void tapForMediaPreviewWithMetaData(IsmChatMessageModel message) async {
+    final parentType = message.metaData?.replyMessage?.parentMessageMessageType;
     if ([IsmChatCustomMessageType.image, IsmChatCustomMessageType.video]
-        .contains(message.metaData?.replyMessage?.parentMessageMessageType)) {
-      final mediaList = _controller.messages
-          .where((item) =>
-              [IsmChatCustomMessageType.image, IsmChatCustomMessageType.video]
-                  .contains(
-                      item.metaData?.replyMessage?.parentMessageMessageType) &&
-              !(IsmChatProperties.chatPageProperties.isShowMessageBlur
-                      ?.call(
-                          IsmChatConfig.kNavigatorKey.currentContext ??
-                              IsmChatConfig.context,
-                          item)
-                      .shouldBlured ??
-                  false))
-          .toList();
-      final selectedMediaIndex = mediaList.indexOf(message);
-      if (IsmChatResponsive.isWeb(IsmChatConfig.kNavigatorKey.currentContext ??
-          IsmChatConfig.context)) {
-        {
-          await IsmChatRoute.goToRoute(IsmWebMessageMediaPreview(
-            previewData: {
-              'mediaIndex': selectedMediaIndex,
-              'messageData': mediaList,
-              'mediaUserName': message.chatName,
-              'initiated': message.sentByMe,
-              'mediaTime': message.sentAt
-            },
-          ));
-        }
-      } else {
-        await IsmChatRoute.goToRoute(IsmMediaPreview(
-          mediaIndex: selectedMediaIndex,
-          messageData: mediaList,
-          mediaUserName: message.chatName,
-          initiated: message.sentByMe,
-          mediaTime: message.sentAt,
-        ));
-      }
+            .contains(parentType) ||
+        parentType == IsmChatCustomMessageType.multipleAttachments) {
+      await _openGalleryForMessage(message);
     } else if (message.metaData?.replyMessage?.parentMessageMessageType ==
         IsmChatCustomMessageType.file) {
       var localPath = message.attachments?.first.mediaUrl;
