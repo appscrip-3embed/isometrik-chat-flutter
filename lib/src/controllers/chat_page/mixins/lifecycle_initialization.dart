@@ -129,6 +129,9 @@ mixin IsmChatPageLifecycleInitializationMixin on GetxController {
       } catch (_) {}
     }
     _controller.conversationDetailsApTimer?.cancel();
+    _controller._messagesReloadTimer?.cancel();
+    _controller._messagesReloadTimer = null;
+    _controller._pendingMessagesReloadId = null;
     _controller.messagesScrollController.dispose();
     _controller.searchMessageScrollController.dispose();
     _controller.attchmentOverlayEntry?.dispose();

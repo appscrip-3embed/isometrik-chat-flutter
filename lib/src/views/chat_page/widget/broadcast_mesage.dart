@@ -303,11 +303,14 @@ class _BroadCastMessageState extends State<_BroadCastMessage> {
                                 reverse: true,
                                 padding: IsmChatDimens.edgeInsets4_8,
                                 itemCount: controller.messages.length,
-                                itemBuilder: (_, index) => IsmChatMessage(
-                                  index,
-                                  controller.messages[index],
-                                  isIgnorTap: true,
-                                ),
+                                itemBuilder: (_, index) {
+                                  final messages = controller.messages;
+                                  return IsmChatMessage(
+                                    index,
+                                    messages[messages.length - 1 - index],
+                                    isIgnorTap: true,
+                                  );
+                                },
                               ),
                             )
                           : IsmChatProperties.chatPageProperties.placeholder ??

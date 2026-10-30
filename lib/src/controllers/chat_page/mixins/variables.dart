@@ -104,6 +104,19 @@ mixin IsmChatPageVariablesMixin on GetxController {
   List<IsmChatMessageModel> get messages => _messages;
   set messages(List<IsmChatMessageModel> value) => _messages.value = value;
 
+  /// Bumped when the open chat inserts a message or saves its message map.
+  ///
+  /// Message loading records this before reading Hive and ignores that
+  /// snapshot if the counter moved, so a burst of group MQTT events cannot
+  /// replace the list with an older copy.
+  int _messagesGeneration = 0;
+  int get messagesGeneration => _messagesGeneration;
+  void bumpMessagesGeneration() => _messagesGeneration++;
+
+  /// Coalesces scheduleMessagesReload so a burst schedules one DB reload.
+  Timer? _messagesReloadTimer;
+  String? _pendingMessagesReloadId;
+
   final _predictionList = <IsmChatPrediction>[].obs;
   List<IsmChatPrediction> get predictionList => _predictionList;
   set predictionList(List<IsmChatPrediction> value) =>

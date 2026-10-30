@@ -50,12 +50,20 @@ mixin IsmChatPageGetMessageMixin on GetxController {
       }
     }
 
+    // Captured immediately before the Hive read. A message insert or queued
+    // save during the awaits below bumps [messagesGeneration]; applying this
+    // older list would hide those rows.
+    final generation = _controller.messagesGeneration;
     final messages =
         await IsmChatConfig.dbWrapper?.getMessage(conversationId, dbBox);
     // Guard against race conditions: if user switched chat while this async DB
     // read was running, ignore this result so messages from old chat don't show.
     if ((_controller.conversation?.conversationId ?? '') !=
         requestedConversationId) {
+      _controller.isMessagesLoading = false;
+      return;
+    }
+    if (generation != _controller.messagesGeneration) {
       _controller.isMessagesLoading = false;
       return;
     }
@@ -94,11 +102,40 @@ mixin IsmChatPageGetMessageMixin on GetxController {
         messages: localMessages,
       );
     }
+    if (generation != _controller.messagesGeneration ||
+        (_controller.conversation?.conversationId ?? '') !=
+            requestedConversationId) {
+      _controller.isMessagesLoading = false;
+      return;
+    }
     _controller.messages = _controller.commonController
         .sortMessages(filterMessages(localMessages));
     _controller.isMessagesLoading = false;
     _controller._generateIndexedMessageList();
     update();
+  }
+
+  /// Reloads [conversationId] once a short burst of MQTT messages settles.
+  ///
+  /// Each incoming group message used to start its own [getMessagesFromDB].
+  /// Those reads overlapped and the oldest one painted last, removing rows
+  /// that a newer event had already shown. Later calls replace the pending
+  /// reload instead of stacking another one.
+  void scheduleMessagesReload(String conversationId) {
+    if (conversationId.isEmpty) return;
+    _controller._pendingMessagesReloadId = conversationId;
+    _controller._messagesReloadTimer?.cancel();
+    _controller._messagesReloadTimer = Timer(
+      const Duration(milliseconds: 50),
+      () {
+        final id = _controller._pendingMessagesReloadId;
+        _controller._pendingMessagesReloadId = null;
+        _controller._messagesReloadTimer = null;
+        if (id == null || id.isEmpty) return;
+        if ((_controller.conversation?.conversationId ?? '') != id) return;
+        unawaited(getMessagesFromDB(id));
+      },
+    );
   }
 
   List<IsmChatMessageModel> insertEndtoEndMessage(
@@ -711,46 +748,58 @@ mixin IsmChatPageGetMessageMixin on GetxController {
         isLoading: false,
       );
       if (response != null) {
-        final conversation =
-            await IsmChatConfig.dbWrapper?.getConversation(conversationId);
-
-        final dbMessages = conversation?.messages?.values.toList() ?? [];
-        for (var dbmessage in dbMessages) {
-          final messageStatus = response.cast<MessageStatusModel?>().firstWhere(
-                (e) => e?.messageId == dbmessage.messageId,
-                orElse: () => null,
-              );
-          if (dbmessage.messageId == messageStatus?.messageId) {
-            if (messageStatus?.deliveredToAll ?? false) {
-              dbmessage.deliveredTo?.add(
-                MessageStatus(
-                  userId: conversation?.opponentDetails?.userId ?? '',
-                  timestamp: int.tryParse(dbmessage.key),
-                ),
-              );
+        final saved = await IsmChatConfig.dbWrapper?.updateConversation(
+          conversationId: conversationId,
+          update: (conversation) {
+            if (conversation == null) return null;
+            final messages = Map<String, IsmChatMessageModel>.from(
+              conversation.messages ?? {},
+            );
+            var changed = false;
+            for (final entry in messages.entries) {
+              final dbmessage = entry.value;
+              final messageStatus =
+                  response.cast<MessageStatusModel?>().firstWhere(
+                        (e) => e?.messageId == dbmessage.messageId,
+                        orElse: () => null,
+                      );
+              if (dbmessage.messageId != messageStatus?.messageId) continue;
+              if (messageStatus?.deliveredToAll ?? false) {
+                dbmessage.deliveredTo?.add(
+                  MessageStatus(
+                    userId: conversation.opponentDetails?.userId ?? '',
+                    timestamp: int.tryParse(entry.key),
+                  ),
+                );
+              }
+              if (messageStatus?.readByAll ?? false) {
+                dbmessage.readBy?.add(
+                  MessageStatus(
+                    userId: conversation.opponentDetails?.userId ?? '',
+                    timestamp: int.tryParse(entry.key),
+                  ),
+                );
+              }
+              dbmessage
+                ..readByAll = messageStatus?.readByAll ?? false
+                ..deliveredToAll = messageStatus?.deliveredToAll ?? false;
+              // If readByAll is true, deliveredToAll must also be true
+              // (you can't read a message that hasn't been delivered)
+              if (dbmessage.readByAll == true) {
+                dbmessage.deliveredToAll = true;
+              }
+              messages[entry.key] = dbmessage;
+              changed = true;
             }
-            if (messageStatus?.readByAll ?? false) {
-              dbmessage.readBy?.add(
-                MessageStatus(
-                  userId: conversation?.opponentDetails?.userId ?? '',
-                  timestamp: int.tryParse(dbmessage.key),
-                ),
-              );
-            }
-            dbmessage
-              ..readByAll = messageStatus?.readByAll ?? false
-              ..deliveredToAll = messageStatus?.deliveredToAll ?? false;
-            // If readByAll is true, deliveredToAll must also be true
-            // (you can't read a message that hasn't been delivered)
-            if (dbmessage.readByAll == true) {
-              dbmessage.deliveredToAll = true;
-            }
-            conversation?.messages?[dbmessage.key] = dbmessage;
-          }
+            if (!changed) return null;
+            return conversation.copyWith(messages: messages);
+          },
+        );
+        if (saved != null &&
+            (_controller.conversation?.conversationId ?? '') ==
+                conversationId) {
+          await getMessagesFromDB(conversationId);
         }
-        await IsmChatConfig.dbWrapper
-            ?.saveConversation(conversation: conversation!);
-        await getMessagesFromDB(conversationId);
       }
     }
   }
