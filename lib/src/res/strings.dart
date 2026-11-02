@@ -199,6 +199,7 @@ class IsmChatStrings {
   static String get sentContact => IsmChatL10n.get('sentContact');
   static String get sentLocation => IsmChatL10n.get('sentLocation');
   static String get sentImage => IsmChatL10n.get('sentImage');
+  static String get imagesAndVideos => IsmChatL10n.get('imagesAndVideos');
   static String get sentGif => IsmChatL10n.get('sentGif');
   static String get sentSticker => IsmChatL10n.get('sentSticker');
   static String get searchGifs => IsmChatL10n.get('searchGifs');
@@ -210,6 +211,8 @@ class IsmChatStrings {
   static String get messageInfo => IsmChatL10n.get('messageInfo');
   static String get inviteToChat => IsmChatL10n.get('inviteToChat');
   static String get youCanNotSend => IsmChatL10n.get('youCanNotSend');
+  static String get maxPickerAttachmentsReached =>
+      IsmChatL10n.get('maxPickerAttachmentsReached');
   static String get aboutMe => IsmChatL10n.get('aboutMe');
   static String get recipients => IsmChatL10n.get('recipients');
   static String get addrecipient => IsmChatL10n.get('addrecipient');

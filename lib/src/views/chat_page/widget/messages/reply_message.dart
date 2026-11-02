@@ -238,6 +238,8 @@ class _ReplyMessage extends StatelessWidget {
       IsmChatCustomMessageType.audio => Icons.mic_outlined,
       IsmChatCustomMessageType.location => Icons.location_on_outlined,
       IsmChatCustomMessageType.file => Icons.description_outlined,
+      IsmChatCustomMessageType.multipleAttachments =>
+        Icons.description_outlined,
       IsmChatCustomMessageType.contact => Icons.contact_page_outlined,
       _ => null,
     };
@@ -354,7 +356,8 @@ class ReplayParentMessagePreview extends StatelessWidget {
               : null;
           final attachmentUrl = switch (customType) {
             IsmChatCustomMessageType.audio ||
-            IsmChatCustomMessageType.file =>
+            IsmChatCustomMessageType.file ||
+            IsmChatCustomMessageType.multipleAttachments =>
               attachment?.name,
             IsmChatCustomMessageType.contact => contact?.contactIdentifier,
             IsmChatCustomMessageType.location ||

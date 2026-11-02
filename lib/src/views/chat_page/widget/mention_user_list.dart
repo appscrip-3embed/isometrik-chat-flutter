@@ -8,7 +8,13 @@ class MentionUserList extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
-        builder: (controller) => AnimatedContainer(
+        builder: (controller) {
+          final currentUserId =
+              IsmChatConfig.communicationConfig.userConfig.userId.trim();
+          final suggestions = controller.mentionSuggestions
+              .where((m) => m.userId.trim() != currentUserId)
+              .toList();
+          return AnimatedContainer(
           curve: Curves.easeInOut,
           duration: IsmChatConfig.animationDuration,
           margin: IsmChatDimens.edgeInsetsLeft10,
@@ -17,23 +23,23 @@ class MentionUserList extends StatelessWidget {
             borderRadius: BorderRadius.circular(IsmChatDimens.sixteen),
             color: IsmChatColors.whiteColor,
           ),
-          height: controller.mentionSuggestions.isEmpty
+          height: suggestions.isEmpty
               ? IsmChatDimens.zero
               // ? IsmChatDimens.percentHeight(0.08)
-              : controller.mentionSuggestions.take(4).length *
+              : suggestions.take(4).length *
                   IsmChatDimens.percentHeight(0.07),
           width: IsmChatResponsive.isWeb(context)
               ? IsmChatDimens.percentWidth(.4)
               : IsmChatDimens.percentWidth(.8),
-          child: controller.mentionSuggestions.isEmpty
+          child: suggestions.isEmpty
               ? const SizedBox.shrink()
               : ListView.separated(
                   shrinkWrap: true,
                   padding: IsmChatDimens.edgeInsets0_4,
                   separatorBuilder: (_, index) => IsmChatDimens.box0,
-                  itemCount: controller.mentionSuggestions.length,
+                  itemCount: suggestions.length,
                   itemBuilder: (_, index) {
-                    var member = controller.mentionSuggestions[index];
+                    var member = suggestions[index];
                     return IsmChatTapHandler(
                       onTap: () {
                         controller.updateMentionUser(member.userName);
@@ -68,6 +74,7 @@ class MentionUserList extends StatelessWidget {
                     );
                   },
                 ),
-        ),
+        );
+        },
       );
 }

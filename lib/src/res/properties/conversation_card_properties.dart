@@ -1,5 +1,6 @@
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
+/// Per-conversation list / card UI overrides (conversation list, global search).
 class IsmChatCardProperties {
   const IsmChatCardProperties({
     this.profileImageBuilder,

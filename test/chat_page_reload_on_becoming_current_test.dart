@@ -40,6 +40,28 @@ void main() {
       );
     });
 
+    test('reloads when rebound to new 1:1 with empty conversation id', () {
+      expect(
+        IsmChatPageView.shouldReloadOnBecomingCurrent(
+          openedConversationId: 'group-chat-1',
+          currentConversationId: '',
+          rebindConversationId: '',
+        ),
+        isTrue,
+      );
+    });
+
+    test('reloads when rebind is empty and opened id not yet updated', () {
+      expect(
+        IsmChatPageView.shouldReloadOnBecomingCurrent(
+          openedConversationId: '',
+          currentConversationId: '',
+          rebindConversationId: '',
+        ),
+        isTrue,
+      );
+    });
+
     test('does nothing before this route resolved its conversation', () {
       expect(
         IsmChatPageView.shouldReloadOnBecomingCurrent(

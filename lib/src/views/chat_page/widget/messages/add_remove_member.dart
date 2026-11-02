@@ -15,6 +15,26 @@ class IsmChatAddRemoveMember extends StatelessWidget {
   final bool didLeft;
   final bool didJoin;
 
+  String get _removedOrAddedMemberLabel {
+    final fromList = message.members
+            ?.map((e) => (e.memberName ?? e.userName).trim())
+            .where((name) => name.isNotEmpty)
+            .join(', ') ??
+        '';
+    if (fromList.isNotEmpty) {
+      return fromList;
+    }
+    final single = (message.memberName ?? '').trim();
+    if (single.isNotEmpty) {
+      if (message.memberId ==
+          IsmChatConfig.communicationConfig.userConfig.userId) {
+        return IsmChatStrings.you;
+      }
+      return single;
+    }
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) => Center(
         child: Container(
@@ -26,9 +46,10 @@ class IsmChatAddRemoveMember extends StatelessWidget {
           ),
           padding: IsmChatDimens.edgeInsets8_4,
           child: Text(
-            didLeft
-                ? '${message.userName} has left'
-                : '${message.initiator} ${isAdded ? 'added' : 'removed'} ${message.members?.map((e) => e.memberName).join(', ')}',
+            (didLeft
+                    ? '${message.userName} has left'
+                    : '${message.initiator} ${isAdded ? 'added' : 'removed'} $_removedOrAddedMemberLabel')
+                .trim(),
             textAlign: TextAlign.center,
             style: IsmChatConfig
                     .chatTheme.chatPageTheme?.centerMessageTheme?.textStyle ??

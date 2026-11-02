@@ -27,7 +27,8 @@ class IsmChatLinkMessage extends StatelessWidget {
                 : context.height * .05,
           ),
           child: LinkPreviewView(
-            url: message.body.convertToValidUrl,
+            // [LinkPreviewView] lowercases + normalizes before fetch; keep raw body.
+            url: message.body.trim(),
             message: message,
           ),
         ),

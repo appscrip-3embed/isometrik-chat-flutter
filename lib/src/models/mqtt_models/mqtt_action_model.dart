@@ -46,15 +46,20 @@ class IsmChatMqttActionModel {
             ? List<String>.from((map['messageIds'] as List<dynamic>)
                 .map<dynamic>((dynamic x) => x))
             : [],
-        userDetails: map['userId'] != null
-            ? IsmChatMqttUserModel(
-                userId: map['userId'] as String? ?? '',
-                userName: map['userName'] as String? ?? '',
-                userIdentifier: map['userIdentifier'] as String? ?? '',
-                profileImageUrl: map['userProfileImageUrl'] as String? ?? '',
-                metaData: IsmChatMqttUserModel.metaDataFromMap(map),
-              )
-            : null,
+        userDetails: () {
+          final userId = map['userId']?.toString().trim() ?? '';
+          if (userId.isEmpty) {
+            return null;
+          }
+          return IsmChatMqttUserModel(
+            userId: userId,
+            userName: map['userName']?.toString().trim() ?? '',
+            userIdentifier: map['userIdentifier']?.toString().trim() ?? '',
+            profileImageUrl:
+                map['userProfileImageUrl']?.toString().trim() ?? '',
+            metaData: IsmChatMqttUserModel.metaDataFromMap(map),
+          );
+        }(),
         opponentDetails: map['opponentId'] != null
             ? IsmChatMqttUserModel(
                 userId: map['opponentId'] as String? ?? '',
@@ -91,16 +96,23 @@ class IsmChatMqttActionModel {
             : null,
         sentAt: map['sentAt'] as int? ?? 0,
         lastMessageSentAt: map['lastMessageSentAt'] as int? ?? 0,
-        initiatorId: map['createdBy'] != null
-            ? map['createdBy'] as String? ?? ''
-            : map['initiatorId'] as String? ?? '',
-        initiatorName: map['initiatorName'] as String? ?? '',
+        initiatorId: () {
+          final createdBy = map['createdBy']?.toString().trim() ?? '';
+          if (createdBy.isNotEmpty) {
+            return createdBy;
+          }
+          return map['initiatorId']?.toString().trim() ?? '';
+        }(),
+        initiatorName: map['initiatorName']?.toString().trim() ?? '',
         memberId: map['memberId'] as String? ?? '',
         memberName: map['memberName'] as String? ?? '',
         action: IsmChatActionEvents.fromName(map['action'] as String? ?? ''),
         reactionType: map['reactionType'] as String? ?? '',
         reactionsCount: map['reactionsCount'] as int? ?? 0,
         senderId: map['senderId'] as String? ?? '',
+        senderName: map['senderName'] as String? ??
+            map['userName'] as String? ??
+            '',
         body: () {
           // Check metaData map directly for broadcast message info before parsing
           final metaDataMap = map['metaData'] as Map<String, dynamic>?;

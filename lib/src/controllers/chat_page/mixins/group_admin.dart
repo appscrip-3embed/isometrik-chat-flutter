@@ -86,11 +86,48 @@ mixin IsmChatGroupAdminMixin on GetxController {
     }
   }
 
+  /// Resolves a participant row for admin-then-remove sequencing in [removeMember].
+  UserDetails? _findGroupMember(String id) {
+    final needle = id.trim();
+    if (needle.isEmpty) return null;
+    for (final member in _controller.groupMembers) {
+      if (member.matchesConversationMember(needle)) return member;
+    }
+    final members = _controller.conversation?.members;
+    if (members != null) {
+      for (final member in members) {
+        if (member.matchesConversationMember(needle)) return member;
+      }
+    }
+    return null;
+  }
+
   ///Remove members from conversation
   Future<void> removeMember(String userId) async {
+    final apiMemberId = userId.trim();
+    if (apiMemberId.isEmpty) return;
+
+    final conversationId = _controller.conversation?.conversationId ?? '';
+    if (conversationId.isEmpty) return;
+
+    final member = _findGroupMember(apiMemberId);
+    if (member?.isAdmin == true) {
+      final adminResponse = await _controller.viewModel.removeAdmin(
+        conversationId: conversationId,
+        memberId: member!.conversationMemberIdForApi,
+      );
+      if (adminResponse?.hasError ?? true) {
+        IsmChatUtility.showToast(
+          'Could not remove admin role for ${member.userName}.',
+          timeOutInSec: 2,
+        );
+        return;
+      }
+    }
+
     final response = await _controller.viewModel.removeMember(
-      conversationId: _controller.conversation?.conversationId ?? '',
-      userId: userId,
+      conversationId: conversationId,
+      userId: apiMemberId,
     );
 
     if (response?.hasError ?? true) {
@@ -178,42 +215,99 @@ mixin IsmChatGroupAdminMixin on GetxController {
     return true;
   }
 
+  void _syncMemberAdminLocally(String memberId, {required bool isAdmin}) {
+    final id = memberId.trim();
+    if (id.isEmpty) return;
+
+    final conv = _controller.conversation;
+    if (conv?.members != null) {
+      final updatedMembers = conv!.members!
+          .map(
+            (m) =>
+                m.matchesConversationMember(id) ? m.copyWith(isAdmin: isAdmin) : m,
+          )
+          .toList();
+      _controller.conversation = conv.copyWith(members: updatedMembers);
+    }
+    if (_controller.groupMembers.isNotEmpty) {
+      _controller.groupMembers = _controller.groupMembers
+          .map(
+            (m) =>
+                m.matchesConversationMember(id) ? m.copyWith(isAdmin: isAdmin) : m,
+          )
+          .toList();
+    }
+    _controller.update();
+  }
+
+  Future<void> _refreshConversationDetailsAfterAdminChange() async {
+    await _controller.getConverstaionDetails(isLoading: false);
+    // Group info often triggers a details fetch on open; if one is in flight,
+    // the call above is a no-op — retry once so admin badge updates.
+    if (!_controller.isCoverationApiDetails) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      await _controller.getConverstaionDetails(isLoading: false);
+    }
+  }
+
   /// make admin
   Future<void> makeAdmin(
     String memberId,
     String userName, [
     bool updateConversation = true,
   ]) async {
+    final apiMemberId = memberId.trim();
+    if (apiMemberId.isEmpty) {
+      IsmChatUtility.showToast('Unable to update admin role.', timeOutInSec: 2);
+      return;
+    }
     final response = await _controller.viewModel.makeAdmin(
-        memberId: memberId,
+        memberId: apiMemberId,
         conversationId: _controller.conversation?.conversationId ?? '');
     if (response?.hasError ?? true) {
+      IsmChatUtility.showToast('Could not make $userName an admin.',
+          timeOutInSec: 2);
       return;
     }
     if (updateConversation) {
+      _syncMemberAdminLocally(apiMemberId, isAdmin: true);
       IsmChatUtility.showToast('You made $userName an admin of this group',
           timeOutInSec: 2);
-      await _controller.getConverstaionDetails(
-        isLoading: false,
+      await _refreshConversationDetailsAfterAdminChange();
+      await _controller.getMessagesFromAPI(
+        lastMessageTimestamp: _controller.messages.isNotEmpty
+            ? _controller.messages.last.sentAt
+            : _controller.conversation?.lastMessageSentAt,
       );
     }
   }
 
   ///Remove member as admin from conversation
   Future<void> removeAdmin(String memberId, String userName) async {
+    final apiMemberId = memberId.trim();
+    if (apiMemberId.isEmpty) {
+      IsmChatUtility.showToast('Unable to update admin role.', timeOutInSec: 2);
+      return;
+    }
     final response = await _controller.viewModel.removeAdmin(
       conversationId: _controller.conversation?.conversationId ?? '',
-      memberId: memberId,
+      memberId: apiMemberId,
     );
 
     if (response?.hasError ?? true) {
+      IsmChatUtility.showToast('Could not remove admin role for $userName.',
+          timeOutInSec: 2);
       return;
     }
+    _syncMemberAdminLocally(apiMemberId, isAdmin: false);
     IsmChatUtility.showToast(
         'You removed $userName from being an admin of this group',
         timeOutInSec: 2);
-    await _controller.getConverstaionDetails(
-      isLoading: false,
+    await _refreshConversationDetailsAfterAdminChange();
+    await _controller.getMessagesFromAPI(
+      lastMessageTimestamp: _controller.messages.isNotEmpty
+          ? _controller.messages.last.sentAt
+          : _controller.conversation?.lastMessageSentAt,
     );
   }
 }

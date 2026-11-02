@@ -135,11 +135,14 @@ class IsmChatOpenChatMessagePage extends StatelessWidget {
                       reverse: true,
                       padding: IsmChatDimens.edgeInsets4_8,
                       itemCount: controller.messages.length,
-                      itemBuilder: (_, index) => IsmChatMessage(
-                        index,
-                        controller.messages[index],
-                        isIgnorTap: false,
-                      ),
+                      itemBuilder: (_, index) {
+                        final messages = controller.messages;
+                        return IsmChatMessage(
+                          index,
+                          messages[messages.length - 1 - index],
+                          isIgnorTap: false,
+                        );
+                      },
                     ),
                   ),
                 ),

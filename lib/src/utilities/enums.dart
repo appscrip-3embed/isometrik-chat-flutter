@@ -107,7 +107,8 @@ enum IsmChatCustomMessageType {
   videoCall(102),
   groupCall(103),
   livestream(104),
-  story(105);
+  story(105),
+  multipleAttachments(106);
 
   const IsmChatCustomMessageType(this.number);
 
@@ -122,7 +123,9 @@ enum IsmChatCustomMessageType {
       'text': IsmChatCustomMessageType.text,
       'AttachmentMessage:Text': IsmChatCustomMessageType.text,
       'file': IsmChatCustomMessageType.file,
+      'doc': IsmChatCustomMessageType.file,
       'AttachmentMessage:File': IsmChatCustomMessageType.file,
+      'AttachmentMessage:Doc': IsmChatCustomMessageType.file,
       'replyText': IsmChatCustomMessageType.reply,
       'reply': IsmChatCustomMessageType.reply,
       'AttachmentMessage:Reply': IsmChatCustomMessageType.reply,
@@ -190,6 +193,8 @@ enum IsmChatCustomMessageType {
       'GroupCall': IsmChatCustomMessageType.groupCall,
       'Livestream': IsmChatCustomMessageType.livestream,
       'Story': IsmChatCustomMessageType.story,
+      'AttachmentMessage:Multiple':
+          IsmChatCustomMessageType.multipleAttachments,
     };
     var type = value.split('.').last;
     return map[type] ?? IsmChatCustomMessageType.text;
@@ -209,6 +214,10 @@ enum IsmChatCustomMessageType {
   factory IsmChatCustomMessageType.withBody(IsmChatMessageModel message) {
     if (message.body.isEmpty) {
       return IsmChatCustomMessageType.text;
+    }
+
+    if (message.body == 'AttachmentMessage:Multiple') {
+      return IsmChatCustomMessageType.multipleAttachments;
     }
 
     // if (body.toLowerCase().contains('map')) {
@@ -238,8 +247,8 @@ enum IsmChatCustomMessageType {
     // }
 
     if (message.mentionList.isNotEmpty && message.mentionList.first.isLink) {
-      if (message.mentionList.first.text.startsWith('http') ||
-          message.mentionList.first.text.startsWith('www')) {
+      final linkText = message.mentionList.first.text.toLowerCase();
+      if (linkText.startsWith('http') || linkText.startsWith('www')) {
         return IsmChatCustomMessageType.link;
       }
     }
@@ -324,7 +333,7 @@ enum IsmChatCustomMessageType {
       case IsmChatCustomMessageType.audio:
         return 'AttachmentMessage:Audio';
       case IsmChatCustomMessageType.file:
-        return 'AttachmentMessage:File';
+        return 'AttachmentMessage:Doc';
       case IsmChatCustomMessageType.location:
         return 'AttachmentMessage:Location';
       case IsmChatCustomMessageType.contact:
@@ -423,6 +432,8 @@ enum IsmChatCustomMessageType {
         return 'Livestream';
       case IsmChatCustomMessageType.story:
         return 'Story';
+      case IsmChatCustomMessageType.multipleAttachments:
+        return 'AttachmentMessage:Multiple';
     }
   }
 }
@@ -478,6 +489,12 @@ enum IsmChatConversationType {
       '${name[0].toUpperCase()}${name.substring(1).toLowerCase()}';
 }
 
+/// Layout for a single message with multiple homogeneous attachments.
+enum MultipleAttachmentLayout {
+  mediaGrid,
+  documentList,
+}
+
 /// [IsmChatMediaType] is an `Enum` used for passing different type of media to and from API
 enum IsmChatMediaType {
   image(0),
@@ -530,7 +547,7 @@ enum IsmChatMediaType {
       case IsmChatMediaType.audio:
         return 'AttachmentMessage:Audio';
       case IsmChatMediaType.file:
-        return 'AttachmentMessage:File';
+        return 'AttachmentMessage:Doc';
       case IsmChatMediaType.location:
         return 'AttachmentMessage:Location';
       case IsmChatMediaType.adminMessage:

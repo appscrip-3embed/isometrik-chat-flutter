@@ -103,8 +103,9 @@ mixin IsmChatConversationsUserOperationsMixin on GetxController {
             final filePath = await IsmChatUtility.makeDirectoryWithUrl(
                 urlPath: assetList[indexOfAsset].values.first.imageUrl ?? '',
                 fileName: pathName);
+            final conversationId = assetList[indexOfAsset].keys.first;
             assetList[indexOfAsset] = {
-              '${assetList[indexOfAsset].keys}': IsmChatBackgroundModel(
+              conversationId: IsmChatBackgroundModel(
                 color: assetList[indexOfAsset].values.first.color,
                 isImage: assetList[indexOfAsset].values.first.isImage,
                 imageUrl: filePath.path,
@@ -189,19 +190,27 @@ mixin IsmChatConversationsUserOperationsMixin on GetxController {
     );
   }
 
-  /// Changes the profile image for a group.
+  /// Picks, crops, and uploads a group profile image.
   ///
-  /// `imageSource`: The source of the image to upload.
-  Future<void> ismChangeImage(ImageSource imageSource) async {
+  /// Returns the new media URL, or `null` when the user cancels pick/crop,
+  /// dismisses the cropper, or upload fails. Callers must skip group profile
+  /// API updates when this returns `null`.
+  Future<String?> ismChangeImage(ImageSource imageSource) async {
     var file = await IsmChatUtility.pickMedia(imageSource);
-    if (file.isEmpty) {
-      return;
+    if (file.isEmpty || file.first == null) {
+      return null;
     }
 
-    final bytes = await file.first?.readAsBytes();
-    final fileExtension = file.first?.path.split('.').last;
-    await _controller.getPresignedUrl(
-        fileExtension ?? '', bytes ?? Uint8List(0));
+    final pickedFile = file.first!;
+    final bytes = await pickedFile.readAsBytes();
+    final fileExtension = pickedFile.path.split('.').last;
+    final previousUrl = _controller.profileImage;
+    await _controller.getPresignedUrl(fileExtension, bytes);
+    final uploadedUrl = _controller.profileImage;
+    if (uploadedUrl.isEmpty || uploadedUrl == previousUrl) {
+      return null;
+    }
+    return uploadedUrl;
   }
 
   /// Retrieves a presigned URL for uploading media.
@@ -213,9 +222,10 @@ mixin IsmChatConversationsUserOperationsMixin on GetxController {
     String mediaExtension,
     Uint8List bytes, [
     bool isLoading = false,
+    bool updateProfileImage = true,
   ]) async {
     final response = await _controller.commonController.getPresignedUrl(
-        isLoading: true,
+        isLoading: isLoading,
         userIdentifier: _controller.userDetails?.userIdentifier ?? '',
         mediaExtension: mediaExtension,
         bytes: bytes);
@@ -229,9 +239,13 @@ mixin IsmChatConversationsUserOperationsMixin on GetxController {
       isLoading: isLoading,
     );
     if (responseCode == 200) {
-      _controller.profileImage = response.mediaUrl ?? '';
+      final mediaUrl = response.mediaUrl ?? '';
+      if (updateProfileImage) {
+        _controller.profileImage = mediaUrl;
+      }
+      return mediaUrl;
     }
-    return _controller.profileImage;
+    return '';
   }
 
   /// Unblocks a user based on their opponent ID

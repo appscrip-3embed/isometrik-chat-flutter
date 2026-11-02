@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -191,16 +192,39 @@ class IsmChatWallpaperPreview extends StatelessWidget {
                         IsmChatUtility.conversationController;
                     if (imagePath?.path.isNotEmpty == true) {
                       IsmChatUtility.showLoader();
-                      pageController
-                        ..backgroundImage = imagePath?.path ?? ''
-                        ..backgroundColor = '';
+                      var wallpaperImageUrl = imagePath?.path ?? '';
                       if (assetSrNo == 100) {
-                        var file = imagePath;
-                        var bytes = await file?.readAsBytes() ?? Uint8List(0);
-                        var fileExtension = file?.path.split('.').last;
-                        await conversationController.getPresignedUrl(
-                            fileExtension ?? '', bytes);
+                        final file = imagePath;
+                        final bytes = await file?.readAsBytes() ?? Uint8List(0);
+                        if (bytes.isEmpty) {
+                          IsmChatUtility.closeLoader();
+                          IsmChatUtility.showToast(
+                              IsmChatStrings.errorLoadingImage);
+                          return;
+                        }
+                        final fileExtension = kIsWeb
+                            ? 'jpg'
+                            : (file?.path.split('.').last ?? 'jpg');
+                        wallpaperImageUrl =
+                            await conversationController.getPresignedUrl(
+                          fileExtension,
+                          bytes,
+                          false,
+                          false,
+                        );
+                        if (wallpaperImageUrl.isEmpty ||
+                            !wallpaperImageUrl.isSupportedChatWallpaperUrl) {
+                          IsmChatUtility.closeLoader();
+                          IsmChatUtility.showToast(
+                              IsmChatStrings.errorLoadingImage);
+                          return;
+                        }
                       }
+                      pageController
+                        ..backgroundImage = assetSrNo == 100
+                            ? (imagePath?.path ?? wallpaperImageUrl)
+                            : wallpaperImageUrl
+                        ..backgroundColor = '';
                       var assetList = conversationController
                               .userDetails?.metaData?.assetList ??
                           [];
@@ -212,9 +236,7 @@ class IsmChatWallpaperPreview extends StatelessWidget {
                           '${pageController.conversation?.conversationId}':
                               IsmChatBackgroundModel(
                             isImage: true,
-                            imageUrl: assetSrNo == 100
-                                ? conversationController.profileImage
-                                : imagePath?.path ?? '',
+                            imageUrl: wallpaperImageUrl,
                             srNoBackgroundAssset:
                                 assetSrNo == 100 ? 100 : assetSrNo,
                           )
@@ -224,9 +246,7 @@ class IsmChatWallpaperPreview extends StatelessWidget {
                           '${pageController.conversation?.conversationId}':
                               IsmChatBackgroundModel(
                             isImage: true,
-                            imageUrl: assetSrNo == 100
-                                ? conversationController.profileImage
-                                : imagePath?.path ?? '',
+                            imageUrl: wallpaperImageUrl,
                             srNoBackgroundAssset:
                                 assetSrNo == 100 ? 100 : assetSrNo,
                           )

@@ -35,6 +35,7 @@ mixin IsmChatTapsController on GetxController {
           IsmChatCustomMessageType.image,
           IsmChatCustomMessageType.video,
           IsmChatCustomMessageType.file,
+          IsmChatCustomMessageType.multipleAttachments,
           if (!IsmChatResponsive.isWeb(
               IsmChatConfig.kNavigatorKey.currentContext ??
                   IsmChatConfig.context))

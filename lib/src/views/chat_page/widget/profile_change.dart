@@ -4,6 +4,25 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
+/// Gallery/camera → crop → upload; only hits change-group-profile when upload succeeds.
+Future<void> _pickGroupPhotoAndUpdate(ImageSource source) async {
+  final conversationsController = Get.find<IsmChatConversationsController>(
+    tag: IsmChat.i.chatListPageTag,
+  );
+  final chatPageController = Get.find<IsmChatPageController>(
+    tag: IsmChat.i.chatPageTag,
+  );
+  final imageUrl = await conversationsController.ismChangeImage(source);
+  if (imageUrl == null || imageUrl.isEmpty) {
+    return;
+  }
+  await chatPageController.changeGroupProfile(
+    conversationImageUrl: imageUrl,
+    conversationId: chatPageController.conversation?.conversationId ?? '',
+    isLoading: true,
+  );
+}
+
 class ProfileChange extends StatelessWidget {
   const ProfileChange({super.key});
 
@@ -17,17 +36,9 @@ class ProfileChange extends StatelessWidget {
                 CupertinoActionSheetAction(
                   onPressed: () async {
                     IsmChatRoute.goBack();
-                    final chatpageController =
-                        Get.find<IsmChatPageController>(
-                            tag: IsmChat.i.chatPageTag);
-                    await controller.ismChangeImage(ImageSource.camera);
-                    await chatpageController.changeGroupProfile(
-                      conversationImageUrl: controller.profileImage,
-                      conversationId:
-                          chatpageController.conversation?.conversationId ??
-                              '',
-                      isLoading: true,
-                    );
+                    // Let the action sheet finish dismissing before presenting UIImagePicker.
+                    await WidgetsBinding.instance.endOfFrame;
+                    await _pickGroupPhotoAndUpdate(ImageSource.camera);
                   },
                   child: Padding(
                     padding: IsmChatDimens.edgeInsets10_0,
@@ -57,17 +68,8 @@ class ProfileChange extends StatelessWidget {
                 CupertinoActionSheetAction(
                   onPressed: () async {
                     IsmChatRoute.goBack();
-                    final chatpageController =
-                        Get.find<IsmChatPageController>(
-                            tag: IsmChat.i.chatPageTag);
-                    await controller.ismChangeImage(ImageSource.gallery);
-                    await chatpageController.changeGroupProfile(
-                      conversationImageUrl: controller.profileImage,
-                      conversationId:
-                          chatpageController.conversation?.conversationId ??
-                              '',
-                      isLoading: true,
-                    );
+                    await WidgetsBinding.instance.endOfFrame;
+                    await _pickGroupPhotoAndUpdate(ImageSource.gallery);
                   },
                   child: Padding(
                     padding: IsmChatDimens.edgeInsets10_0,

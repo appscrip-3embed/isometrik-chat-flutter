@@ -131,6 +131,9 @@ mixin IsmChatPageLifecycleInitializationMixin on GetxController {
       } catch (_) {}
     }
     _controller.conversationDetailsApTimer?.cancel();
+    _controller._messagesReloadTimer?.cancel();
+    _controller._messagesReloadTimer = null;
+    _controller._pendingMessagesReloadId = null;
     _controller.messagesScrollController.dispose();
     _controller.searchMessageScrollController.dispose();
     _controller.attchmentOverlayEntry?.dispose();
@@ -185,8 +188,16 @@ mixin IsmChatPageLifecycleInitializationMixin on GetxController {
         .where((e) => e.keys.contains(_controller.conversation?.conversationId))
         .toList();
     if (asset.isNotEmpty) {
-      _controller.backgroundColor = asset.first.values.first.color!;
-      _controller.backgroundImage = asset.first.values.first.imageUrl!;
+      final background = asset.first.values.first;
+      if (background.isImage) {
+        _controller.backgroundColor = '';
+        final imageUrl = background.imageUrl ?? '';
+        _controller.backgroundImage =
+            imageUrl.isSupportedChatWallpaperUrl ? imageUrl : '';
+      } else {
+        _controller.backgroundColor = background.color ?? '';
+        _controller.backgroundImage = '';
+      }
     } else {
       _controller.backgroundColor = '';
       _controller.backgroundImage =

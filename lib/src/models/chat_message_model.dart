@@ -128,6 +128,127 @@ class IsmChatMessageModel {
   factory IsmChatMessageModel.fromJson(String source) =>
       IsmChatMessageModel.fromMap(json.decode(source) as Map<String, dynamic>);
 
+  /// Group system rows (add/remove member, admin). [memberId] is the subject,
+  /// not the actor — keep in sync with
+  /// [IsmChatGroupSystemMessageCoordinator.resolveInitiator].
+  static const _groupSystemActorCustomTypes = {
+    IsmChatCustomMessageType.removeMember,
+    IsmChatCustomMessageType.addMember,
+    IsmChatCustomMessageType.addAdmin,
+    IsmChatCustomMessageType.removeAdmin,
+  };
+
+  static bool isGroupSystemActorCustomType(IsmChatCustomMessageType? type) =>
+      type != null && _groupSystemActorCustomTypes.contains(type);
+
+  /// Member affected by add/remove (not the actor). Used to avoid treating
+  /// [userId] on wire payloads as the actor when it identifies the subject.
+  static String? groupSystemSubjectMemberId(IsmChatMessageModel model) {
+    final member = model.memberId?.trim();
+    if (member != null && member.isNotEmpty) {
+      return member;
+    }
+    final first = model.members?.isNotEmpty == true ? model.members!.first : null;
+    if (first == null) return null;
+    final fromMember = (first.memberId ?? '').trim();
+    if (fromMember.isNotEmpty) return fromMember;
+    final fromUser = first.userId.trim();
+    return fromUser.isEmpty ? null : fromUser;
+  }
+
+  static bool _isSubjectUserId(IsmChatMessageModel model, String userId) {
+    if (userId.isEmpty) return false;
+    final subject = groupSystemSubjectMemberId(model);
+    return subject != null && subject == userId;
+  }
+
+  /// Resolves actor user id for centered group system messages (banner copy).
+  static String resolveGroupSystemActorId(IsmChatMessageModel model) {
+    final initiator = model.initiatorId?.trim();
+    if (initiator != null && initiator.isNotEmpty) {
+      return initiator;
+    }
+
+    final fromMeta = model.metaData?.senderInfo?.userId.trim();
+    final fromSender = model.senderInfo?.userId.trim();
+    final senderId =
+        (fromMeta != null && fromMeta.isNotEmpty) ? fromMeta : fromSender;
+    if (senderId != null && senderId.isNotEmpty) {
+      return senderId;
+    }
+
+    final uid = (model.userId ?? '').trim();
+    if (uid.isNotEmpty && !_isSubjectUserId(model, uid)) {
+      return uid;
+    }
+
+    final created = model.createdBy?.trim();
+    if (created != null && created.isNotEmpty) {
+      return created;
+    }
+
+    return '';
+  }
+
+  /// Resolves actor display name for centered group system messages.
+  static String resolveGroupSystemActorName(IsmChatMessageModel model) {
+    final initiatorName = model.initiatorName?.trim();
+    if (initiatorName != null && initiatorName.isNotEmpty) {
+      return initiatorName;
+    }
+
+    final fromSender = model.senderInfo?.userName.trim();
+    if (fromSender != null && fromSender.isNotEmpty) {
+      return fromSender;
+    }
+
+    final uid = (model.userId ?? '').trim();
+    final userName = model.userName?.trim();
+    if (userName != null &&
+        userName.isNotEmpty &&
+        (uid.isEmpty || !_isSubjectUserId(model, uid))) {
+      return userName;
+    }
+
+    final createdName = model.createdByUserName?.trim();
+    if (createdName != null && createdName.isNotEmpty) {
+      return createdName;
+    }
+
+    return '';
+  }
+
+  /// Fills [initiatorId]/[initiatorName]/[senderInfo] on API rows missing actor fields.
+  static IsmChatMessageModel normalizeGroupSystemActor(IsmChatMessageModel model) {
+    if (!isGroupSystemActorCustomType(model.customType)) {
+      return model;
+    }
+
+    final actorId = resolveGroupSystemActorId(model);
+    final actorName = resolveGroupSystemActorName(model);
+    if (actorId.isEmpty && actorName.isEmpty) {
+      return model;
+    }
+
+    final senderInfo = model.senderInfo ??
+        (actorId.isNotEmpty
+            ? UserDetails(
+                userProfileImageUrl: model.initiatorImageUrl ?? '',
+                userName: actorName,
+                userIdentifier: '',
+                userId: actorId,
+                online: false,
+                lastSeen: 0,
+              )
+            : null);
+
+    return model.copyWith(
+      initiatorId: actorId.isNotEmpty ? actorId : model.initiatorId,
+      initiatorName: actorName.isNotEmpty ? actorName : model.initiatorName,
+      senderInfo: senderInfo,
+    );
+  }
+
   /// Derives [sentByMe] from sender / initiator fields.
   ///
   /// Call payloads often omit [senderInfo] but set [initiatorId] or top-level
@@ -139,6 +260,14 @@ class IsmChatMessageModel {
       return model.sentByMe;
     }
     final currentUserId = IsmChatConfig.communicationConfig.userConfig.userId;
+
+    if (_groupSystemActorCustomTypes.contains(model.customType)) {
+      final actorId = resolveGroupSystemActorId(model);
+      if (actorId.isNotEmpty) {
+        return actorId == currentUserId;
+      }
+      return false;
+    }
 
     final fromMeta = model.metaData?.senderInfo?.userId.trim();
     final fromSender = model.senderInfo?.userId.trim();
@@ -168,7 +297,24 @@ class IsmChatMessageModel {
       return created == currentUserId;
     }
 
-    return true;
+    return false;
+  }
+
+  /// Resolves [customType] after [fromMap] (multi-attachment detection via body + attachments).
+  ///
+  /// Wire format: `customType` is `AttachmentMessage:Multiple` when there are
+  /// two or more files. `body` is the caption, or `AttachmentMessage:Multiple`
+  /// when there is no caption. Older payloads may still put that placeholder
+  /// in `body` while `customType` is the first file (for example `AttachmentMessage:Image`).
+  static IsmChatCustomMessageType resolveCustomType(IsmChatMessageModel model) {
+    if (model.isMultipleAttachmentsMessage) {
+      return IsmChatCustomMessageType.multipleAttachments;
+    }
+    final type = model.customType;
+    if (type != null && type != IsmChatCustomMessageType.text) {
+      return type;
+    }
+    return IsmChatCustomMessageType.withBody(model);
   }
 
   factory IsmChatMessageModel.fromMap(Map<String, dynamic> map) {
@@ -359,15 +505,15 @@ class IsmChatMessageModel {
     if (IsmChatConfig.configInitilized) {
       try {
         model = model.copyWith(
-          customType: model.customType != null &&
-                  model.customType != IsmChatCustomMessageType.text
-              ? model.customType
-              : IsmChatCustomMessageType.withBody(model),
+          customType: resolveCustomType(model),
+        );
+        model = normalizeGroupSystemActor(model);
+        model = model.copyWith(
           sentByMe: resolveSentByMe(model),
           isGroup: model.conversationDetails?.isNotEmpty == true
               ? model.conversationDetails!['isGroup']
               : false,
-          senderInfo: model.metaData?.senderInfo,
+          senderInfo: model.metaData?.senderInfo ?? model.senderInfo,
         );
       } catch (eroor, st) {
         IsmChatLog.error(eroor, st);
@@ -638,10 +784,31 @@ class IsmChatMessageModel {
 
   String get chatName => conversationTitle ?? senderInfo?.userName ?? '';
 
-  String get initiator =>
-      userId == IsmChatConfig.communicationConfig.userConfig.userId
-          ? 'You'
-          : userName!;
+  /// Actor label for group system banners (add/remove member, admin).
+  ///
+  /// Field priority matches [IsmChatGroupSystemMessageCoordinator.resolveInitiator]
+  /// so MQTT persistence and UI stay consistent.
+  String get initiator {
+    final resolvedName = resolveGroupSystemActorName(this);
+    final resolvedId = resolveGroupSystemActorId(this);
+    if (!IsmChatConfig.configInitilized) {
+      if (resolvedName.isNotEmpty) return resolvedName;
+      final fallbackName = userName?.trim() ?? '';
+      return fallbackName.isNotEmpty ? fallbackName : 'User';
+    }
+    final currentUserId =
+        IsmChatConfig.communicationConfig.userConfig.userId.trim();
+    if (resolvedId.isNotEmpty && resolvedId == currentUserId) {
+      return 'You';
+    }
+    if (resolvedName.isNotEmpty) {
+      return resolvedName;
+    }
+    if (resolvedId.isNotEmpty) {
+      return resolvedId;
+    }
+    return 'User';
+  }
 
   IsmChatMessageModel copyWith({
     String? body,

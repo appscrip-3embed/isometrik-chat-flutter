@@ -168,6 +168,7 @@ const Map<String, String> kIsmChatLocaleFr = {
   'sentContact': 'Vous a envoyé un contact',
   'sentLocation': 'Vous a envoyé une localisation',
   'sentImage': 'Vous a envoyé une image',
+  'imagesAndVideos': 'Images et vidéos',
   'sentGif': 'Vous a envoyé un GIF',
   'sentSticker': 'Vous a envoyé un sticker',
   'gif': 'GIF',
@@ -181,6 +182,8 @@ const Map<String, String> kIsmChatLocaleFr = {
   'messageInfo': 'Infos du message',
   'inviteToChat': 'Inviter à',
   'youCanNotSend': 'Vous ne pouvez pas envoyer de média de plus de 20 Mo.',
+  'maxPickerAttachmentsReached':
+      'Vous pouvez sélectionner jusqu’à 5 pièces jointes à la fois.',
   'aboutMe': 'À propos',
   'defaultString': 'Par défaut',
   'recipients': 'Destinataires :',

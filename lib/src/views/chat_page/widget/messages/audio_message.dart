@@ -18,14 +18,11 @@ class IsmChatAudioMessage extends StatelessWidget {
   /// Same as [IsmChatConfig.isChatDarkMode] — set [IsmChatConfig.chatBrightness] from the app.
   static bool get _isSdkDarkMode => IsmChatConfig.isChatDarkMode;
 
-  /// Voice bar fill: black in dark mode so it does not show a grey card patch
-  /// behind the waveform (app [audioMessageBGColor] is often a light surface).
+  /// Voice bar fill from [IsmChatMessageTheme.audioMessageBGColor] (set per app
+  /// light/dark palette — e.g. white bars in dark mode).
   static Color voiceBarBackgroundColor({
     required bool sentByMe,
   }) {
-    if (_isSdkDarkMode) {
-      return IsmChatColors.blackColor;
-    }
     final messageTheme = sentByMe
         ? IsmChatConfig.chatTheme.chatPageTheme?.selfMessageTheme
         : IsmChatConfig.chatTheme.chatPageTheme?.opponentMessageTheme;
@@ -34,18 +31,42 @@ class IsmChatAudioMessage extends StatelessWidget {
         IsmChatColors.primaryColorLight;
   }
 
-  /// In dark mode, skip app overlay colors (often semi-transparent cards/grey).
   static Color? voiceProgressOverlayColor({
     required bool sentByMe,
-  }) {
+  }) =>
+      sentByMe
+          ? IsmChatProperties
+              .chatPageProperties.voiceMessageProgressOverlayColorMe
+          : IsmChatProperties
+              .chatPageProperties.voiceMessageProgressOverlayColorOpponent;
+
+  /// Play button + duration label contrast on the voice bar background.
+  static ({
+    Color meFgColor,
+    Color mePlayIconColor,
+    Color contactFgColor,
+    Color contactPlayIconColor,
+    Color contactPlayIconBgColor,
+  }) voiceChromeColors() {
     if (_isSdkDarkMode) {
-      return null;
+      // White voice bar in dark apps: dark waveform + inverted control chip.
+      return (
+        meFgColor: IsmChatColors.blackColor,
+        mePlayIconColor: IsmChatColors.whiteColor,
+        contactFgColor: IsmChatColors.blackColor,
+        contactPlayIconColor: IsmChatColors.whiteColor,
+        contactPlayIconBgColor: IsmChatColors.blackColor,
+      );
     }
-    return sentByMe
-        ? IsmChatProperties
-            .chatPageProperties.voiceMessageProgressOverlayColorMe
-        : IsmChatProperties
-            .chatPageProperties.voiceMessageProgressOverlayColorOpponent;
+    final primary = IsmChatConfig.chatTheme.primaryColor ??
+        IsmChatColors.primaryColorLight;
+    return (
+      meFgColor: IsmChatColors.whiteColor,
+      mePlayIconColor: primary,
+      contactFgColor: Colors.grey,
+      contactPlayIconColor: Colors.black26,
+      contactPlayIconBgColor: Colors.grey,
+    );
   }
 
   @override
@@ -54,6 +75,7 @@ class IsmChatAudioMessage extends StatelessWidget {
         ?.call(context, message);
     final voiceBg =
         voiceBarBackgroundColor(sentByMe: message.sentByMe);
+    final chrome = voiceChromeColors();
     return Material(
       color: Colors.transparent,
       child: BlurFilter(
@@ -75,8 +97,11 @@ class IsmChatAudioMessage extends StatelessWidget {
                   IsmChatProperties.chatPageProperties.voiceMessageLoadingIcon,
               meBgColor: voiceBg,
               opponentBgColor: voiceBg,
-              mePlayIconColor: IsmChatConfig.chatTheme.primaryColor ??
-                  IsmChatColors.primaryColorLight,
+              meFgColor: chrome.meFgColor,
+              mePlayIconColor: chrome.mePlayIconColor,
+              contactFgColor: chrome.contactFgColor,
+              contactPlayIconColor: chrome.contactPlayIconColor,
+              contactPlayIconBgColor: chrome.contactPlayIconBgColor,
               meProgressOverlayColor:
                   voiceProgressOverlayColor(sentByMe: true),
               opponentProgressOverlayColor:

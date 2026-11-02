@@ -5,6 +5,7 @@ export 'az_list.dart';
 export 'blure_widget.dart';
 export 'bottom_sheet_option.dart';
 export 'chat_image.dart';
+export 'conversation_card_profile_image.dart';
 export 'custom_snackbar.dart';
 export 'file_widget.dart';
 export 'icon_and_text.dart';

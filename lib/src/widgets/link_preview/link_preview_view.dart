@@ -59,7 +59,11 @@ class _LinkPreviewViewState extends State<LinkPreviewView> {
   PreviewData? _previewData;
   bool _isLoading = true;
 
-  String get _cacheKey => widget.url.convertToValidUrl;
+  /// Preview fetch/cache/open use a lowercased URL so caps typed while sending
+  /// still resolve (scheme/host); message text keeps the original casing.
+  String _previewUrl(String raw) => raw.trim().toLowerCase().convertToValidUrl;
+
+  String get _cacheKey => _previewUrl(widget.url);
 
   @override
   void initState() {
@@ -131,7 +135,7 @@ class _LinkPreviewViewState extends State<LinkPreviewView> {
   }
 
   Future<void> _openLink(String url) async {
-    final uri = Uri.tryParse(url.convertToValidUrl);
+    final uri = Uri.tryParse(_previewUrl(url));
     if (uri == null) return;
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -191,7 +195,7 @@ class _LinkPreviewViewState extends State<LinkPreviewView> {
   ) {
     final data = _previewData;
     final imageUrl = data?.image?.url;
-    final link = (data?.link as String?) ?? widget.url.convertToValidUrl;
+    final link = (data?.link as String?) ?? _previewUrl(widget.url);
     final title = data?.title;
     final description = data?.description;
 

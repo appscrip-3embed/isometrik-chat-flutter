@@ -1,5 +1,5 @@
-// coverage:ignore-file
-// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
+import 'dart:async';
+
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/utilities.dart';
 import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/variables.dart';
@@ -19,20 +19,26 @@ mixin IsmChatMqttEventGroupOperationsMixin {
 
     if (actionModel.action == IsmChatActionEvents.addMember) {
       for (final member in eventMembers) {
-        final id = member.userId.trim();
+        final id = member.conversationMemberIdForApi;
         if (id.isEmpty) continue;
-        if (!existingMembers.any((e) => e.userId.trim() == id)) {
+        final existingIndex = existingMembers.indexWhere(
+          (e) => e.matchesConversationMember(id),
+        );
+        // Re-add after remove must replace stale rows (e.g. old isAdmin flag).
+        if (existingIndex >= 0) {
+          existingMembers[existingIndex] = member;
+        } else {
           existingMembers.add(member);
         }
       }
     } else if (actionModel.action == IsmChatActionEvents.membersRemove) {
       final removedIds = eventMembers
-          .map((e) => e.userId.trim())
+          .map((e) => e.conversationMemberIdForApi)
           .where((id) => id.isNotEmpty)
           .toSet();
       if (removedIds.isNotEmpty) {
         existingMembers.removeWhere(
-          (e) => removedIds.contains(e.userId.trim()),
+          (e) => removedIds.any(e.matchesConversationMember),
         );
       }
     }
@@ -52,7 +58,7 @@ mixin IsmChatMqttEventGroupOperationsMixin {
         self is IsmChatMqttEventVariablesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
       final vars = self as IsmChatMqttEventVariablesMixin;
-      if (utils.isSenderMe(actionModel.userDetails?.userId)) return;
+      // Process self-initiated add/remove so the actor sees the center banner.
       if (vars.messageId == actionModel.sentAt.toString()) return;
       vars.messageId = actionModel.sentAt.toString();
 
@@ -60,109 +66,28 @@ mixin IsmChatMqttEventGroupOperationsMixin {
         return;
       }
       final conversationController = IsmChatUtility.conversationController;
-      if (actionModel.action == IsmChatActionEvents.addMember) {
-        await conversationController.getChatConversations();
-      }
 
-      var conversation = await IsmChatConfig.dbWrapper
-          ?.getConversation(actionModel.conversationId ?? '');
-      if (conversation != null) {
-        conversation = _applyMemberDelta(conversation, actionModel);
-      }
-      final allMessages = conversation?.messages;
-      allMessages?.addEntries(
-        {
-          '${actionModel.sentAt}': IsmChatMessageModel(
-            members: actionModel.members,
-            initiatorId: actionModel.userDetails?.userId,
-            initiatorName: actionModel.userDetails?.userName,
-            customType:
-                IsmChatCustomMessageType.fromString(actionModel.action.name),
-            body: '',
-            sentAt: actionModel.sentAt,
-            sentByMe: false,
-            isGroup: true,
-            conversationId: actionModel.conversationId,
-            memberId: actionModel.members?.first.memberId,
-            memberName: actionModel.members?.first.memberName,
-            senderInfo: UserDetails(
-              userProfileImageUrl:
-                  actionModel.userDetails?.profileImageUrl ?? '',
-              userName: actionModel.userDetails?.userName ?? '',
-              userIdentifier: actionModel.userDetails?.userIdentifier ?? '',
-              userId: actionModel.userDetails?.userId ?? '',
-              online: true,
-              lastSeen: 0,
-            ),
-          )
-        }.entries,
+      final initiator =
+          IsmChatGroupSystemMessageCoordinator.resolveInitiator(actionModel);
+      final sentByMe = utils.isSenderMe(initiator.id);
+
+      await IsmChatGroupSystemMessageCoordinator.persistAndRefreshOpenChat(
+        actionModel: actionModel,
+        sentByMe: sentByMe,
+        transformBeforeSave: (conv) => _applyMemberDelta(conv, actionModel),
+        unreadMessagesCount:
+            actionModel.action == IsmChatActionEvents.membersRemove ? 0 : null,
+        syncInMemoryConversation: (conv) => _applyMemberDelta(conv, actionModel),
       );
+
+      await conversationController.getConversationsFromDB();
 
       if (IsmChatUtility.chatPageControllerRegistered) {
         final chatPageController = IsmChatUtility.chatPageController;
         if (actionModel.conversationId ==
             chatPageController.conversation?.conversationId) {
-          chatPageController.conversation =
-              chatPageController.conversation?.copyWith(
-            lastMessageDetails: LastMessageDetails(
-              sentByMe: false,
-              showInConversation: true,
-              sentAt: actionModel.sentAt,
-              senderName: actionModel.userDetails?.userName ?? '',
-              messageType: 0,
-              messageId: '',
-              conversationId: actionModel.conversationId ?? '',
-              body: '',
-              customType:
-                  IsmChatCustomMessageType.fromString(actionModel.action.name),
-              senderId: actionModel.userDetails?.userId ?? '',
-              userId: actionModel.members?.first.memberId,
-              members:
-                  actionModel.members?.map((e) => e.memberName ?? '').toList(),
-              reactionType: '',
-            ),
-          );
-          if (chatPageController.conversation != null) {
-            chatPageController.conversation = _applyMemberDelta(
-              chatPageController.conversation!,
-              actionModel,
-            );
-          }
-          await chatPageController
-              .getMessagesFromDB(actionModel.conversationId ?? '');
-          await chatPageController.getConverstaionDetails();
+          await chatPageController.getConverstaionDetails(isLoading: false);
         }
-      }
-      if (actionModel.action == IsmChatActionEvents.membersRemove) {
-        if (conversation != null) {
-          conversation = conversation.copyWith(
-            lastMessageDetails: conversation.lastMessageDetails?.copyWith(
-              sentByMe: false,
-              showInConversation: true,
-              sentAt: actionModel.sentAt,
-              senderName: actionModel.userDetails?.userName ?? '',
-              messageType: 0,
-              messageId: '',
-              conversationId: actionModel.conversationId ?? '',
-              body: '',
-              customType:
-                  IsmChatCustomMessageType.fromString(actionModel.action.name),
-              senderId: actionModel.userDetails?.userId ?? '',
-              userId: actionModel.members?.first.memberId,
-              members:
-                  actionModel.members?.map((e) => e.memberName.toString()).toList(),
-              reactionType: '',
-            ),
-          );
-          conversation = conversation.copyWith(unreadMessagesCount: 0);
-          await IsmChatConfig.dbWrapper
-              ?.saveConversation(conversation: conversation);
-          await conversationController.getConversationsFromDB();
-        }
-      } else if (actionModel.action == IsmChatActionEvents.addMember &&
-          conversation != null) {
-        await IsmChatConfig.dbWrapper?.saveConversation(conversation: conversation);
-        await conversationController.getConversationsFromDB();
       }
     }
   }
@@ -176,23 +101,66 @@ mixin IsmChatMqttEventGroupOperationsMixin {
         self is IsmChatMqttEventVariablesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
       final vars = self as IsmChatMqttEventVariablesMixin;
-      if (utils.isSenderMe(actionModel.userDetails?.userId)) return;
       if (vars.messageId == actionModel.sentAt.toString()) return;
       vars.messageId = actionModel.sentAt.toString();
+
+      if (!IsmChatUtility.conversationControllerRegistered) {
+        return;
+      }
+      final conversationController = IsmChatUtility.conversationController;
+
+      final subjectId = (actionModel.userDetails?.userId ??
+              actionModel.memberId ??
+              '')
+          .trim();
+      final sentByMe = utils.isSenderMe(subjectId);
+
+      await IsmChatGroupSystemMessageCoordinator.persistAndRefreshOpenChat(
+        actionModel: actionModel,
+        sentByMe: sentByMe,
+      );
+
+      await conversationController.getConversationsFromDB();
+
       if (IsmChatUtility.chatPageControllerRegistered) {
-        var controller = IsmChatUtility.chatPageController;
+        final controller = IsmChatUtility.chatPageController;
         if (controller.conversation?.conversationId ==
                 actionModel.conversationId &&
             controller.conversation?.lastMessageSentAt != actionModel.sentAt) {
-          await controller.getMessagesFromAPI(
-            lastMessageTimestamp: controller.messages.last.sentAt,
+          unawaited(
+            controller.getMessagesFromAPI(
+              lastMessageTimestamp: controller.messages.isNotEmpty
+                  ? controller.messages.last.sentAt
+                  : controller.conversation?.lastMessageSentAt,
+            ),
           );
         }
       }
-      if (IsmChatUtility.conversationControllerRegistered) {
-        await IsmChatUtility.conversationController.getChatConversations();
+
+      unawaited(conversationController.getChatConversations());
+    }
+  }
+
+  /// Updates [isAdmin] on the affected member in local conversation state.
+  IsmChatConversationModel _applyAdminDelta(
+    IsmChatConversationModel conversation,
+    IsmChatMqttActionModel actionModel, {
+    required bool isAdmin,
+  }) {
+    final targetId = (actionModel.memberId ??
+            actionModel.members?.firstOrNull?.conversationMemberIdForApi ??
+            '')
+        .trim();
+    if (targetId.isEmpty) return conversation;
+
+    final members = List<UserDetails>.from(conversation.members ?? []);
+    for (var i = 0; i < members.length; i++) {
+      if (members[i].matchesConversationMember(targetId)) {
+        members[i] = members[i].copyWith(isAdmin: isAdmin);
+        break;
       }
     }
+    return conversation.copyWith(members: members);
   }
 
   /// Handles an admin remove and add event.
@@ -214,118 +182,56 @@ mixin IsmChatMqttEventGroupOperationsMixin {
       }
       final conversationController = IsmChatUtility.conversationController;
 
-      // Save the admin add/remove message to the database
-      var conversation = await IsmChatConfig.dbWrapper
-          ?.getConversation(actionModel.conversationId ?? '');
-      final allMessages = conversation?.messages;
+      final initiator =
+          IsmChatGroupSystemMessageCoordinator.resolveInitiator(actionModel);
+      final sentByMe = utils.isSenderMe(initiator.id);
 
-      // Get initiator info (person who made the change)
-      final initiatorId = actionModel.initiatorId ??
-          actionModel.initiatorDetails?.userId ??
-          actionModel.userDetails?.userId ??
-          '';
-      final initiatorName = actionModel.initiatorName ??
-          actionModel.initiatorDetails?.userName ??
-          actionModel.userDetails?.userName ??
-          '';
+      final isAddAdmin = actionModel.action == IsmChatActionEvents.addAdmin;
+      final isRemoveAdmin =
+          actionModel.action == IsmChatActionEvents.removeAdmin;
+      final adminFlag =
+          isAddAdmin ? true : (isRemoveAdmin ? false : null);
 
-      // Get member info (person who was made/removed as admin)
-      final memberId = actionModel.memberId ?? '';
-      final memberName = actionModel.memberName ?? '';
-
-      allMessages?.addEntries(
-        {
-          '${actionModel.sentAt}': IsmChatMessageModel(
-            members: actionModel.members,
-            initiatorId: initiatorId,
-            initiatorName: initiatorName,
-            // Set userId and userName for initiator getter to work
-            userId: initiatorId,
-            userName: initiatorName,
-            customType: IsmChatCustomMessageType.fromAction(
-                    actionModel.action.name) ??
-                IsmChatCustomMessageType.fromString(actionModel.action.name),
-            body: '',
-            sentAt: actionModel.sentAt,
-            sentByMe: utils.isSenderMe(initiatorId),
-            isGroup: true,
-            conversationId: actionModel.conversationId,
-            memberId: memberId,
-            memberName: memberName,
-            senderInfo: UserDetails(
-              userProfileImageUrl:
-                  actionModel.initiatorDetails?.profileImageUrl ??
-                      actionModel.userDetails?.profileImageUrl ??
-                      '',
-              userName: initiatorName,
-              userIdentifier: actionModel.initiatorDetails?.userIdentifier ??
-                  actionModel.userDetails?.userIdentifier ??
-                  '',
-              userId: initiatorId,
-              online: true,
-              lastSeen: 0,
-            ),
-          )
-        }.entries,
-      );
-
-      // Update conversation last message details
-      if (conversation != null) {
-        conversation = conversation.copyWith(
-          lastMessageDetails: LastMessageDetails(
-            sentByMe: utils.isSenderMe(initiatorId),
-            showInConversation: true,
-            sentAt: actionModel.sentAt,
-            senderName: initiatorName,
-            messageType: 0,
-            messageId: '',
-            conversationId: actionModel.conversationId ?? '',
-            body: '',
-            customType:
-                IsmChatCustomMessageType.fromString(actionModel.action.name),
-            senderId: initiatorId,
-            userId: memberId,
-            memberName: memberName,
-            members:
-                actionModel.members?.map((e) => e.memberName ?? '').toList(),
-            reactionType: '',
-          ),
-        );
-        await IsmChatConfig.dbWrapper
-            ?.saveConversation(conversation: conversation);
-        await conversationController.getConversationsFromDB();
+      IsmChatConversationModel applyAdminDelta(IsmChatConversationModel conv) {
+        if (adminFlag == null) return conv;
+        return _applyAdminDelta(conv, actionModel, isAdmin: adminFlag);
       }
 
-      // Update chat page if it's open for this conversation
+      await IsmChatGroupSystemMessageCoordinator.persistAndRefreshOpenChat(
+        actionModel: actionModel,
+        sentByMe: sentByMe,
+        transformBeforeSave:
+            adminFlag != null ? applyAdminDelta : null,
+        syncInMemoryConversation:
+            adminFlag != null ? applyAdminDelta : null,
+      );
+
+      await conversationController.getConversationsFromDB();
+
       if (IsmChatUtility.chatPageControllerRegistered) {
-        final controller = IsmChatUtility.chatPageController;
-        if (controller.conversation?.conversationId ==
-            actionModel.conversationId) {
-          controller.conversation = controller.conversation?.copyWith(
-            lastMessageDetails: LastMessageDetails(
-              sentByMe: utils.isSenderMe(initiatorId),
-              showInConversation: true,
-              sentAt: actionModel.sentAt,
-              senderName: initiatorName,
-              messageType: 0,
-              messageId: '',
-              conversationId: actionModel.conversationId ?? '',
-              body: '',
-              customType:
-                  IsmChatCustomMessageType.fromString(actionModel.action.name),
-              senderId: initiatorId,
-              userId: memberId,
-              memberName: memberName,
-              members:
-                  actionModel.members?.map((e) => e.memberName ?? '').toList(),
-              reactionType: '',
-            ),
-          );
-          await controller.getMessagesFromDB(actionModel.conversationId ?? '');
+        final chatPageController = IsmChatUtility.chatPageController;
+        if (actionModel.conversationId ==
+            chatPageController.conversation?.conversationId) {
+          if (adminFlag != null) {
+            final targetId = (actionModel.memberId ??
+                    actionModel.members?.firstOrNull
+                        ?.conversationMemberIdForApi ??
+                    '')
+                .trim();
+            if (targetId.isNotEmpty) {
+              chatPageController.groupMembers = chatPageController.groupMembers
+                  .map(
+                    (m) => m.matchesConversationMember(targetId)
+                        ? m.copyWith(isAdmin: adminFlag)
+                        : m,
+                  )
+                  .toList();
+            }
+          }
+          await chatPageController.getConverstaionDetails(isLoading: false);
         }
       }
 
-      // Refresh conversation list if current user is affected
       if (actionModel.memberId ==
               IsmChatConfig.communicationConfig.userConfig.userId &&
           IsmChatUtility.conversationControllerRegistered) {

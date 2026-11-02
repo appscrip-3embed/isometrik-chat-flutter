@@ -64,6 +64,34 @@ class _IsmChatTextMessageState extends State<IsmChatTextMessage> {
                   children: message.mentionList.map(
                     (e) {
                       if (e.isLink) {
+                        if (e.text.startsWith('@')) {
+                          return WidgetSpan(
+                            alignment: PlaceholderAlignment.baseline,
+                            baseline: TextBaseline.alphabetic,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () async {
+                                if (!IsmChatUtility
+                                    .chatPageControllerRegistered) {
+                                  return;
+                                }
+                                final mentioned = message.resolveMentionedUser(
+                                  e.text.substring(1),
+                                );
+                                if (mentioned == null) return;
+                                await IsmChatUtility.chatPageController
+                                    .onMentionLinkTapped(message, e.text);
+                              },
+                              child: Text(
+                                e.text,
+                                style: message.style.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: IsmChatConfig.chatTheme.mentionColor,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
                         return TextSpan(
                           text: e.text,
                           style: message.style.copyWith(
@@ -118,37 +146,6 @@ class _IsmChatTextMessageState extends State<IsmChatTextMessage> {
 
                                   if (await canLaunchUrl(Uri.parse(url))) {
                                     await launchUrl(Uri.parse(url));
-                                  }
-                                } else if (e.text.startsWith('@')) {
-                                  var user = message.mentionedUsers
-                                      ?.where((user) => user.userName
-                                          .toLowerCase()
-                                          .contains(e.text
-                                              .substring(1)
-                                              .toLowerCase()))
-                                      .toList();
-
-                                  if (!user.isNullOrEmpty) {
-                                    var conversationcontroller =
-                                        IsmChatUtility.conversationController;
-                                    var conversationId = conversationcontroller
-                                        .getConversationId(user!.first.userId);
-                                    conversationcontroller
-                                      ..contactDetails = user.first
-                                      ..userConversationId = conversationId;
-                                    if (IsmChatResponsive.isWeb(context)) {
-                                      conversationcontroller
-                                              .isRenderChatPageaScreen =
-                                          IsRenderChatPageScreen.userInfoView;
-                                    } else {
-                                      await IsmChatRoute.goToRoute(
-                                        IsmChatUserInfo(
-                                          conversationId: conversationId,
-                                          user: user.first,
-                                          fromMessagePage: true,
-                                        ),
-                                      );
-                                    }
                                   }
                                 }
                               }

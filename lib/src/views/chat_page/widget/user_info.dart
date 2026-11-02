@@ -41,6 +41,39 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
   bool _showsMetaDataFullName(UserDetails? member) =>
       member != null && _metaDataFullName(member).isNotEmpty;
 
+  /// Conversation model for [IsmChatConversationCardProfileImage] (app
+  /// `conversationInfoAssets.profileImageBuilder`).
+  IsmChatConversationModel? _conversationForProfileImage(
+    IsmChatPageController chatController,
+  ) {
+    final conversationId = widget.conversationId;
+    if (conversationId.isNotEmpty) {
+      if (chatController.conversation?.conversationId == conversationId) {
+        return chatController.conversation;
+      }
+      final cached = conversationController.getConversation(conversationId);
+      if (cached != null) {
+        return cached;
+      }
+    }
+    if (widget.user == null) {
+      return null;
+    }
+    final targetConversationId = conversationId.isNotEmpty
+        ? conversationId
+        : conversationController.getConversationId(widget.user!.userId);
+    return IsmChatConversationModel(
+      messagingDisabled: false,
+      isGroup: false,
+      opponentDetails: widget.user,
+      unreadMessagesCount: 0,
+      lastMessageDetails: null,
+      lastMessageSentAt: 0,
+      membersCount: 1,
+      conversationId: targetConversationId,
+    );
+  }
+
   List<IsmChatMessageModel> mediaList = [];
   List<IsmChatMessageModel> mediaListLinks = [];
   List<IsmChatMessageModel> mediaListDocs = [];
@@ -64,6 +97,29 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
     }
   }
 
+  List<IsmChatMessageModel> _mediaTabListFrom(
+    Iterable<IsmChatMessageModel> messages,
+  ) =>
+      expandMediaGalleryItems(
+        messages.where((e) => e.contributesToConversationMediaTab),
+        includeAudio: true,
+      );
+
+  List<IsmChatMessageModel> _docsTabListFrom(
+    Iterable<IsmChatMessageModel> messages,
+  ) =>
+      expandDocsGalleryItems(
+        messages.where((e) => e.contributesToConversationDocsTab),
+      );
+
+  void _applyMediaTabListsFromMessages(Iterable<IsmChatMessageModel> messages) {
+    mediaList = _mediaTabListFrom(messages);
+    mediaListLinks = messages
+        .where((e) => e.customType == IsmChatCustomMessageType.link)
+        .toList();
+    mediaListDocs = _docsTabListFrom(messages);
+  }
+
   /// Loads media messages from chat page controller if conversation is already loaded (fastest)
   void loadMessagesFromController() {
     if (IsmChatUtility.chatPageControllerRegistered) {
@@ -72,21 +128,7 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
               widget.conversationId &&
           chatController.messages.isNotEmpty) {
         // Use messages already loaded in memory
-        mediaList = chatController.messages
-            .where((e) => [
-                  IsmChatCustomMessageType.video,
-                  IsmChatCustomMessageType.image,
-                  IsmChatCustomMessageType.audio
-                ].contains(e.customType))
-            .toList();
-        mediaListLinks = chatController.messages
-            .where(
-                (e) => [IsmChatCustomMessageType.link].contains(e.customType))
-            .toList();
-        mediaListDocs = chatController.messages
-            .where(
-                (e) => [IsmChatCustomMessageType.file].contains(e.customType))
-            .toList();
+        _applyMediaTabListsFromMessages(chatController.messages);
         if (mounted) {
           setState(() {});
         }
@@ -106,25 +148,9 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
     var messages =
         await IsmChatConfig.dbWrapper?.getMessage(widget.conversationId);
     if (messages != null && messages.isNotEmpty) {
-      final filteredMedia = messages.values
-          .where((e) => [
-                IsmChatCustomMessageType.video,
-                IsmChatCustomMessageType.image,
-                IsmChatCustomMessageType.audio
-              ].contains(e.customType))
-          .toList();
-      final filteredLinks = messages.values
-          .where((e) => [IsmChatCustomMessageType.link].contains(e.customType))
-          .toList();
-      final filteredDocs = messages.values
-          .where((e) => [IsmChatCustomMessageType.file].contains(e.customType))
-          .toList();
-
       if (mounted) {
         setState(() {
-          mediaList = filteredMedia;
-          mediaListLinks = filteredLinks;
-          mediaListDocs = filteredDocs;
+          _applyMediaTabListsFromMessages(messages.values);
         });
       }
     } else {
@@ -149,28 +175,8 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
 
       if (allMessages.isNotEmpty && mounted) {
         // Filter messages by custom type
-        final filteredMediaList = allMessages
-            .where((e) => [
-                  IsmChatCustomMessageType.video,
-                  IsmChatCustomMessageType.image,
-                  IsmChatCustomMessageType.audio
-                ].contains(e.customType))
-            .toList();
-
-        final filteredLinkList = allMessages
-            .where(
-                (e) => [IsmChatCustomMessageType.link].contains(e.customType))
-            .toList();
-
-        final filteredDocList = allMessages
-            .where(
-                (e) => [IsmChatCustomMessageType.file].contains(e.customType))
-            .toList();
-
         setState(() {
-          mediaList = filteredMediaList;
-          mediaListLinks = filteredLinkList;
-          mediaListDocs = filteredDocList;
+          _applyMediaTabListsFromMessages(allMessages);
         });
       }
     } catch (e) {
@@ -182,12 +188,10 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
   Widget build(BuildContext context) => GetBuilder<IsmChatPageController>(
       tag: IsmChat.i.chatPageTag,
       builder: (controller) {
-        // Clear previous references to prevent memory leaks
-        // (Optional: assign empty lists before populating)
-        // This ensures no residual data persists across rebuilds
-        mediaList = [];
-        mediaListLinks = [];
-        mediaListDocs = [];
+        if (controller.conversation?.conversationId == widget.conversationId &&
+            controller.messages.isNotEmpty) {
+          _applyMediaTabListsFromMessages(controller.messages);
+        }
         final isDocumentAllowed = IsmChatProperties
             .chatPageProperties.attachments
             .contains(IsmChatAttachmentType.document);
@@ -222,9 +226,12 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
                   mainAxisSize: MainAxisSize.max,
                   children: [
                     IsmChatDimens.boxHeight16,
-                    IsmChatImage.profile(
-                      widget.user?.profileUrl ?? '',
+                    IsmChatConversationCardProfileImage(
+                      conversation: _conversationForProfileImage(controller),
                       dimensions: IsmChatDimens.oneHundredFifty,
+                      fallbackUrl: widget.user?.profileUrl ?? '',
+                      displayName:
+                          _memberDisplayName(widget.user).capitalizeFirst,
                     ),
                     IsmChatDimens.boxHeight5,
                     Text(
@@ -310,26 +317,45 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
                     ListTile(
                       onTap: () async {
                         IsmChatUtility.showLoader();
-                        final chatController = IsmChatUtility.chatPageController;
-                        final targetConversationId = widget.conversationId.isNotEmpty
-                            ? widget.conversationId
-                            : conversationController.getConversationId(
-                                widget.user?.userId ?? '',
-                              );
+                        final chatController =
+                            IsmChatUtility.chatPageController;
+                        final opponentId = widget.user?.userId ?? '';
+                        final targetConversationId =
+                            widget.conversationId.isNotEmpty
+                                ? widget.conversationId
+                                : conversationController.getConversationId(
+                                    opponentId,
+                                  );
+                        final activeConversation =
+                            chatController.conversation ??
+                                conversationController.currentConversation;
                         final currentConversationId =
-                            chatController.conversation?.conversationId ?? '';
+                            activeConversation?.conversationId ?? '';
+                        final isOnGroupChat =
+                            activeConversation?.isGroup ?? false;
+                        final currentOpponentId =
+                            isOnGroupChat
+                                ? null
+                                : activeConversation?.opponentDetails?.userId;
 
                         // Reuse the current chat route when possible:
-                        // - If this is the same conversation, just return to it.
+                        // - Group info → Message always leaves the group chat.
+                        // - Never-DM users have target id '' — do not treat '' == ''
+                        //   as "same conversation" while still on a group.
                         // - If switching to another conversation from profile, resolve
                         //   the cached conversation by conversationId (not userId) and
-                        //   let chat-page [startInit] handle the reload. Clearing the
-                        //   visible list here caused the revealed stacked chat route to
-                        //   flash / appear blank before the async reload completed.
-                        if (targetConversationId != currentConversationId) {
-                          IsmChatConversationModel? conversationModel =
-                              await IsmChatConfig.dbWrapper
-                                  ?.getConversation(targetConversationId);
+                        //   let chat-page [startInit] handle the reload.
+                        final switchingChat = isOnGroupChat ||
+                            targetConversationId != currentConversationId ||
+                            (opponentId.isNotEmpty &&
+                                currentOpponentId != opponentId);
+
+                        if (switchingChat) {
+                          IsmChatConversationModel? conversationModel;
+                          if (targetConversationId.isNotEmpty) {
+                            conversationModel = await IsmChatConfig.dbWrapper
+                                ?.getConversation(targetConversationId);
+                          }
                           conversationModel ??= IsmChatConversationModel(
                             messagingDisabled: false,
                             isGroup: false,
@@ -338,16 +364,17 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
                             lastMessageDetails: null,
                             lastMessageSentAt: 0,
                             membersCount: 1,
-                            conversationId: targetConversationId,
+                            conversationId: targetConversationId.isEmpty
+                                ? null
+                                : targetConversationId,
                           );
 
                           await conversationController
                               .updateLocalConversation(conversationModel);
-                          // Same chat route is being rebound — tell the page not to
-                          // restore the previous conversation id on become-current.
                           chatController
-                              .setRebindConversationId(targetConversationId);
-                          chatController.isMessagesLoading = true;
+                            ..setRebindConversationId(targetConversationId)
+                            ..markProfileMessageRebindPending()
+                            ..isMessagesLoading = true;
                         }
                         if (widget.fromMessagePage) {
                           IsmChatRoute.goBack();
@@ -358,9 +385,13 @@ class _IsmChatUserInfoState extends State<IsmChatUserInfo> {
 
                         IsmChatUtility.closeLoader();
                         controller.closeOverlay();
-                        // Defer initialization to allow UI to render first
-                        unawaited(
-                            Future.microtask(() => controller.startInit()));
+                        // When switching chats, [IsmChatPageView] restore runs
+                        // startInit after pop; avoid racing it with a second init.
+                        if (!switchingChat) {
+                          unawaited(
+                            Future.microtask(() => controller.startInit()),
+                          );
+                        }
                       },
                       title: Text(
                         IsmChatStrings.message,
