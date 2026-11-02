@@ -10,18 +10,32 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 class IsmChatGroupSystemMessageCoordinator {
   IsmChatGroupSystemMessageCoordinator._();
 
+  static String _firstNonEmpty(Iterable<String?> values) {
+    for (final value in values) {
+      final trimmed = value?.trim() ?? '';
+      if (trimmed.isNotEmpty) {
+        return trimmed;
+      }
+    }
+    return '';
+  }
+
   static ({String id, String name, String profileUrl, String identifier})
       resolveInitiator(IsmChatMqttActionModel actionModel) {
-    final id = (actionModel.initiatorId ??
-            actionModel.initiatorDetails?.userId ??
-            actionModel.userDetails?.userId ??
-            '')
-        .trim();
-    final name = (actionModel.initiatorName ??
-            actionModel.initiatorDetails?.userName ??
-            actionModel.userDetails?.userName ??
-            '')
-        .trim();
+    // MQTT often sends createdBy:"" — empty [initiatorId] must not block
+    // [userDetails] (Status topic actor lives in userId/userName).
+    final id = _firstNonEmpty([
+      actionModel.initiatorId,
+      actionModel.initiatorDetails?.userId,
+      actionModel.userDetails?.userId,
+      actionModel.senderId,
+    ]);
+    final name = _firstNonEmpty([
+      actionModel.initiatorName,
+      actionModel.initiatorDetails?.userName,
+      actionModel.userDetails?.userName,
+      actionModel.senderName,
+    ]);
     final profileUrl = actionModel.initiatorDetails?.profileImageUrl ??
         actionModel.userDetails?.profileImageUrl ??
         '';
@@ -77,7 +91,8 @@ class IsmChatGroupSystemMessageCoordinator {
       lastSeen: 0,
     );
 
-    return IsmChatMessageModel(
+    return IsmChatMessageModel.normalizeGroupSystemActor(
+      IsmChatMessageModel(
       members: actionModel.members,
       initiatorId: initiator.id,
       initiatorName: initiator.name,
@@ -93,6 +108,7 @@ class IsmChatGroupSystemMessageCoordinator {
       memberName: memberName.isEmpty ? null : memberName,
       showInConversation: true,
       senderInfo: senderInfo,
+      ),
     );
   }
 
@@ -121,12 +137,16 @@ class IsmChatGroupSystemMessageCoordinator {
       body: '',
       customType: customType,
       senderId: initiator.id,
+      initiatorId: initiator.id,
       userId: isJoinOrLeave
           ? (actionModel.userDetails?.userId ?? actionModel.memberId)
           : (actionModel.memberId ?? firstMember?.memberId),
       memberId: actionModel.memberId ?? firstMember?.memberId,
       memberName: actionModel.memberName ?? firstMember?.memberName,
-      members: actionModel.members?.map((e) => e.memberName ?? '').toList(),
+      members: actionModel.members
+          ?.map((e) => (e.memberName ?? e.userName).trim())
+          .where((name) => name.isNotEmpty)
+          .toList(),
       reactionType: '',
     );
   }

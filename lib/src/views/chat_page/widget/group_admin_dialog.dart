@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
+/// Admin actions for a group member (view info, make/revoke admin, remove).
+///
+/// Uses plain [ListTile] actions — not [PopupMenuItem] — so taps work reliably
+/// inside a [Dialog] (PopupMenuItem tries to [Navigator.pop] the dialog route).
 class IsmChatGroupAdminDialog extends StatelessWidget {
   const IsmChatGroupAdminDialog(
       {super.key, required this.user, this.isAdmin = false, this.groupName});
@@ -9,6 +13,13 @@ class IsmChatGroupAdminDialog extends StatelessWidget {
   final UserDetails user;
   final bool isAdmin;
   final String? groupName;
+
+  Future<void> _closeDialogThen(Future<void> Function() action) async {
+    IsmChatRoute.goBack();
+    // Let the dialog route finish popping before running async controller work.
+    await Future.delayed(const Duration(milliseconds: 100));
+    await action();
+  }
 
   @override
   Widget build(BuildContext context) => Dialog(
@@ -26,44 +37,53 @@ class IsmChatGroupAdminDialog extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  PopupMenuItem(
+                  ListTile(
+                    title: const Text('View info'),
                     onTap: () async {
-                      await controller.showUserDetails(
-                        user,
-                        fromMessagePage: false,
-                      );
+                      await _closeDialogThen(() => controller.showUserDetails(
+                            user,
+                            fromMessagePage: false,
+                          ));
                     },
-                    padding: IsmChatDimens.edgeInsets24_0,
-                    child: const Text('View info'),
                   ),
-                  PopupMenuItem(
-                    onTap: () {
-                      if (isAdmin) {
-                        controller.removeAdmin(user.userId, user.userName);
-                      } else {
-                        controller.makeAdmin(user.userId, user.userName);
-                      }
-                    },
-                    padding: IsmChatDimens.edgeInsets24_0,
-                    child: Text(isAdmin ? 'Revoke Admin' : 'Make Admin'),
-                  ),
-                  PopupMenuItem(
+                  ListTile(
+                    title: Text(isAdmin ? 'Revoke Admin' : 'Make Admin'),
                     onTap: () async {
-                      await Future.delayed(const Duration(milliseconds: 100));
-                      await IsmChatContextWidget.showDialogContext(
-                        content: IsmChatAlertDialogBox(
-                          title:
-                              'Remove "${user.userName.capitalizeFirst}" from $groupName?',
-                          actionLabels: [IsmChatStrings.okay],
-                          callbackActions: [
-                            () => controller.removeMember(user.userId),
-                          ],
-                        ),
-                      );
+                      final memberId = user.conversationMemberIdForApi;
+                      await _closeDialogThen(() async {
+                        if (isAdmin) {
+                          await controller.removeAdmin(
+                            memberId,
+                            user.userName,
+                          );
+                        } else {
+                          await controller.makeAdmin(
+                            memberId,
+                            user.userName,
+                          );
+                        }
+                      });
                     },
-                    padding: IsmChatDimens.edgeInsets24_0,
-                    child: const Text('Remove from group'),
-                  )
+                  ),
+                  ListTile(
+                    title: const Text('Remove from group'),
+                    onTap: () async {
+                      await _closeDialogThen(() async {
+                        await IsmChatContextWidget.showDialogContext(
+                          content: IsmChatAlertDialogBox(
+                            title:
+                                'Remove "${user.userName.capitalizeFirst}" from $groupName?',
+                            actionLabels: [IsmChatStrings.okay],
+                            callbackActions: [
+                              () => controller.removeMember(
+                                    user.conversationMemberIdForApi,
+                                  ),
+                            ],
+                          ),
+                        );
+                      });
+                    },
+                  ),
                 ],
               ),
             ),

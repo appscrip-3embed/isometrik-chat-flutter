@@ -637,7 +637,7 @@ mixin IsmChatPageGetMessageMixin on GetxController {
             messageType: message.messageType?.value ?? 0,
             messageId: message.messageId ?? '',
             conversationId: message.conversationId ?? '',
-            body: message.body,
+            body: IsmChatUtility.lastMessageBodyForConversationSync(message),
             senderId: message.senderInfo?.userId,
             customType: message.customType,
             readBy: [],
@@ -659,6 +659,7 @@ mixin IsmChatPageGetMessageMixin on GetxController {
             members:
                 message.members?.map((e) => e.memberName ?? '').toList() ?? [],
             action: '',
+            metaData: message.metaData,
             // Propagate local-only / failed sends so conversation list shows error.
             isInvalidMessage: message.isInvalidMessage,
           ),

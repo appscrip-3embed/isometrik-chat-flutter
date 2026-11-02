@@ -183,10 +183,13 @@ mixin IsmChatShowDialogMixin on GetxController {
   /// function to show dialog for changing the group profile
   Future<void> showDialogForChangeGroupProfile() async {
     if (kIsWeb) {
-      await _controller.conversationController
+      final imageUrl = await _controller.conversationController
           .ismChangeImage(ImageSource.gallery);
+      if (imageUrl == null || imageUrl.isEmpty) {
+        return;
+      }
       await _controller.changeGroupProfile(
-          conversationImageUrl: _controller.conversationController.profileImage,
+          conversationImageUrl: imageUrl,
           conversationId: _controller.conversation?.conversationId ?? '',
           isLoading: true);
     } else {

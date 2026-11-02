@@ -55,11 +55,12 @@ class IsmChatPageView extends StatefulWidget {
     required String currentConversationId,
     required String? rebindConversationId,
   }) {
+    // Includes '' for profile → Message to a user with no existing 1:1 yet.
+    if (rebindConversationId != null) {
+      return true;
+    }
     if (openedConversationId.isEmpty) {
       return false;
-    }
-    if (rebindConversationId?.isNotEmpty == true) {
-      return true;
     }
     return currentConversationId != openedConversationId;
   }
@@ -126,8 +127,40 @@ class _IsmChatPageViewState extends State<IsmChatPageView>
 
     // Profile "Message" may intentionally rebind this same page to another chat.
     final rebindId = controller.consumeRebindConversationId();
-    if (rebindId != null && rebindId.isNotEmpty) {
-      _openedConversationId = rebindId;
+    final profileMessagePending =
+        controller.consumeProfileMessageRebindPending();
+    if (rebindId != null || profileMessagePending) {
+      final effectiveRebindId = rebindId ?? '';
+      _openedConversationId = effectiveRebindId;
+      // Stacked chats can leave this flag stuck mid-request; unlock scroll-up loads.
+      controller.canCallCurrentApi = false;
+
+      if (effectiveRebindId.isEmpty) {
+        // New 1:1 — [IsmChatUserInfo] already called [updateLocalConversation].
+        // Do not restore the previous group id from Hive.
+        await controller.startInit();
+        return;
+      }
+
+      final currentId = controller.conversation?.conversationId ?? '';
+      if (currentId == effectiveRebindId) {
+        await controller.getMessagesFromDB(effectiveRebindId);
+        controller.isMessagesLoading = false;
+        return;
+      }
+
+      final cached =
+          await IsmChatConfig.dbWrapper?.getConversation(effectiveRebindId);
+      if (!mounted || !IsmChatUtility.chatPageControllerRegistered) return;
+
+      if (cached != null && IsmChatUtility.conversationControllerRegistered) {
+        await IsmChatUtility.conversationController
+            .updateLocalConversation(cached);
+      }
+      if (!mounted || !IsmChatUtility.chatPageControllerRegistered) return;
+      await controller.getMessagesFromDB(effectiveRebindId);
+      controller.isMessagesLoading = false;
+      return;
     }
 
     // Stacked chats can leave this flag stuck mid-request; unlock scroll-up loads.
@@ -135,6 +168,19 @@ class _IsmChatPageViewState extends State<IsmChatPageView>
 
     final openedId = _openedConversationId;
     final currentId = controller.conversation?.conversationId ?? '';
+    final activeConversation = controller.conversation ??
+        (IsmChatUtility.conversationControllerRegistered
+            ? IsmChatUtility.conversationController.currentConversation
+            : null);
+    // Safety net: profile already switched to a new 1:1 but rebind was missed.
+    if (openedId.isNotEmpty &&
+        (activeConversation?.isGroup != true) &&
+        (activeConversation?.conversationId.isNullOrEmpty ?? true) &&
+        (activeConversation?.opponentDetails?.userId.isNotEmpty ?? false)) {
+      _openedConversationId = '';
+      await controller.startInit();
+      return;
+    }
     if (!IsmChatPageView.shouldReloadOnBecomingCurrent(
       openedConversationId: openedId,
       currentConversationId: currentId,

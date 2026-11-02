@@ -100,6 +100,9 @@ class LastMessageDetails {
       meetingType:
           map['meetingType'] != null ? map['meetingType'] as int? ?? 0 : null,
     );
+
+    details = _enrichGroupSystemLastMessageFromWire(details, map);
+
     details = details.copyWith(
       body: details.metaData?.replyMessage?.parentMessageMessageType ==
               IsmChatCustomMessageType.contact
@@ -118,10 +121,82 @@ class LastMessageDetails {
           : details.initiatorId?.isNotEmpty == true
               ? details.initiatorId ==
                   IsmChatConfig.communicationConfig.userConfig.userId
-              : true,
+              : false,
     );
 
     return details;
+  }
+
+  /// Status-topic / API rows may put the actor in top-level [userId]/[userName]
+  /// and the subject in [memberId] — keep list preview actor in sync with banners.
+  static LastMessageDetails _enrichGroupSystemLastMessageFromWire(
+    LastMessageDetails details,
+    Map<String, dynamic> map,
+  ) {
+    if (!IsmChatMessageModel.isGroupSystemActorCustomType(details.customType)) {
+      return details;
+    }
+
+    final subjectId = () {
+      final mid = (details.memberId ?? '').trim();
+      if (mid.isNotEmpty) return mid;
+      final members = map['members'];
+      if (members is List && members.isNotEmpty) {
+        final first = members.first;
+        if (first is Map) {
+          final fromMap = (first['memberId'] as String? ?? '').trim();
+          if (fromMap.isNotEmpty) return fromMap;
+          return (first['userId'] as String? ?? '').trim();
+        }
+      }
+      return '';
+    }();
+
+    var actorId = (details.initiatorId ?? '').trim();
+    var actorName = details.senderName.trim();
+
+    if (actorId.isEmpty) {
+      actorId = (map['initiatorId'] as String? ?? '').trim();
+    }
+    if (actorName.isEmpty) {
+      actorName = (map['initiatorName'] as String? ??
+              map['senderName'] as String? ??
+              '')
+          .trim();
+    }
+
+    final wireUserId = (map['userId'] as String? ?? '').trim();
+    final wireUserName = (map['userName'] as String? ?? '').trim();
+    if (actorId.isEmpty &&
+        wireUserId.isNotEmpty &&
+        wireUserId != subjectId) {
+      actorId = wireUserId;
+      if (actorName.isEmpty && wireUserName.isNotEmpty) {
+        actorName = wireUserName;
+      }
+    }
+
+    var senderId = details.senderId.trim();
+    var senderName = details.senderName.trim();
+    if (subjectId.isNotEmpty && senderId == subjectId && actorId.isNotEmpty) {
+      senderId = actorId;
+      if (actorName.isNotEmpty) {
+        senderName = actorName;
+      }
+    } else {
+      if (senderName.isEmpty && actorName.isNotEmpty) {
+        senderName = actorName;
+      }
+      if (senderId.isEmpty && actorId.isNotEmpty) {
+        senderId = actorId;
+      }
+    }
+
+    return details.copyWith(
+      senderId: senderId,
+      senderName: senderName,
+      initiatorId: actorId.isNotEmpty ? actorId : details.initiatorId,
+    );
   }
 
   LastMessageDetails({

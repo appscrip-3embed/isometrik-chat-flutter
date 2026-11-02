@@ -151,6 +151,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
       sentAt: sentAt,
       sentByMe: true,
       isUploading: true,
+      notificationBody: 'Documents',
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,

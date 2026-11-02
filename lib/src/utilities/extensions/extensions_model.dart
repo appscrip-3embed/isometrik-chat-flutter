@@ -205,6 +205,10 @@ extension ModelConversion on IsmChatConversationModel {
         ? 'You'
         : lastMessageDetails?.senderName;
 
+    if ((senderName ?? '').trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final listSubtitleStyle =
         IsmChatConfig.chatTheme.chatListCardThemData?.senderTextStyle ??
             IsmChatStyles.w400Black12;
@@ -227,6 +231,7 @@ extension ModelConversion on IsmChatConversationModel {
 
       if ([
         IsmChatCustomMessageType.addMember,
+        IsmChatCustomMessageType.removeMember,
         IsmChatCustomMessageType.addAdmin,
         IsmChatCustomMessageType.removeAdmin,
         IsmChatCustomMessageType.unblock,
@@ -352,11 +357,10 @@ extension LastMessageBody on LastMessageDetails {
       case IsmChatCustomMessageType.file:
         return 'Document';
       case IsmChatCustomMessageType.multipleAttachments:
-        final trimmed = body.trim();
-        if (trimmed.isNotEmpty && trimmed != 'AttachmentMessage:Multiple') {
-          return trimmed;
-        }
-        return 'Multiple Media';
+        return IsmChatUtility.resolveMultipleAttachmentsPreviewLabel(
+          body: body,
+          metaData: metaData,
+        );
       case IsmChatCustomMessageType.location:
         return 'Location';
       case IsmChatCustomMessageType.block:
@@ -1269,13 +1273,25 @@ extension MentionMessage on IsmChatMessageModel {
 
   /// Conversation preview for multi-attachment messages.
   String get multipleAttachmentsPreviewLabel {
-    final count = attachments?.length ?? 0;
+    final list = attachments;
+    if (list == null || list.isEmpty) {
+      return IsmChatUtility.resolveMultipleAttachmentsPreviewLabel(
+        body: body,
+        metaData: metaData,
+      );
+    }
     final layout = multipleAttachmentLayout;
     if (layout == MultipleAttachmentLayout.documentList) {
+      final count = list.length;
       return count > 1 ? '$count Documents' : IsmChatStrings.document;
     }
     if (layout == MultipleAttachmentLayout.mediaGrid) {
-      return count > 1 ? '$count Photos' : IsmChatStrings.image;
+      return IsmChatUtility.multipleMediaBatchLabelFromAttachments(list);
+    }
+    final gridMedia =
+        list.where((attachment) => attachment.isGridMediaAttachment);
+    if (gridMedia.isNotEmpty) {
+      return IsmChatUtility.multipleMediaBatchLabelFromAttachments(gridMedia);
     }
     return IsmChatStrings.document;
   }

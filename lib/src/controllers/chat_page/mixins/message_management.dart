@@ -88,7 +88,7 @@ mixin IsmChatPageMessageManagementMixin on GetxController {
               messageType: lastMessage.messageType?.value ?? 0,
               messageId: lastMessage.messageId ?? '',
               conversationId: lastMessage.conversationId ?? '',
-              body: lastMessage.body,
+              body: IsmChatUtility.lastMessageBodyForConversationSync(lastMessage),
               action: lastMessage.action,
               customType: lastMessage.customType,
               readCount: lastMessage.messageId?.isNotEmpty == true

@@ -7,28 +7,47 @@ class UserDetails {
   factory UserDetails.fromJson(String source) =>
       UserDetails.fromMap(json.decode(source) as Map<String, dynamic>);
 
-  factory UserDetails.fromMap(Map<String, dynamic> map) => UserDetails(
-        userProfileImageUrl: map['userProfileImageUrl'] as String? ?? '',
-        userName: map['userName'] as String? ?? '',
-        userIdentifier: map['userIdentifier'] as String? ?? '',
-        userId: map['userId'] as String? ?? '',
-        online: map['online'] as bool? ?? false,
-        memberName: map['memberName'] as String? ?? '',
-        memberId: map['memberId'] as String? ?? '',
-        // Same as MQTT user parsing: nested metaData or top-level firstName/lastName.
-        metaData: IsmChatMqttUserModel.metaDataFromMap(map) ?? IsmChatMetaData(),
-        lastSeen: map['lastSeen'] as int? ?? 0,
-        timestamp: map['timestamp'] as int? ?? 0,
-        visibility: map['visibility'] as bool? ?? false,
-        notification: map['notification'] as bool? ?? false,
-        language: map['language'] as String? ?? '',
-        order: map['order'] as int? ?? 0,
-        wordCount: map['wordCount'] as int? ?? 0,
-        isAdmin: map['isAdmin'] as bool? ?? false,
-        customUserType: map['customUserType'] as String?,
-        // Defaults to true when absent so older cached members do not mute by accident.
-        pushNotification: map['pushNotification'] as bool? ?? true,
-      );
+  factory UserDetails.fromMap(Map<String, dynamic> map) {
+    // MQTT member payloads often use memberId/memberName only (reuse for deltas).
+    final rawUserId = (map['userId'] as String? ?? '').trim();
+    final memberIdFallback = (map['memberId'] as String? ?? '').trim();
+    final resolvedUserId = rawUserId.isNotEmpty ? rawUserId : memberIdFallback;
+    final rawUserName = (map['userName'] as String? ?? '').trim();
+    final memberNameFallback = (map['memberName'] as String? ?? '').trim();
+    final resolvedUserName =
+        rawUserName.isNotEmpty ? rawUserName : memberNameFallback;
+    final profileUrl = (map['userProfileImageUrl'] as String? ??
+            map['memberProfileImageUrl'] as String? ??
+            '')
+        .trim();
+    final identifier = (map['userIdentifier'] as String? ??
+            map['memberIdentifier'] as String? ??
+            '')
+        .trim();
+
+    return UserDetails(
+      userProfileImageUrl: profileUrl,
+      userName: resolvedUserName,
+      userIdentifier: identifier,
+      userId: resolvedUserId,
+      online: map['online'] as bool? ?? false,
+      memberName: map['memberName'] as String? ?? '',
+      memberId: map['memberId'] as String? ?? '',
+      // Same as MQTT user parsing: nested metaData or top-level firstName/lastName.
+      metaData: IsmChatMqttUserModel.metaDataFromMap(map) ?? IsmChatMetaData(),
+      lastSeen: map['lastSeen'] as int? ?? 0,
+      timestamp: map['timestamp'] as int? ?? 0,
+      visibility: map['visibility'] as bool? ?? false,
+      notification: map['notification'] as bool? ?? false,
+      language: map['language'] as String? ?? '',
+      order: map['order'] as int? ?? 0,
+      wordCount: map['wordCount'] as int? ?? 0,
+      isAdmin: map['isAdmin'] as bool? ?? false,
+      customUserType: map['customUserType'] as String?,
+      // Defaults to true when absent so older cached members do not mute by accident.
+      pushNotification: map['pushNotification'] as bool? ?? true,
+    );
+  }
 
   UserDetails({
     required this.userProfileImageUrl,
@@ -96,6 +115,22 @@ class UserDetails {
     }
 
     return metaData?.profilePic ?? '';
+  }
+
+  /// Id for conversation admin / member APIs that expect a `memberId` field.
+  /// Prefer [userId] (same as remove-member routes); fall back to [memberId]
+  /// for MQTT-only payloads. Reuse at call sites instead of [userId] alone.
+  String get conversationMemberIdForApi {
+    final resolvedUserId = userId.trim();
+    if (resolvedUserId.isNotEmpty) return resolvedUserId;
+    return memberId?.trim() ?? '';
+  }
+
+  /// True when this row is the same member as [id] (matches userId or memberId).
+  bool matchesConversationMember(String id) {
+    final needle = id.trim();
+    if (needle.isEmpty) return false;
+    return userId.trim() == needle || (memberId?.trim() ?? '') == needle;
   }
 
   UserDetails copyWith({

@@ -199,6 +199,7 @@ class IsmChatStrings {
   static String get sentContact => IsmChatL10n.get('sentContact');
   static String get sentLocation => IsmChatL10n.get('sentLocation');
   static String get sentImage => IsmChatL10n.get('sentImage');
+  static String get imagesAndVideos => IsmChatL10n.get('imagesAndVideos');
   static String get sentGif => IsmChatL10n.get('sentGif');
   static String get sentSticker => IsmChatL10n.get('sentSticker');
   static String get searchGifs => IsmChatL10n.get('searchGifs');

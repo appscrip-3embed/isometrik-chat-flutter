@@ -168,6 +168,7 @@ const Map<String, String> kIsmChatLocaleFr = {
   'sentContact': 'Vous a envoyé un contact',
   'sentLocation': 'Vous a envoyé une localisation',
   'sentImage': 'Vous a envoyé une image',
+  'imagesAndVideos': 'Images et vidéos',
   'sentGif': 'Vous a envoyé un GIF',
   'sentSticker': 'Vous a envoyé un sticker',
   'gif': 'GIF',

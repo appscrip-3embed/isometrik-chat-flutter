@@ -82,55 +82,63 @@ class IsmChatImage extends StatelessWidget {
                       backgroundColor: backgroundColor,
                       imageUrl: imageUrl,
                       name: _name,
+                      isProfileImage: _isProfileImage,
                     )
                   : _FileImage(
                       backgroundColor: backgroundColor,
                       imageUrl: imageUrl,
                       name: _name,
+                      isProfileImage: _isProfileImage,
                     ),
         ),
       );
 }
 
 class _FileImage extends StatelessWidget {
-  const _FileImage(
-      {required this.imageUrl, required this.name, this.backgroundColor});
+  const _FileImage({
+    required this.imageUrl,
+    required this.name,
+    required this.isProfileImage,
+    this.backgroundColor,
+  });
   final String imageUrl;
   final String name;
+  final bool isProfileImage;
   final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
-    try {
-      return Image.file(
-        File(imageUrl),
-        fit: BoxFit.cover,
-      );
-    } catch (e) {
-      return Container(
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: Border.all(color: IsmChatColors.whiteColor),
-          color: backgroundColor ??
-              IsmChatConfig.chatTheme.primaryColor!.applyIsmOpacity(0.2),
-          shape: BoxShape.circle,
-        ),
-        child: Text(
-          _buildInitials(name),
-          style: IsmChatStyles.w600Black20.copyWith(
-            color: IsmChatConfig.chatTheme.primaryColor,
-          ),
-        ),
+    if (imageUrl.trim().isEmpty) {
+      return _ErrorImage(
+        backgroundColor: backgroundColor,
+        isProfileImage: isProfileImage,
+        name: name,
       );
     }
+    return Image.file(
+      File(imageUrl),
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (_, __, ___) => _ErrorImage(
+        backgroundColor: backgroundColor,
+        isProfileImage: isProfileImage,
+        name: name,
+      ),
+    );
   }
 }
 
 class _MemeroyImage extends StatelessWidget {
-  const _MemeroyImage(
-      {required this.imageUrl, required this.name, this.backgroundColor});
+  const _MemeroyImage({
+    required this.imageUrl,
+    required this.name,
+    required this.isProfileImage,
+    this.backgroundColor,
+  });
   final String imageUrl;
   final String name;
+  final bool isProfileImage;
   final Color? backgroundColor;
 
   @override
@@ -139,26 +147,24 @@ class _MemeroyImage extends StatelessWidget {
     if (imageUrl.isNotEmpty && imageUrl != 'null') {
       bytes = imageUrl.strigToUnit8List;
     }
-    return bytes == null || bytes.isEmpty == true
-        ? Container(
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              border: Border.all(color: IsmChatColors.whiteColor),
-              color: backgroundColor ??
-                  IsmChatConfig.chatTheme.primaryColor!.applyIsmOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              _buildInitials(name),
-              style: IsmChatStyles.w600Black20.copyWith(
-                color: IsmChatConfig.chatTheme.primaryColor,
-              ),
-            ),
-          )
-        : Image.memory(
-            bytes,
-            fit: BoxFit.cover,
-          );
+    if (bytes == null || bytes.isEmpty) {
+      return _ErrorImage(
+        backgroundColor: backgroundColor,
+        isProfileImage: isProfileImage,
+        name: name,
+      );
+    }
+    return Image.memory(
+      bytes,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (_, __, ___) => _ErrorImage(
+        backgroundColor: backgroundColor,
+        isProfileImage: isProfileImage,
+        name: name,
+      ),
+    );
   }
 }
 
@@ -177,37 +183,33 @@ class _NetworkImage extends StatelessWidget {
   final String _name;
 
   @override
-  Widget build(BuildContext context) => CachedNetworkImage(
+  Widget build(BuildContext context) {
+    if (imageUrl.trim().isEmpty) {
+      return _ErrorImage(
+        backgroundColor: backgroundColor,
+        isProfileImage: _isProfileImage,
+        name: _name,
+      );
+    }
+
+    return CachedNetworkImage(
         imageUrl: imageUrl,
         fit: BoxFit.cover,
         alignment: Alignment.center,
         cacheKey: imageUrl,
-        imageBuilder: (_, image) {
-          try {
-            if (imageUrl.isEmpty) {
-              return _ErrorImage(
+        // DecorationImage in imageBuilder decodes async; failures (e.g. SVG
+        // cached as a file) skip errorWidget — use Image.errorBuilder instead.
+        imageBuilder: (context, imageProvider) => Image(
+              image: imageProvider,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (_, __, ___) => _ErrorImage(
                 backgroundColor: backgroundColor,
                 isProfileImage: _isProfileImage,
                 name: _name,
-              );
-            }
-            return Container(
-              decoration: BoxDecoration(
-                // border: Border.all(color: IsmChatColors.whiteColor),
-                shape: _isProfileImage ? BoxShape.circle : BoxShape.rectangle,
-                color:
-                    backgroundColor ?? IsmChatConfig.chatTheme.backgroundColor!,
-                image: DecorationImage(image: image, fit: BoxFit.cover),
               ),
-            );
-          } catch (e) {
-            return _ErrorImage(
-              backgroundColor: backgroundColor,
-              isProfileImage: _isProfileImage,
-              name: _name,
-            );
-          }
-        },
+            ),
         placeholder: (context, url) => Container(
           alignment: Alignment.center,
           decoration: BoxDecoration(
@@ -238,6 +240,7 @@ class _NetworkImage extends StatelessWidget {
             isProfileImage: _isProfileImage,
             name: _name),
       );
+  }
 }
 
 class _ErrorImage extends StatelessWidget {
@@ -257,7 +260,8 @@ class _ErrorImage extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           border: Border.all(color: IsmChatColors.whiteColor),
-          color: IsmChatConfig.chatTheme.primaryColor!.applyIsmOpacity(0.2),
+          color: backgroundColor ??
+              IsmChatConfig.chatTheme.primaryColor!.applyIsmOpacity(0.2),
           shape: _isProfileImage ? BoxShape.circle : BoxShape.rectangle,
         ),
         child: _isProfileImage

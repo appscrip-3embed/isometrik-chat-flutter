@@ -308,8 +308,21 @@ mixin IsmChatPageVariablesMixin on GetxController {
   /// previous conversation id over the intentional switch.
   String? _rebindConversationId;
 
+  /// Set with [setRebindConversationId] when profile → Message switches chats.
+  bool _profileMessageRebindPending = false;
+
   void setRebindConversationId(String conversationId) {
     _rebindConversationId = conversationId;
+  }
+
+  void markProfileMessageRebindPending() {
+    _profileMessageRebindPending = true;
+  }
+
+  bool consumeProfileMessageRebindPending() {
+    final pending = _profileMessageRebindPending;
+    _profileMessageRebindPending = false;
+    return pending;
   }
 
   String? consumeRebindConversationId() {

@@ -35,6 +35,10 @@ class IsmChatUtility {
 
   static bool isLoading = false;
 
+  /// Reuse one picker — iOS native layer rejects overlapping pick requests.
+  static final ImagePicker _imagePicker = ImagePicker();
+  static bool _pickMediaInFlight = false;
+
   static void hideKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
 
   static void openKeyboard() =>
@@ -325,56 +329,70 @@ class IsmChatUtility {
 
   static Future<List<XFile?>> pickMedia(ImageSource source,
       {bool isVideoAndImage = false}) async {
-    List<XFile?> result;
-
-    if (isVideoAndImage) {
-      result = await ImagePicker().pickMultipleMedia(
-        imageQuality: 25,
-        requestFullMetadata: true,
-        limit: IsmChatConstants.maxOutboundPickerAttachments,
-      );
-    } else {
-      result = [
-        await ImagePicker().pickImage(
-          imageQuality: 25,
-          source: source,
-        )
-      ];
-    }
-
-    if (result.isEmpty) {
+    if (_pickMediaInFlight) {
       return [];
     }
-    if (isVideoAndImage) {
-      return result;
-    }
-    var croppedFile = await ImageCropper().cropImage(
-      sourcePath: result.first?.path ?? '',
-      compressQuality: 100,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Cropper'.tr,
-          toolbarColor: IsmChatColors.blackColor,
-          toolbarWidgetColor: IsmChatColors.whiteColor,
-          initAspectRatio: CropAspectRatioPreset.original,
-          lockAspectRatio: false,
-          cropStyle: CropStyle.circle,
-        ),
-        IOSUiSettings(
-          title: 'Cropper',
-          cropStyle: CropStyle.circle,
-        ),
-        WebUiSettings(
-          context: IsmChatConfig.kNavigatorKey.currentContext ??
-              IsmChatConfig.context,
-        ),
-      ],
-    );
+    _pickMediaInFlight = true;
+    try {
+      List<XFile?> result;
 
-    if (croppedFile != null) {
-      return [XFile(croppedFile.path)];
+      if (isVideoAndImage) {
+        result = await _imagePicker.pickMultipleMedia(
+          imageQuality: 25,
+          requestFullMetadata: true,
+          limit: IsmChatConstants.maxOutboundPickerAttachments,
+        );
+      } else {
+        result = [
+          await _imagePicker.pickImage(
+            imageQuality: 25,
+            source: source,
+          )
+        ];
+      }
+
+      if (result.isEmpty) {
+        return [];
+      }
+      if (isVideoAndImage) {
+        return result;
+      }
+      var croppedFile = await ImageCropper().cropImage(
+        sourcePath: result.first?.path ?? '',
+        compressQuality: 100,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Cropper'.tr,
+            toolbarColor: IsmChatColors.blackColor,
+            toolbarWidgetColor: IsmChatColors.whiteColor,
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+            cropStyle: CropStyle.circle,
+          ),
+          IOSUiSettings(
+            title: 'Cropper',
+            cropStyle: CropStyle.circle,
+          ),
+          WebUiSettings(
+            context: IsmChatConfig.kNavigatorKey.currentContext ??
+                IsmChatConfig.context,
+          ),
+        ],
+      );
+
+      if (croppedFile != null) {
+        return [XFile(croppedFile.path)];
+      }
+      return [];
+    } on PlatformException catch (e, st) {
+      // Double-taps or dismiss + pick racing the iOS picker surface.
+      if (e.code != 'multiple_request') {
+        IsmChatLog.error('pickMedia: $e', st);
+      }
+      return [];
+    } finally {
+      _pickMediaInFlight = false;
     }
-    return [];
   }
 
   /// Returns text representation of a provided bytes value (e.g. 1kB, 1GB)
@@ -1031,6 +1049,102 @@ class IsmChatUtility {
   static String? outboundAttachmentCaptionMeta(String? caption) {
     final trimmed = caption?.trim() ?? '';
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  /// FCM / conversation preview for a multi photo+video batch (no docs).
+  static String multipleMediaBatchLabel({
+    required bool hasVideo,
+    required bool hasImage,
+  }) {
+    if (hasVideo && hasImage) {
+      return IsmChatStrings.imagesAndVideos;
+    }
+    if (hasVideo) {
+      return IsmChatStrings.video;
+    }
+    return IsmChatStrings.image;
+  }
+
+  static String multipleMediaBatchLabelFromAttachments(
+    Iterable<AttachmentModel> attachments,
+  ) {
+    var hasVideo = false;
+    var hasImage = false;
+    for (final attachment in attachments) {
+      if (!attachment.isGridMediaAttachment) {
+        continue;
+      }
+      if (attachment.resolvedMediaType == IsmChatMediaType.video) {
+        hasVideo = true;
+      } else {
+        hasImage = true;
+      }
+      if (hasVideo && hasImage) {
+        break;
+      }
+    }
+    return multipleMediaBatchLabel(hasVideo: hasVideo, hasImage: hasImage);
+  }
+
+  static String multipleMediaBatchLabelFromWebMedia(
+    Iterable<WebMediaModel> mediaList,
+  ) {
+    var hasVideo = false;
+    var hasImage = false;
+    for (final media in mediaList) {
+      if (media.isVideo) {
+        hasVideo = true;
+      } else {
+        hasImage = true;
+      }
+      if (hasVideo && hasImage) {
+        break;
+      }
+    }
+    return multipleMediaBatchLabel(hasVideo: hasVideo, hasImage: hasImage);
+  }
+
+  /// Conversation list subtitle for [multipleAttachments] (caption or media label).
+  static String resolveMultipleAttachmentsPreviewLabel({
+    required String body,
+    IsmChatMetaData? metaData,
+    List<AttachmentModel>? attachments,
+  }) {
+    const placeholder = 'AttachmentMessage:Multiple';
+    final trimmed = body.trim();
+    if (trimmed.isNotEmpty && trimmed != placeholder) {
+      return trimmed;
+    }
+    final metaLabel =
+        metaData?.customMetaData?[IsmChatConstants.multipleMediaPreviewLabelKey];
+    if (metaLabel is String && metaLabel.trim().isNotEmpty) {
+      return metaLabel.trim();
+    }
+    if (attachments != null && attachments.isNotEmpty) {
+      return multipleMediaBatchLabelFromAttachments(attachments);
+    }
+    return IsmChatStrings.image;
+  }
+
+  static String lastMessageBodyForConversationSync(IsmChatMessageModel message) {
+    if (message.customType != IsmChatCustomMessageType.multipleAttachments) {
+      return message.body;
+    }
+    return resolveMultipleAttachmentsPreviewLabel(
+      body: message.body,
+      metaData: message.metaData,
+      attachments: message.attachments,
+    );
+  }
+
+  static Map<String, dynamic>? mergeMultipleMediaPreviewMeta({
+    Map<String, dynamic>? existing,
+    required String previewLabel,
+  }) {
+    return {
+      ...?existing,
+      IsmChatConstants.multipleMediaPreviewLabelKey: previewLabel,
+    };
   }
 
   /// Picks the first non-empty per-file caption, else composer text.

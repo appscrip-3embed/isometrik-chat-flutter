@@ -19,20 +19,26 @@ mixin IsmChatMqttEventGroupOperationsMixin {
 
     if (actionModel.action == IsmChatActionEvents.addMember) {
       for (final member in eventMembers) {
-        final id = member.userId.trim();
+        final id = member.conversationMemberIdForApi;
         if (id.isEmpty) continue;
-        if (!existingMembers.any((e) => e.userId.trim() == id)) {
+        final existingIndex = existingMembers.indexWhere(
+          (e) => e.matchesConversationMember(id),
+        );
+        // Re-add after remove must replace stale rows (e.g. old isAdmin flag).
+        if (existingIndex >= 0) {
+          existingMembers[existingIndex] = member;
+        } else {
           existingMembers.add(member);
         }
       }
     } else if (actionModel.action == IsmChatActionEvents.membersRemove) {
       final removedIds = eventMembers
-          .map((e) => e.userId.trim())
+          .map((e) => e.conversationMemberIdForApi)
           .where((id) => id.isNotEmpty)
           .toSet();
       if (removedIds.isNotEmpty) {
         existingMembers.removeWhere(
-          (e) => removedIds.contains(e.userId.trim()),
+          (e) => removedIds.any(e.matchesConversationMember),
         );
       }
     }
@@ -60,9 +66,6 @@ mixin IsmChatMqttEventGroupOperationsMixin {
         return;
       }
       final conversationController = IsmChatUtility.conversationController;
-      if (actionModel.action == IsmChatActionEvents.addMember) {
-        await conversationController.getChatConversations();
-      }
 
       final initiator =
           IsmChatGroupSystemMessageCoordinator.resolveInitiator(actionModel);
@@ -138,6 +141,28 @@ mixin IsmChatMqttEventGroupOperationsMixin {
     }
   }
 
+  /// Updates [isAdmin] on the affected member in local conversation state.
+  IsmChatConversationModel _applyAdminDelta(
+    IsmChatConversationModel conversation,
+    IsmChatMqttActionModel actionModel, {
+    required bool isAdmin,
+  }) {
+    final targetId = (actionModel.memberId ??
+            actionModel.members?.firstOrNull?.conversationMemberIdForApi ??
+            '')
+        .trim();
+    if (targetId.isEmpty) return conversation;
+
+    final members = List<UserDetails>.from(conversation.members ?? []);
+    for (var i = 0; i < members.length; i++) {
+      if (members[i].matchesConversationMember(targetId)) {
+        members[i] = members[i].copyWith(isAdmin: isAdmin);
+        break;
+      }
+    }
+    return conversation.copyWith(members: members);
+  }
+
   /// Handles an admin remove and add event.
   ///
   /// * `actionModel`: The admin remove and add event model to handle
@@ -161,12 +186,51 @@ mixin IsmChatMqttEventGroupOperationsMixin {
           IsmChatGroupSystemMessageCoordinator.resolveInitiator(actionModel);
       final sentByMe = utils.isSenderMe(initiator.id);
 
+      final isAddAdmin = actionModel.action == IsmChatActionEvents.addAdmin;
+      final isRemoveAdmin =
+          actionModel.action == IsmChatActionEvents.removeAdmin;
+      final adminFlag =
+          isAddAdmin ? true : (isRemoveAdmin ? false : null);
+
+      IsmChatConversationModel applyAdminDelta(IsmChatConversationModel conv) {
+        if (adminFlag == null) return conv;
+        return _applyAdminDelta(conv, actionModel, isAdmin: adminFlag);
+      }
+
       await IsmChatGroupSystemMessageCoordinator.persistAndRefreshOpenChat(
         actionModel: actionModel,
         sentByMe: sentByMe,
+        transformBeforeSave:
+            adminFlag != null ? applyAdminDelta : null,
+        syncInMemoryConversation:
+            adminFlag != null ? applyAdminDelta : null,
       );
 
       await conversationController.getConversationsFromDB();
+
+      if (IsmChatUtility.chatPageControllerRegistered) {
+        final chatPageController = IsmChatUtility.chatPageController;
+        if (actionModel.conversationId ==
+            chatPageController.conversation?.conversationId) {
+          if (adminFlag != null) {
+            final targetId = (actionModel.memberId ??
+                    actionModel.members?.firstOrNull
+                        ?.conversationMemberIdForApi ??
+                    '')
+                .trim();
+            if (targetId.isNotEmpty) {
+              chatPageController.groupMembers = chatPageController.groupMembers
+                  .map(
+                    (m) => m.matchesConversationMember(targetId)
+                        ? m.copyWith(isAdmin: adminFlag)
+                        : m,
+                  )
+                  .toList();
+            }
+          }
+          await chatPageController.getConverstaionDetails(isLoading: false);
+        }
+      }
 
       if (actionModel.memberId ==
               IsmChatConfig.communicationConfig.userConfig.userId &&

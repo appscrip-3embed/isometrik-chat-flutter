@@ -436,7 +436,7 @@ class IsmChatDBWrapper {
           messageType: last.messageType?.value ?? 0,
           messageId: last.messageId ?? '',
           conversationId: last.conversationId ?? conversationId,
-          body: last.body,
+          body: IsmChatUtility.lastMessageBodyForConversationSync(last),
           customType: last.customType,
           action: last.action,
           deliverCount: last.deliveredTo?.length ?? 0,
@@ -465,7 +465,7 @@ class IsmChatDBWrapper {
           messageType: last.messageType?.value ?? 0,
           messageId: last.messageId ?? '',
           conversationId: last.conversationId ?? conversationId,
-          body: last.body,
+          body: IsmChatUtility.lastMessageBodyForConversationSync(last),
           deliverCount: last.deliveredTo?.length ?? 0,
           readCount: last.readBy?.length ?? 0,
           sentByMe: last.sentByMe,
@@ -684,12 +684,32 @@ class IsmChatDBWrapper {
           await saveConversation(conversation: conversationModel);
           return;
         }
+        final incomingLast = conversationModel.lastMessageDetails;
+        final localLast = conversation.lastMessageDetails;
+        var mergedLast = incomingLast;
+        if (incomingLast != null &&
+            localLast != null &&
+            incomingLast.sentAt == localLast.sentAt &&
+            incomingLast.senderName.trim().isEmpty &&
+            localLast.senderName.trim().isNotEmpty &&
+            IsmChatMessageModel.isGroupSystemActorCustomType(
+              incomingLast.customType,
+            )) {
+          mergedLast = incomingLast.copyWith(
+            senderName: localLast.senderName,
+            senderId: localLast.senderId.isNotEmpty
+                ? localLast.senderId
+                : incomingLast.senderId,
+            initiatorId: localLast.initiatorId ?? incomingLast.initiatorId,
+            sentByMe: localLast.sentByMe,
+          );
+        }
         conversation = conversation.copyWith(
           conversationImageUrl: conversationModel.conversationImageUrl,
           conversationTitle: conversationModel.conversationTitle,
           isGroup: conversationModel.isGroup,
           membersCount: conversationModel.membersCount,
-          lastMessageDetails: conversationModel.lastMessageDetails,
+          lastMessageDetails: mergedLast,
           messagingDisabled: conversationModel.messagingDisabled,
           unreadMessagesCount: conversationModel.unreadMessagesCount,
           opponentDetails: conversationModel.opponentDetails,

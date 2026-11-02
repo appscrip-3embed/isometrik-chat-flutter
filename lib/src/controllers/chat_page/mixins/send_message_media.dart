@@ -304,8 +304,8 @@ mixin IsmChatPageSendMessageMediaMixin {
       _controller.chatInputController.clear();
     }
 
-    const multipleBody = 'AttachmentMessage:Multiple';
-    final body = caption.isNotEmpty ? caption.trim() : multipleBody;
+    final mediaPreviewLabel =
+        IsmChatUtility.multipleMediaBatchLabelFromWebMedia(mediaList);
     final sentAt = _controller.nextUniqueMediaSentAt();
     final localAttachments = <AttachmentModel>[];
     for (var i = 0; i < mediaList.length; i++) {
@@ -317,6 +317,10 @@ mixin IsmChatPageSendMessageMediaMixin {
         ),
       );
     }
+
+    final multipleBody =
+        IsmChatUtility.multipleMediaBatchLabelFromWebMedia(mediaList);
+    final body = caption.isNotEmpty ? caption.trim() : multipleBody;
 
     final mediaMessage = IsmChatMessageModel(
       body: body,
@@ -338,7 +342,10 @@ mixin IsmChatPageSendMessageMediaMixin {
         messageSentAt: sentAt,
         isDownloaded: true,
         caption: IsmChatUtility.outboundAttachmentCaptionMeta(caption),
-        customMetaData: metaDataFromDelegate,
+        customMetaData: IsmChatUtility.mergeMultipleMediaPreviewMeta(
+          existing: metaDataFromDelegate,
+          previewLabel: mediaPreviewLabel,
+        ),
       ),
     );
 
@@ -387,7 +394,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       createdAt: sentAt,
       deviceId: mediaMessage.deviceId ?? '',
       messageType: mediaMessage.messageType?.value ?? 0,
-      notificationBody: IsmChatStrings.sentImage,
+      notificationBody: mediaPreviewLabel,
       notificationTitle: notificationTitle,
       attachments: outgoingAttachments,
       customType: IsmChatCustomMessageType.multipleAttachments.value,

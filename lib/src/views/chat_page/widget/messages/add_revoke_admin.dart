@@ -11,10 +11,10 @@ class IsmChatAddRevokeAdmin extends StatelessWidget {
   final IsmChatMessageModel message;
   final bool isAdded;
 
-  // String get _user =>
-  //     message.memberId == IsmChatConfig.communicationConfig.userConfig.userId
-  //         ? 'you'
-  //         : message.memberName!;
+  String get _memberLabel =>
+      message.memberId == IsmChatConfig.communicationConfig.userConfig.userId
+          ? IsmChatStrings.you.toLowerCase()
+          : (message.memberName ?? '');
 
   @override
   Widget build(BuildContext context) => Center(
@@ -27,9 +27,8 @@ class IsmChatAddRevokeAdmin extends StatelessWidget {
           ),
           padding: IsmChatDimens.edgeInsets8_4,
           child: Text(
-            '${message.initiator} ${isAdded ? 'made' : 'removed'} ${message.memberName ?? ''} ${isAdded ? 'an' : 'from being an'} admin of this group'
-                .trim(), //'${message.initiator} ${isAdded ? 'added' : 'removed'} $_user ${isAdded ? 'as' : 'as an '} Admin'.trim()
-
+            '${message.initiator} ${isAdded ? 'made' : 'removed'} $_memberLabel ${isAdded ? 'an' : 'from being an'} admin of this group'
+                .trim(),
             textAlign: TextAlign.center,
             style: IsmChatConfig
                     .chatTheme.chatPageTheme?.centerMessageTheme?.textStyle ??

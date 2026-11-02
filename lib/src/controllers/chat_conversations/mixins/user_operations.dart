@@ -188,19 +188,27 @@ mixin IsmChatConversationsUserOperationsMixin on GetxController {
     );
   }
 
-  /// Changes the profile image for a group.
+  /// Picks, crops, and uploads a group profile image.
   ///
-  /// `imageSource`: The source of the image to upload.
-  Future<void> ismChangeImage(ImageSource imageSource) async {
+  /// Returns the new media URL, or `null` when the user cancels pick/crop,
+  /// dismisses the cropper, or upload fails. Callers must skip group profile
+  /// API updates when this returns `null`.
+  Future<String?> ismChangeImage(ImageSource imageSource) async {
     var file = await IsmChatUtility.pickMedia(imageSource);
-    if (file.isEmpty) {
-      return;
+    if (file.isEmpty || file.first == null) {
+      return null;
     }
 
-    final bytes = await file.first?.readAsBytes();
-    final fileExtension = file.first?.path.split('.').last;
-    await _controller.getPresignedUrl(
-        fileExtension ?? '', bytes ?? Uint8List(0));
+    final pickedFile = file.first!;
+    final bytes = await pickedFile.readAsBytes();
+    final fileExtension = pickedFile.path.split('.').last;
+    final previousUrl = _controller.profileImage;
+    await _controller.getPresignedUrl(fileExtension, bytes);
+    final uploadedUrl = _controller.profileImage;
+    if (uploadedUrl.isEmpty || uploadedUrl == previousUrl) {
+      return null;
+    }
+    return uploadedUrl;
   }
 
   /// Retrieves a presigned URL for uploading media.

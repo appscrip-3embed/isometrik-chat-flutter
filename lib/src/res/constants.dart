@@ -33,6 +33,9 @@ class IsmChatConstants {
   /// Max images/videos/documents per picker session (gallery + file picker).
   static const int maxOutboundPickerAttachments = 5;
 
+  /// [IsmChatMetaData.customMetaData] key for multi photo/video preview text.
+  static const String multipleMediaPreviewLabelKey = 'multipleMediaPreviewLabel';
+
   static const String profileUrl =
       'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png';
 
