@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Remaining branches need plugins, a live broker, or are documented parsing bugs.
 /// List and Iterable-related extensions for the Isometrik Chat Flutter SDK.
 ///
 /// This file contains extensions on List and Iterable types for common

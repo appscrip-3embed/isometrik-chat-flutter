@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Web-only dart:html implementation; the VM test runner loads blob_io.dart.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';

@@ -5,17 +5,12 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter_method_channel.dar
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('isometrik_chat_flutter');
   final platform = MethodChannelIsometrikChatFlutter();
+  const channel = MethodChannel('isometrik_chat_flutter');
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-      if (methodCall.method == 'getPlatformVersion') {
-        return '42';
-      }
-      return null;
-    });
+        .setMockMethodCallHandler(channel, (call) async => '42');
   });
 
   tearDown(() {

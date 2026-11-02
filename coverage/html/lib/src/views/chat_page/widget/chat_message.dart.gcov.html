@@ -1,0 +1,364 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - lcov.info - lib/src/views/chat_page/widget/chat_message.dart</title>
+  <link rel="stylesheet" type="text/css" href="../../../../../gcov.css">
+</head>
+
+<body>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="title">LCOV - code coverage report</td></tr>
+            <tr><td class="ruler"><img src="../../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+            <tr>
+              <td width="100%">
+                <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="10%" class="headerValue"><a href="../../../../../index.html" title="Click to go to top-level">top level</a> - <a href="index.html" title="Click to go to directory lib/src/views/chat_page/widget">lib/src/views/chat_page/widget</a> - chat_message.dart</td>
+            <td width="5%"></td>
+            <td width="5%"></td>
+            <td width="5%" class="headerCovTableHead">Coverage</td>
+            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
+            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">lcov.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntryLo">0.0&nbsp;%</td>
+            <td class="headerCovTableEntry">158</td>
+            <td class="headerCovTableEntry">0</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test Date:</td>
+            <td class="headerValue">2026-10-30 15:25:41</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntryHi">-</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">0</td>
+          </tr>
+                  <tr><td><img src="../../../../../glass.png" width=3 height=3 alt=""></td></tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr><td class="ruler"><img src="../../../../../glass.png" width=3 height=3 alt=""></td></tr>
+          </table>
+
+          <table cellpadding=0 cellspacing=0 border=0>
+            <tr>
+              <td><br></td>
+            </tr>
+            <tr>
+              <td>
+<pre class="sourceHeading">            Line data    Source code</pre>
+<pre class="source">
+<span id="L1"><span class="lineNum">       1</span>              : import 'package:flutter/material.dart';</span>
+<span id="L2"><span class="lineNum">       2</span>              : import 'package:get/get.dart';</span>
+<span id="L3"><span class="lineNum">       3</span>              : import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';</span>
+<span id="L4"><span class="lineNum">       4</span>              : </span>
+<span id="L5"><span class="lineNum">       5</span>              : class IsmChatMessage extends StatefulWidget {</span>
+<span id="L6"><span class="lineNum">       6</span> <span class="tlaUNC">           0 :   IsmChatMessage(</span></span>
+<span id="L7"><span class="lineNum">       7</span>              :     this.index,</span>
+<span id="L8"><span class="lineNum">       8</span>              :     IsmChatMessageModel? message, {</span>
+<span id="L9"><span class="lineNum">       9</span>              :     bool isIgnorTap = false,</span>
+<span id="L10"><span class="lineNum">      10</span>              :     bool isFromSearchMessage = false,</span>
+<span id="L11"><span class="lineNum">      11</span>              :     super.key,</span>
+<span id="L12"><span class="lineNum">      12</span> <span class="tlaUNC">           0 :   })  : _message = IsmChatUtility.chatPageControllerRegistered</span></span>
+<span id="L13"><span class="lineNum">      13</span>              :             ? isFromSearchMessage</span>
+<span id="L14"><span class="lineNum">      14</span> <span class="tlaUNC">           0 :                 ? IsmChatUtility.chatPageController.searchMessages.reversed</span></span>
+<span id="L15"><span class="lineNum">      15</span> <span class="tlaUNC">           0 :                     .toList()[index]</span></span>
+<span id="L16"><span class="lineNum">      16</span> <span class="tlaUNC">           0 :                 : IsmChatUtility.chatPageController.messages.reversed</span></span>
+<span id="L17"><span class="lineNum">      17</span> <span class="tlaUNC">           0 :                     .toList()[index]</span></span>
+<span id="L18"><span class="lineNum">      18</span>              :             : message,</span>
+<span id="L19"><span class="lineNum">      19</span>              :         _isIgnorTap = isIgnorTap;</span>
+<span id="L20"><span class="lineNum">      20</span>              : </span>
+<span id="L21"><span class="lineNum">      21</span>              :   final IsmChatMessageModel? _message;</span>
+<span id="L22"><span class="lineNum">      22</span>              :   final bool? _isIgnorTap;</span>
+<span id="L23"><span class="lineNum">      23</span>              :   final int index;</span>
+<span id="L24"><span class="lineNum">      24</span>              : </span>
+<span id="L25"><span class="lineNum">      25</span> <span class="tlaUNC">           0 :   @override</span></span>
+<span id="L26"><span class="lineNum">      26</span> <span class="tlaUNC">           0 :   State&lt;IsmChatMessage&gt; createState() =&gt; _IsmChatMessageState();</span></span>
+<span id="L27"><span class="lineNum">      27</span>              : }</span>
+<span id="L28"><span class="lineNum">      28</span>              : </span>
+<span id="L29"><span class="lineNum">      29</span>              : class _IsmChatMessageState extends State&lt;IsmChatMessage&gt;</span>
+<span id="L30"><span class="lineNum">      30</span>              :     with AutomaticKeepAliveClientMixin&lt;IsmChatMessage&gt; {</span>
+<span id="L31"><span class="lineNum">      31</span> <span class="tlaUNC">           0 :   @override</span></span>
+<span id="L32"><span class="lineNum">      32</span> <span class="tlaUNC">           0 :   bool get wantKeepAlive =&gt; mounted;</span></span>
+<span id="L33"><span class="lineNum">      33</span>              : </span>
+<span id="L34"><span class="lineNum">      34</span>              :   final coverstaionController = IsmChatUtility.conversationController;</span>
+<span id="L35"><span class="lineNum">      35</span>              : </span>
+<span id="L36"><span class="lineNum">      36</span>              :   late bool showMessageInCenter;</span>
+<span id="L37"><span class="lineNum">      37</span>              :   late bool isGroup;</span>
+<span id="L38"><span class="lineNum">      38</span>              : </span>
+<span id="L39"><span class="lineNum">      39</span> <span class="tlaUNC">           0 :   void _updateWidget() {</span></span>
+<span id="L40"><span class="lineNum">      40</span> <span class="tlaUNC">           0 :     showMessageInCenter = [</span></span>
+<span id="L41"><span class="lineNum">      41</span>              :       IsmChatCustomMessageType.date,</span>
+<span id="L42"><span class="lineNum">      42</span>              :       IsmChatCustomMessageType.block,</span>
+<span id="L43"><span class="lineNum">      43</span>              :       IsmChatCustomMessageType.unblock,</span>
+<span id="L44"><span class="lineNum">      44</span>              :       IsmChatCustomMessageType.conversationCreated,</span>
+<span id="L45"><span class="lineNum">      45</span>              :       IsmChatCustomMessageType.removeMember,</span>
+<span id="L46"><span class="lineNum">      46</span>              :       IsmChatCustomMessageType.addMember,</span>
+<span id="L47"><span class="lineNum">      47</span>              :       IsmChatCustomMessageType.addAdmin,</span>
+<span id="L48"><span class="lineNum">      48</span>              :       IsmChatCustomMessageType.removeAdmin,</span>
+<span id="L49"><span class="lineNum">      49</span>              :       IsmChatCustomMessageType.memberLeave,</span>
+<span id="L50"><span class="lineNum">      50</span>              :       IsmChatCustomMessageType.conversationImageUpdated,</span>
+<span id="L51"><span class="lineNum">      51</span>              :       IsmChatCustomMessageType.conversationTitleUpdated,</span>
+<span id="L52"><span class="lineNum">      52</span>              :       IsmChatCustomMessageType.memberJoin,</span>
+<span id="L53"><span class="lineNum">      53</span>              :       IsmChatCustomMessageType.observerJoin,</span>
+<span id="L54"><span class="lineNum">      54</span>              :       IsmChatCustomMessageType.observerLeave,</span>
+<span id="L55"><span class="lineNum">      55</span> <span class="tlaUNC">           0 :     ].contains(widget._message?.customType);</span></span>
+<span id="L56"><span class="lineNum">      56</span> <span class="tlaUNC">           0 :     isGroup = coverstaionController.currentConversation?.isGroup ?? false;</span></span>
+<span id="L57"><span class="lineNum">      57</span>              :   }</span>
+<span id="L58"><span class="lineNum">      58</span>              : </span>
+<span id="L59"><span class="lineNum">      59</span> <span class="tlaUNC">           0 :   @override</span></span>
+<span id="L60"><span class="lineNum">      60</span>              :   void initState() {</span>
+<span id="L61"><span class="lineNum">      61</span> <span class="tlaUNC">           0 :     super.initState();</span></span>
+<span id="L62"><span class="lineNum">      62</span> <span class="tlaUNC">           0 :     _updateWidget();</span></span>
+<span id="L63"><span class="lineNum">      63</span>              :   }</span>
+<span id="L64"><span class="lineNum">      64</span>              : </span>
+<span id="L65"><span class="lineNum">      65</span> <span class="tlaUNC">           0 :   @override</span></span>
+<span id="L66"><span class="lineNum">      66</span>              :   void didUpdateWidget(covariant IsmChatMessage oldWidget) {</span>
+<span id="L67"><span class="lineNum">      67</span> <span class="tlaUNC">           0 :     _updateWidget();</span></span>
+<span id="L68"><span class="lineNum">      68</span> <span class="tlaUNC">           0 :     super.didUpdateWidget(oldWidget);</span></span>
+<span id="L69"><span class="lineNum">      69</span>              :   }</span>
+<span id="L70"><span class="lineNum">      70</span>              : </span>
+<span id="L71"><span class="lineNum">      71</span>              :   /// Group-message avatar URL: host override → senderInfo → initiatorImageUrl.</span>
+<span id="L72"><span class="lineNum">      72</span>              :   /// Empty strings are treated as missing so the next source is used.</span>
+<span id="L73"><span class="lineNum">      73</span> <span class="tlaUNC">           0 :   String _groupSenderProfileUrl(</span></span>
+<span id="L74"><span class="lineNum">      74</span>              :       BuildContext context, IsmChatPageController controller) {</span>
+<span id="L75"><span class="lineNum">      75</span>              :     final customUrl = IsmChatProperties</span>
+<span id="L76"><span class="lineNum">      76</span> <span class="tlaUNC">           0 :         .chatPageProperties.messageSenderProfileUrl</span></span>
+<span id="L77"><span class="lineNum">      77</span> <span class="tlaUNC">           0 :         ?.call(context, widget._message!, controller.conversation);</span></span>
+<span id="L78"><span class="lineNum">      78</span> <span class="tlaUNC">           0 :     if (!customUrl.isNullOrEmpty) return customUrl!;</span></span>
+<span id="L79"><span class="lineNum">      79</span>              : </span>
+<span id="L80"><span class="lineNum">      80</span> <span class="tlaUNC">           0 :     final senderUrl = widget._message?.senderInfo?.profileUrl;</span></span>
+<span id="L81"><span class="lineNum">      81</span> <span class="tlaUNC">           0 :     if (!senderUrl.isNullOrEmpty) return senderUrl!;</span></span>
+<span id="L82"><span class="lineNum">      82</span>              : </span>
+<span id="L83"><span class="lineNum">      83</span> <span class="tlaUNC">           0 :     return widget._message?.initiatorImageUrl ?? '';</span></span>
+<span id="L84"><span class="lineNum">      84</span>              :   }</span>
+<span id="L85"><span class="lineNum">      85</span>              : </span>
+<span id="L86"><span class="lineNum">      86</span>              :   /// Group-message avatar name: senderInfo → initiatorName.</span>
+<span id="L87"><span class="lineNum">      87</span> <span class="tlaUNC">           0 :   String _groupSenderName() {</span></span>
+<span id="L88"><span class="lineNum">      88</span> <span class="tlaUNC">           0 :     final senderName = widget._message?.senderInfo?.userName;</span></span>
+<span id="L89"><span class="lineNum">      89</span> <span class="tlaUNC">           0 :     if (!senderName.isNullOrEmpty) return senderName!;</span></span>
+<span id="L90"><span class="lineNum">      90</span> <span class="tlaUNC">           0 :     return widget._message?.initiatorName ?? '';</span></span>
+<span id="L91"><span class="lineNum">      91</span>              :   }</span>
+<span id="L92"><span class="lineNum">      92</span>              : </span>
+<span id="L93"><span class="lineNum">      93</span>              :   /// Checks if this message should be hidden because it's part of a grid group</span>
+<span id="L94"><span class="lineNum">      94</span>              :   /// but not the first message in that group</span>
+<span id="L95"><span class="lineNum">      95</span> <span class="tlaUNC">           0 :   bool _shouldHideMessage(IsmChatPageController controller) {</span></span>
+<span id="L96"><span class="lineNum">      96</span> <span class="tlaUNC">           0 :     final message = widget._message;</span></span>
+<span id="L97"><span class="lineNum">      97</span> <span class="tlaUNC">           0 :     if (message == null || !message.isGridDisplayableMedia) {</span></span>
+<span id="L98"><span class="lineNum">      98</span>              :       return false;</span>
+<span id="L99"><span class="lineNum">      99</span>              :     }</span>
+<span id="L100"><span class="lineNum">     100</span>              : </span>
+<span id="L101"><span class="lineNum">     101</span> <span class="tlaUNC">           0 :     final allMessages = controller.messages</span></span>
+<span id="L102"><span class="lineNum">     102</span> <span class="tlaUNC">           0 :         .where((msg) =&gt; msg.customType != IsmChatCustomMessageType.date)</span></span>
+<span id="L103"><span class="lineNum">     103</span> <span class="tlaUNC">           0 :         .toList();</span></span>
+<span id="L104"><span class="lineNum">     104</span> <span class="tlaUNC">           0 :     final group = IsmChatMediaGridGrouping.collect(allMessages, message);</span></span>
+<span id="L105"><span class="lineNum">     105</span> <span class="tlaUNC">           0 :     return IsmChatMediaGridGrouping.shouldHide(group, message);</span></span>
+<span id="L106"><span class="lineNum">     106</span>              :   }</span>
+<span id="L107"><span class="lineNum">     107</span>              : </span>
+<span id="L108"><span class="lineNum">     108</span> <span class="tlaUNC">           0 :   @override</span></span>
+<span id="L109"><span class="lineNum">     109</span>              :   Widget build(BuildContext context) {</span>
+<span id="L110"><span class="lineNum">     110</span> <span class="tlaUNC">           0 :     super.build(context);</span></span>
+<span id="L111"><span class="lineNum">     111</span> <span class="tlaUNC">           0 :     final conversation = IsmChatUtility.chatPageControllerRegistered</span></span>
+<span id="L112"><span class="lineNum">     112</span> <span class="tlaUNC">           0 :         ? IsmChatUtility.chatPageController.conversation</span></span>
+<span id="L113"><span class="lineNum">     113</span> <span class="tlaUNC">           0 :         : coverstaionController.currentConversation;</span></span>
+<span id="L114"><span class="lineNum">     114</span> <span class="tlaUNC">           0 :     if (widget._message != null &amp;&amp;</span></span>
+<span id="L115"><span class="lineNum">     115</span> <span class="tlaUNC">           0 :         !widget._message!.isVisibleInGroupChat(conversation)) {</span></span>
+<span id="L116"><span class="lineNum">     116</span>              :       return const SizedBox.shrink();</span>
+<span id="L117"><span class="lineNum">     117</span>              :     }</span>
+<span id="L118"><span class="lineNum">     118</span> <span class="tlaUNC">           0 :     var theme = IsmChatConfig.chatTheme.chatPageTheme;</span></span>
+<span id="L119"><span class="lineNum">     119</span> <span class="tlaUNC">           0 :     return GetBuilder&lt;IsmChatPageController&gt;(</span></span>
+<span id="L120"><span class="lineNum">     120</span> <span class="tlaUNC">           0 :       tag: IsmChat.i.chatPageTag,</span></span>
+<span id="L121"><span class="lineNum">     121</span> <span class="tlaUNC">           0 :       builder: (controller) {</span></span>
+<span id="L122"><span class="lineNum">     122</span>              :         // Hide the entire message if it's part of a grid but not the first message</span>
+<span id="L123"><span class="lineNum">     123</span> <span class="tlaUNC">           0 :         if (IsmChatUtility.chatPageControllerRegistered &amp;&amp;</span></span>
+<span id="L124"><span class="lineNum">     124</span> <span class="tlaUNC">           0 :             _shouldHideMessage(controller)) {</span></span>
+<span id="L125"><span class="lineNum">     125</span>              :           return const SizedBox.shrink();</span>
+<span id="L126"><span class="lineNum">     126</span>              :         }</span>
+<span id="L127"><span class="lineNum">     127</span> <span class="tlaUNC">           0 :         return IgnorePointer(</span></span>
+<span id="L128"><span class="lineNum">     128</span> <span class="tlaUNC">           0 :           ignoring: showMessageInCenter || widget._isIgnorTap!,</span></span>
+<span id="L129"><span class="lineNum">     129</span> <span class="tlaUNC">           0 :           child: IsmChatTapHandler(</span></span>
+<span id="L130"><span class="lineNum">     130</span> <span class="tlaUNC">           0 :             onLongPress: showMessageInCenter ||</span></span>
+<span id="L131"><span class="lineNum">     131</span> <span class="tlaUNC">           0 :                     (IsmChatProperties.chatPageProperties.shouldShowHoverHold</span></span>
+<span id="L132"><span class="lineNum">     132</span> <span class="tlaUNC">           0 :                             ?.call(context, controller.conversation,</span></span>
+<span id="L133"><span class="lineNum">     133</span> <span class="tlaUNC">           0 :                                 widget._message!) ??</span></span>
+<span id="L134"><span class="lineNum">     134</span>              :                         false)</span>
+<span id="L135"><span class="lineNum">     135</span>              :                 ? null</span>
+<span id="L136"><span class="lineNum">     136</span> <span class="tlaUNC">           0 :                 : () =&gt; controller.onMessageLongPress(</span></span>
+<span id="L137"><span class="lineNum">     137</span>              :                       context,</span>
+<span id="L138"><span class="lineNum">     138</span> <span class="tlaUNC">           0 :                       widget._message!,</span></span>
+<span id="L139"><span class="lineNum">     139</span> <span class="tlaUNC">           0 :                       showMessageInCenter: showMessageInCenter,</span></span>
+<span id="L140"><span class="lineNum">     140</span>              :                     ),</span>
+<span id="L141"><span class="lineNum">     141</span> <span class="tlaUNC">           0 :             onTap: showMessageInCenter</span></span>
+<span id="L142"><span class="lineNum">     142</span>              :                 ? null</span>
+<span id="L143"><span class="lineNum">     143</span> <span class="tlaUNC">           0 :                 : () {</span></span>
+<span id="L144"><span class="lineNum">     144</span> <span class="tlaUNC">           0 :                     IsmChatUtility.hideKeyboard();</span></span>
+<span id="L145"><span class="lineNum">     145</span> <span class="tlaUNC">           0 :                     controller.onMessageSelect(widget._message!);</span></span>
+<span id="L146"><span class="lineNum">     146</span> <span class="tlaUNC">           0 :                     if (controller.showEmojiBoard) {</span></span>
+<span id="L147"><span class="lineNum">     147</span> <span class="tlaUNC">           0 :                       controller.toggleEmojiBoard(false, false);</span></span>
+<span id="L148"><span class="lineNum">     148</span>              :                     }</span>
+<span id="L149"><span class="lineNum">     149</span>              :                   },</span>
+<span id="L150"><span class="lineNum">     150</span> <span class="tlaUNC">           0 :             child: AbsorbPointer(</span></span>
+<span id="L151"><span class="lineNum">     151</span> <span class="tlaUNC">           0 :               absorbing: controller.isMessageSeleted,</span></span>
+<span id="L152"><span class="lineNum">     152</span> <span class="tlaUNC">           0 :               child: Container(</span></span>
+<span id="L153"><span class="lineNum">     153</span> <span class="tlaUNC">           0 :                 padding: IsmChatDimens.edgeInsets4_0,</span></span>
+<span id="L154"><span class="lineNum">     154</span> <span class="tlaUNC">           0 :                 color: controller.selectedMessage.contains(widget._message)</span></span>
+<span id="L155"><span class="lineNum">     155</span> <span class="tlaUNC">           0 :                     ? (IsmChatConfig.chatTheme.chatPageTheme</span></span>
+<span id="L156"><span class="lineNum">     156</span> <span class="tlaUNC">           0 :                                 ?.messageSelectionColor ??</span></span>
+<span id="L157"><span class="lineNum">     157</span> <span class="tlaUNC">           0 :                             IsmChatConfig.chatTheme.primaryColor!)</span></span>
+<span id="L158"><span class="lineNum">     158</span> <span class="tlaUNC">           0 :                         .applyIsmOpacity(.2)</span></span>
+<span id="L159"><span class="lineNum">     159</span>              :                     : null,</span>
+<span id="L160"><span class="lineNum">     160</span> <span class="tlaUNC">           0 :                 child: UnconstrainedBox(</span></span>
+<span id="L161"><span class="lineNum">     161</span>              :                   clipBehavior: Clip.none,</span>
+<span id="L162"><span class="lineNum">     162</span> <span class="tlaUNC">           0 :                   alignment: showMessageInCenter</span></span>
+<span id="L163"><span class="lineNum">     163</span>              :                       ? Alignment.center</span>
+<span id="L164"><span class="lineNum">     164</span> <span class="tlaUNC">           0 :                       : widget._message?.sentByMe == true</span></span>
+<span id="L165"><span class="lineNum">     165</span>              :                           ? Alignment.centerRight</span>
+<span id="L166"><span class="lineNum">     166</span>              :                           : Alignment.centerLeft,</span>
+<span id="L167"><span class="lineNum">     167</span> <span class="tlaUNC">           0 :                   child: Padding(</span></span>
+<span id="L168"><span class="lineNum">     168</span> <span class="tlaUNC">           0 :                     padding: showMessageInCenter</span></span>
+<span id="L169"><span class="lineNum">     169</span> <span class="tlaUNC">           0 :                         ? IsmChatDimens.edgeInsets0</span></span>
+<span id="L170"><span class="lineNum">     170</span> <span class="tlaUNC">           0 :                         : IsmChatDimens.edgeInsets0_4,</span></span>
+<span id="L171"><span class="lineNum">     171</span> <span class="tlaUNC">           0 :                     child: Row(</span></span>
+<span id="L172"><span class="lineNum">     172</span>              :                       crossAxisAlignment:</span>
+<span id="L173"><span class="lineNum">     173</span> <span class="tlaUNC">           0 :                           theme?.selfMessageTheme?.showProfile != null &amp;&amp;</span></span>
+<span id="L174"><span class="lineNum">     174</span> <span class="tlaUNC">           0 :                                   theme?.selfMessageTheme?.showProfile</span></span>
+<span id="L175"><span class="lineNum">     175</span> <span class="tlaUNC">           0 :                                           ?.isPostionBottom ==</span></span>
+<span id="L176"><span class="lineNum">     176</span>              :                                       true</span>
+<span id="L177"><span class="lineNum">     177</span>              :                               ? CrossAxisAlignment.end</span>
+<span id="L178"><span class="lineNum">     178</span>              :                               : CrossAxisAlignment.start,</span>
+<span id="L179"><span class="lineNum">     179</span> <span class="tlaUNC">           0 :                       children: [</span></span>
+<span id="L180"><span class="lineNum">     180</span> <span class="tlaUNC">           0 :                         if (isGroup &amp;&amp;</span></span>
+<span id="L181"><span class="lineNum">     181</span> <span class="tlaUNC">           0 :                             !showMessageInCenter &amp;&amp;</span></span>
+<span id="L182"><span class="lineNum">     182</span> <span class="tlaUNC">           0 :                             !(widget._message?.sentByMe == true)) ...[</span></span>
+<span id="L183"><span class="lineNum">     183</span> <span class="tlaUNC">           0 :                           IsmChatProperties.chatPageProperties</span></span>
+<span id="L184"><span class="lineNum">     184</span> <span class="tlaUNC">           0 :                                   .messageSenderProfileBuilder</span></span>
+<span id="L185"><span class="lineNum">     185</span> <span class="tlaUNC">           0 :                                   ?.call(</span></span>
+<span id="L186"><span class="lineNum">     186</span>              :                                 context,</span>
+<span id="L187"><span class="lineNum">     187</span> <span class="tlaUNC">           0 :                                 widget._message!,</span></span>
+<span id="L188"><span class="lineNum">     188</span> <span class="tlaUNC">           0 :                                 controller.conversation,</span></span>
+<span id="L189"><span class="lineNum">     189</span>              :                               ) ??</span>
+<span id="L190"><span class="lineNum">     190</span> <span class="tlaUNC">           0 :                               IsmChatTapHandler(</span></span>
+<span id="L191"><span class="lineNum">     191</span> <span class="tlaUNC">           0 :                                 onTap: () async {</span></span>
+<span id="L192"><span class="lineNum">     192</span> <span class="tlaUNC">           0 :                                   await controller.showUserDetails(</span></span>
+<span id="L193"><span class="lineNum">     193</span> <span class="tlaUNC">           0 :                                     widget._message!.senderInfo!,</span></span>
+<span id="L194"><span class="lineNum">     194</span>              :                                   );</span>
+<span id="L195"><span class="lineNum">     195</span>              :                                 },</span>
+<span id="L196"><span class="lineNum">     196</span> <span class="tlaUNC">           0 :                                 child: IsmChatImage.profile(</span></span>
+<span id="L197"><span class="lineNum">     197</span> <span class="tlaUNC">           0 :                                   _groupSenderProfileUrl(context, controller),</span></span>
+<span id="L198"><span class="lineNum">     198</span> <span class="tlaUNC">           0 :                                   name: _groupSenderName(),</span></span>
+<span id="L199"><span class="lineNum">     199</span> <span class="tlaUNC">           0 :                                   dimensions: IsmChatConfig.chatTheme</span></span>
+<span id="L200"><span class="lineNum">     200</span> <span class="tlaUNC">           0 :                                           .chatPageTheme?.profileImageSize ??</span></span>
+<span id="L201"><span class="lineNum">     201</span>              :                                       35,</span>
+<span id="L202"><span class="lineNum">     202</span>              :                                 ),</span>
+<span id="L203"><span class="lineNum">     203</span>              :                               )</span>
+<span id="L204"><span class="lineNum">     204</span>              :                         ],</span>
+<span id="L205"><span class="lineNum">     205</span> <span class="tlaUNC">           0 :                         if (theme?.opponentMessageTheme?.showProfile !=</span></span>
+<span id="L206"><span class="lineNum">     206</span> <span class="tlaUNC">           0 :                             null) ...[</span></span>
+<span id="L207"><span class="lineNum">     207</span> <span class="tlaUNC">           0 :                           if (theme?.opponentMessageTheme?.showProfile</span></span>
+<span id="L208"><span class="lineNum">     208</span> <span class="tlaUNC">           0 :                                       ?.isShowProfile ==</span></span>
+<span id="L209"><span class="lineNum">     209</span>              :                                   true &amp;&amp;</span>
+<span id="L210"><span class="lineNum">     210</span> <span class="tlaUNC">           0 :                               !isGroup &amp;&amp;</span></span>
+<span id="L211"><span class="lineNum">     211</span> <span class="tlaUNC">           0 :                               !showMessageInCenter &amp;&amp;</span></span>
+<span id="L212"><span class="lineNum">     212</span> <span class="tlaUNC">           0 :                               !(widget._message?.sentByMe == true)) ...[</span></span>
+<span id="L213"><span class="lineNum">     213</span> <span class="tlaUNC">           0 :                             IsmChatImage.profile(</span></span>
+<span id="L214"><span class="lineNum">     214</span> <span class="tlaUNC">           0 :                               IsmChatProperties.chatPageProperties.header</span></span>
+<span id="L215"><span class="lineNum">     215</span> <span class="tlaUNC">           0 :                                       ?.profileImageUrl</span></span>
+<span id="L216"><span class="lineNum">     216</span> <span class="tlaUNC">           0 :                                       ?.call(</span></span>
+<span id="L217"><span class="lineNum">     217</span>              :                                           context,</span>
+<span id="L218"><span class="lineNum">     218</span> <span class="tlaUNC">           0 :                                           controller.conversation,</span></span>
+<span id="L219"><span class="lineNum">     219</span> <span class="tlaUNC">           0 :                                           controller.conversation?.profileUrl ??</span></span>
+<span id="L220"><span class="lineNum">     220</span>              :                                               '') ??</span>
+<span id="L221"><span class="lineNum">     221</span> <span class="tlaUNC">           0 :                                   controller.conversation?.profileUrl ??</span></span>
+<span id="L222"><span class="lineNum">     222</span>              :                                   '',</span>
+<span id="L223"><span class="lineNum">     223</span>              :                               name: IsmChatProperties</span>
+<span id="L224"><span class="lineNum">     224</span> <span class="tlaUNC">           0 :                                       .chatPageProperties.header?.title</span></span>
+<span id="L225"><span class="lineNum">     225</span> <span class="tlaUNC">           0 :                                       ?.call(</span></span>
+<span id="L226"><span class="lineNum">     226</span>              :                                           context,</span>
+<span id="L227"><span class="lineNum">     227</span> <span class="tlaUNC">           0 :                                           controller.conversation,</span></span>
+<span id="L228"><span class="lineNum">     228</span> <span class="tlaUNC">           0 :                                           controller.conversation?.chatName ??</span></span>
+<span id="L229"><span class="lineNum">     229</span>              :                                               '') ??</span>
+<span id="L230"><span class="lineNum">     230</span> <span class="tlaUNC">           0 :                                   controller.conversation?.chatName,</span></span>
+<span id="L231"><span class="lineNum">     231</span> <span class="tlaUNC">           0 :                               dimensions: IsmChatConfig.chatTheme.chatPageTheme</span></span>
+<span id="L232"><span class="lineNum">     232</span> <span class="tlaUNC">           0 :                                       ?.profileImageSize ??</span></span>
+<span id="L233"><span class="lineNum">     233</span> <span class="tlaUNC">           0 :                                   IsmChatDimens.thirty,</span></span>
+<span id="L234"><span class="lineNum">     234</span>              :                             ),</span>
+<span id="L235"><span class="lineNum">     235</span>              :                             if (IsmChatProperties</span>
+<span id="L236"><span class="lineNum">     236</span> <span class="tlaUNC">           0 :                                     .chatPageProperties.messageBuilder ==</span></span>
+<span id="L237"><span class="lineNum">     237</span> <span class="tlaUNC">           0 :                                 null) ...[</span></span>
+<span id="L238"><span class="lineNum">     238</span> <span class="tlaUNC">           0 :                               IsmChatDimens.boxWidth2,</span></span>
+<span id="L239"><span class="lineNum">     239</span>              :                             ],</span>
+<span id="L240"><span class="lineNum">     240</span>              :                           ],</span>
+<span id="L241"><span class="lineNum">     241</span> <span class="tlaUNC">           0 :                         ] else ...[</span></span>
+<span id="L242"><span class="lineNum">     242</span> <span class="tlaUNC">           0 :                           IsmChatDimens.boxWidth4,</span></span>
+<span id="L243"><span class="lineNum">     243</span>              :                         ],</span>
+<span id="L244"><span class="lineNum">     244</span> <span class="tlaUNC">           0 :                         if (IsmChatUtility.chatPageControllerRegistered) ...[</span></span>
+<span id="L245"><span class="lineNum">     245</span> <span class="tlaUNC">           0 :                           MessageCard(</span></span>
+<span id="L246"><span class="lineNum">     246</span> <span class="tlaUNC">           0 :                             message: widget._message!,</span></span>
+<span id="L247"><span class="lineNum">     247</span> <span class="tlaUNC">           0 :                             showMessageInCenter: showMessageInCenter,</span></span>
+<span id="L248"><span class="lineNum">     248</span> <span class="tlaUNC">           0 :                             index: widget.index,</span></span>
+<span id="L249"><span class="lineNum">     249</span>              :                           )</span>
+<span id="L250"><span class="lineNum">     250</span>              :                         ],</span>
+<span id="L251"><span class="lineNum">     251</span> <span class="tlaUNC">           0 :                         if (theme?.selfMessageTheme?.showProfile != null)</span></span>
+<span id="L252"><span class="lineNum">     252</span> <span class="tlaUNC">           0 :                           if (theme?.selfMessageTheme?.showProfile</span></span>
+<span id="L253"><span class="lineNum">     253</span> <span class="tlaUNC">           0 :                                       ?.isShowProfile ==</span></span>
+<span id="L254"><span class="lineNum">     254</span>              :                                   true &amp;&amp;</span>
+<span id="L255"><span class="lineNum">     255</span> <span class="tlaUNC">           0 :                               !isGroup &amp;&amp;</span></span>
+<span id="L256"><span class="lineNum">     256</span> <span class="tlaUNC">           0 :                               !showMessageInCenter &amp;&amp;</span></span>
+<span id="L257"><span class="lineNum">     257</span> <span class="tlaUNC">           0 :                               widget._message?.sentByMe == true) ...[</span></span>
+<span id="L258"><span class="lineNum">     258</span>              :                             if (IsmChatProperties</span>
+<span id="L259"><span class="lineNum">     259</span> <span class="tlaUNC">           0 :                                     .chatPageProperties.messageBuilder ==</span></span>
+<span id="L260"><span class="lineNum">     260</span> <span class="tlaUNC">           0 :                                 null) ...[</span></span>
+<span id="L261"><span class="lineNum">     261</span> <span class="tlaUNC">           0 :                               IsmChatDimens.boxWidth4,</span></span>
+<span id="L262"><span class="lineNum">     262</span>              :                             ],</span>
+<span id="L263"><span class="lineNum">     263</span> <span class="tlaUNC">           0 :                             IsmChatImage.profile(</span></span>
+<span id="L264"><span class="lineNum">     264</span> <span class="tlaUNC">           0 :                               IsmChatConfig.communicationConfig.userConfig</span></span>
+<span id="L265"><span class="lineNum">     265</span> <span class="tlaUNC">           0 :                                       .userProfile ??</span></span>
+<span id="L266"><span class="lineNum">     266</span> <span class="tlaUNC">           0 :                                   coverstaionController</span></span>
+<span id="L267"><span class="lineNum">     267</span> <span class="tlaUNC">           0 :                                       .userDetails?.userProfileImageUrl ??</span></span>
+<span id="L268"><span class="lineNum">     268</span>              :                                   '',</span>
+<span id="L269"><span class="lineNum">     269</span> <span class="tlaUNC">           0 :                               name: IsmChatConfig.communicationConfig.userConfig</span></span>
+<span id="L270"><span class="lineNum">     270</span> <span class="tlaUNC">           0 :                                       .userName ??</span></span>
+<span id="L271"><span class="lineNum">     271</span> <span class="tlaUNC">           0 :                                   coverstaionController.userDetails?.userName,</span></span>
+<span id="L272"><span class="lineNum">     272</span> <span class="tlaUNC">           0 :                               dimensions: IsmChatConfig.chatTheme.chatPageTheme</span></span>
+<span id="L273"><span class="lineNum">     273</span> <span class="tlaUNC">           0 :                                       ?.profileImageSize ??</span></span>
+<span id="L274"><span class="lineNum">     274</span> <span class="tlaUNC">           0 :                                   IsmChatDimens.thirty,</span></span>
+<span id="L275"><span class="lineNum">     275</span>              :                             ),</span>
+<span id="L276"><span class="lineNum">     276</span>              :                           ]</span>
+<span id="L277"><span class="lineNum">     277</span>              :                       ],</span>
+<span id="L278"><span class="lineNum">     278</span>              :                     ),</span>
+<span id="L279"><span class="lineNum">     279</span>              :                   ),</span>
+<span id="L280"><span class="lineNum">     280</span>              :                 ),</span>
+<span id="L281"><span class="lineNum">     281</span>              :               ),</span>
+<span id="L282"><span class="lineNum">     282</span>              :             ),</span>
+<span id="L283"><span class="lineNum">     283</span>              :           ),</span>
+<span id="L284"><span class="lineNum">     284</span>              :         );</span>
+<span id="L285"><span class="lineNum">     285</span>              :       },</span>
+<span id="L286"><span class="lineNum">     286</span>              :     );</span>
+<span id="L287"><span class="lineNum">     287</span>              :   }</span>
+<span id="L288"><span class="lineNum">     288</span>              : }</span>
+        </pre>
+              </td>
+            </tr>
+          </table>
+          <br>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="ruler"><img src="../../../../../glass.png" width=3 height=3 alt=""></td></tr>
+            <tr><td class="versionInfo">Generated by: <a href="https://github.com/linux-test-project/lcov" target="_parent">LCOV version 2.6-0</a></td></tr>
+          </table>
+          <br>
+
+</body>
+</html>

@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Debug-only stopwatch; no production logic.
 import 'package:flutter/foundation.dart';
 import 'package:isometrik_chat_flutter/src/utilities/chat_log.dart';
 

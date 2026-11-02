@@ -1,5 +1,7 @@
 part of '../chat_conversations_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Lifecycle and initialization mixin for IsmChatConversationsController.
 ///
 /// This mixin contains methods related to controller lifecycle (onInit, onClose, dispose)

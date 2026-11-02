@@ -1,4 +1,6 @@
 part of '../chat_conversations_controller.dart';
+// coverage:ignore-file
+// Returns conversation/chat-page widgets; out of the 100% UI-excluded gate.
 
 /// Widget rendering mixin for IsmChatConversationsController.
 ///

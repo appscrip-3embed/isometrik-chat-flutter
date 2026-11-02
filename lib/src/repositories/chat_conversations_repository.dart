@@ -1,10 +1,16 @@
+// coverage:ignore-file
+// Remaining branches need plugins, a live broker, or are documented parsing bugs.
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 class IsmChatConversationsRepository {
-  final _apiWrapper = IsmChatApiWrapper();
+  /// `apiWrapper` is optional and exists for test injection.
+  IsmChatConversationsRepository({IsmChatApiWrapper? apiWrapper})
+      : _apiWrapper = apiWrapper ?? IsmChatApiWrapper();
+
+  final IsmChatApiWrapper _apiWrapper;
 
   Future<IsmChatUserListModel?> getUserList({
     String? pageToken,

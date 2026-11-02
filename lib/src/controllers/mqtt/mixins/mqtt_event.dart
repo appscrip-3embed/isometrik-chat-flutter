@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 // Export all sub-mixins so they can be used directly by the controller
 export 'mqtt_event/block_unblock.dart';
 export 'mqtt_event/broadcast.dart';

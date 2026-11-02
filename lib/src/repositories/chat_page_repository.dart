@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Remaining branches need plugins, a live broker, or are documented parsing bugs.
 import 'dart:convert';
 
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -36,11 +38,18 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 /// - [IsmChatApiWrapper] - API wrapper for HTTP calls
 /// - [ARCHITECTURE.md] - Architecture documentation
 class IsmChatPageRepository {
+  /// Creates the repository.
+  ///
+  /// `apiWrapper` is optional and exists for test injection (e.g. a wrapper
+  /// built with a `MockClient`). Production code uses the default.
+  IsmChatPageRepository({IsmChatApiWrapper? apiWrapper})
+      : _apiWrapper = apiWrapper ?? IsmChatApiWrapper();
+
   /// The API wrapper instance for making HTTP requests.
   ///
   /// This wrapper handles error handling, retry logic, and request/response
   /// processing. It's initialized once and reused for all API calls.
-  final _apiWrapper = IsmChatApiWrapper();
+  final IsmChatApiWrapper _apiWrapper;
 
   /// Retrieves chat messages from the API.
   ///

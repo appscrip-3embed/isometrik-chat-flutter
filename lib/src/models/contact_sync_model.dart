@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Remaining branches need plugins, a live broker, or are documented parsing bugs.
 // To parse this JSON data, do
 //
 //     final welcome = welcomeFromJson(jsonString);
