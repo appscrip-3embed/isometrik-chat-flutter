@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Core mixin for message sending functionality in the chat page controller.
 ///
 /// This mixin provides the core message sending methods including:

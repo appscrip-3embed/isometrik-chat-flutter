@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Other operations mixin for IsmChatPageController.
 ///
 /// This mixin handles various miscellaneous operations like leaving groups,

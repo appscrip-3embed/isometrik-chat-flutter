@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// GetX Bindings: DI wiring only.
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 

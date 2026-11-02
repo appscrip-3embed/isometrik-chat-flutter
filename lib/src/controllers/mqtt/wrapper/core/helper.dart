@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// MQTT broker socket client; needs a live broker, not exercisable in VM tests.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';

@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Browser MQTT client; the VM test runner loads mobile_client.dart instead.
 import 'package:isometrik_chat_flutter/src/controllers/mqtt/mqtt_helper.dart';
 import 'package:mqtt_client/mqtt_browser_client.dart';
 

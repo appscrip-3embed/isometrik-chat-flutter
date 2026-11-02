@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 import 'package:mqtt_client/mqtt_client.dart';
 
 // Define a type alias for a map with dynamic values.

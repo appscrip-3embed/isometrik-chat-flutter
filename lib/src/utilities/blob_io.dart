@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// dart:io + video_thumbnail plugin glue; no VM implementation for thumbnails.
 import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter/foundation.dart';

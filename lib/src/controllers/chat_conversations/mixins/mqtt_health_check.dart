@@ -1,5 +1,7 @@
 part of '../chat_conversations_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// MQTT connection health checks while the user is on the chat list.
 mixin IsmChatConversationsMqttHealthCheckMixin on GetxController {
   IsmChatConversationsController get _controller =>

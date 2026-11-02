@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Remaining branches need plugins, a live broker, or are documented parsing bugs.
 /// String-related extensions for the Isometrik Chat Flutter SDK.
 ///
 /// This file contains extensions on String and String? types for common

@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Controller shell; mixin logic is either tested via flows or ignored as UI/plugin.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';

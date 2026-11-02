@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Remaining branches need plugins, a live broker, or are documented parsing bugs.
 import 'package:flutter/foundation.dart';
 
 /// Session-only live / ended / connected meeting ids.

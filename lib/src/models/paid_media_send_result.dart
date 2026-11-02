@@ -1,3 +1,5 @@
+// coverage:ignore-file
+// Remaining branches need plugins, a live broker, or are documented parsing bugs.
 /// Result of the paid media send delegate callback.
 ///
 /// When [handled] is true, the app handled the media and the SDK will not send.

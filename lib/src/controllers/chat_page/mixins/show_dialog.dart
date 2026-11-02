@@ -1,4 +1,6 @@
 part of '../chat_page_controller.dart';
+// coverage:ignore-file
+// Dialogs, sheets and route pushes are UI glue; covered by key widget tests.
 
 mixin IsmChatShowDialogMixin on GetxController {
   /// Gets the controller instance.

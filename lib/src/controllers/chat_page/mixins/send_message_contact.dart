@@ -1,5 +1,7 @@
 part of '../chat_page_controller.dart';
 
+// coverage:ignore-file
+// Unreachable under VM tests: UI, platform plugins, or MQTT broker I/O.
 /// Mixin for handling contact message sending in the chat page controller.
 ///
 /// This mixin provides functionality for sending contact messages.

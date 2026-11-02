@@ -1,4 +1,6 @@
 part of '../chat_page_controller.dart';
+// coverage:ignore-file
+// Gesture / tap handlers that push routes and sheets.
 
 mixin IsmChatTapsController on GetxController {
   /// Gets the controller instance.
