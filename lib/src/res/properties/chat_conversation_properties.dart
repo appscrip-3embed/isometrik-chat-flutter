@@ -43,6 +43,11 @@ class IsmChatConversationProperties {
     this.refreshFooter,
     this.conversationListEmptyOrNot,
     this.conversationScreenBuilder,
+    this.enableStorageQuotaListBanner = true,
+    this.storageQuotaWarningThreshold = 0.9,
+    this.storageQuotaListBannerBuilder,
+    this.storageQuotaListBannerProperties =
+        IsmChatStorageQuotaListBannerProperties.defaults,
   }) {
     assert(
       (showCreateChatIcon && onCreateTap != null) || !showCreateChatIcon,
@@ -54,6 +59,10 @@ class IsmChatConversationProperties {
         allowedConversations.isNotEmpty &&
             allowedConversations.contains(IsmChatConversationType.private),
         'allowedConversations must not be empty and must contain IsmChatConversationType.private');
+    assert(
+      storageQuotaWarningThreshold >= 0 && storageQuotaWarningThreshold <= 1,
+      'storageQuotaWarningThreshold must be between 0 and 1',
+    );
   }
 
   /// A callback that is called when a chat item is tapped.
@@ -273,4 +282,21 @@ class IsmChatConversationProperties {
   /// conversationScreenBuilder: (context) => const MyMessagesScreen(),
   /// ```
   final ConversationScreenBuilder? conversationScreenBuilder;
+
+  /// When `true` (default), shows a media-storage warning banner at the top of
+  /// the default conversation list when usage reaches
+  /// [storageQuotaWarningThreshold]. Set `false` to hide it entirely.
+  final bool enableStorageQuotaListBanner;
+
+  /// Fraction of quota used (`0.0`–`1.0`) at which the list banner appears.
+  /// Default `0.9` (90%).
+  final double storageQuotaWarningThreshold;
+
+  /// Optional full replacement for the default list banner UI. Visibility rules
+  /// still apply; omit to use [IsmChatStorageQuotaListBanner] styling.
+  final StorageQuotaListBannerBuilder? storageQuotaListBannerBuilder;
+
+  /// Text, icons, colors, and padding for the default list banner. Use
+  /// [storageQuotaListBannerBuilder] only when the host needs a fully custom widget.
+  final IsmChatStorageQuotaListBannerProperties storageQuotaListBannerProperties;
 }

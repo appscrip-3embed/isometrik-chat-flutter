@@ -88,6 +88,15 @@ class IsmChatStorageUsageModel {
   bool get isOverLimit =>
       quotaEnabled && !canUpload;
 
+  /// Whether usage has reached [threshold] of the allowance (e.g. `0.9` for 90%).
+  ///
+  /// Used by the conversation-list warning banner. Always `false` when quota is
+  /// off or [quotaBytes] is zero/unknown.
+  bool shouldWarnNearQuota({double threshold = 0.9}) =>
+      quotaEnabled &&
+      (quotaBytes ?? 0) > 0 &&
+      usedFraction >= threshold;
+
   /// Whether a prospective upload of [size] bytes fits in the remaining
   /// allowance. Always `true` when quota is off. Mirrors the server rule:
   /// a file larger than [remainingBytes] is rejected on send.

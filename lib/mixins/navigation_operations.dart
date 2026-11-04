@@ -131,14 +131,6 @@ mixin IsmChatNavigationOperationsMixin {
       '''Input Error: Please make sure that required fields are filled out.
       members and groupTitle cannot be empty.''',
     );
-    assert(
-      groupImage.isNotEmpty ||
-          (groupImageBytes != null &&
-              groupImageBytes.isNotEmpty &&
-              (groupImageExtension?.isNotEmpty == true)),
-      '''Input Error: Please provide either conversationImageUrl or both
-      groupImageBytes and groupImageExtension.''',
-    );
 
     return await _delegate.createGroup(
       members: members,

@@ -21,6 +21,20 @@ typedef ConversationCardCallback = Widget Function(
 /// Omit / leave null on properties to keep the SDK default UI.
 typedef ConversationScreenBuilder = Widget Function(BuildContext context);
 
+/// Optional override for the media storage warning banner on the conversation list.
+typedef StorageQuotaListBannerBuilder = Widget Function(
+  BuildContext context,
+  IsmChatStorageUsageModel usage,
+  VoidCallback onManageStorage,
+  VoidCallback onDismiss,
+);
+
+/// Resolves banner copy from [IsmChatStorageQuotaListBannerProperties] builders.
+typedef StorageQuotaListBannerTextBuilder = String? Function(
+  BuildContext context,
+  IsmChatStorageUsageModel usage,
+);
+
 typedef ConversationWidgetCallback = Widget? Function(
   BuildContext,
   IsmChatConversationModel?,

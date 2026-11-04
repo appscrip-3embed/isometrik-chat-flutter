@@ -402,7 +402,48 @@ For live list updates (MQTT, refresh), rebuild when `IsmChatConversationsControl
 
 ---
 
-## 5. Notes
+## 5. Media storage warning banner
+
+When you **omit** `conversationScreenBuilder`, the SDK shows [`IsmChatStorageQuotaListBanner`](lib/src/views/chat_storage/widget/storage_quota_list_banner.dart) above the conversation rows if server media quota usage reaches **90%** by default (`storageQuotaWarningThreshold` on `IsmChatConversationProperties`).
+
+- Disable: `enableStorageQuotaListBanner: false`
+- Change threshold: `storageQuotaWarningThreshold: 0.85` (85%)
+- **Texts & default banner look:** `storageQuotaListBannerProperties: IsmChatStorageQuotaListBannerProperties(...)` — title, subtitle, action label, colors, padding, custom leading icon, or `*Builder` callbacks with `IsmChatStorageUsageModel` for dynamic copy
+- **Fully custom widget:** `storageQuotaListBannerBuilder: (context, usage, onManage, onDismiss) => ...`
+
+```dart
+IsmChatConversationProperties(
+  storageQuotaListBannerProperties: IsmChatStorageQuotaListBannerProperties(
+    title: 'Storage almost full',
+    subtitle: 'Delete old media to keep sending files.',
+    actionLabel: 'Free up space',
+    backgroundColor: Color(0xFFFFF3E0),
+    // Or dynamic copy:
+    // subtitleBuilder: (context, usage) =>
+    //     '${IsmChatUtility.formatBytes(usage.usedBytes ?? 0)} used',
+  ),
+)
+```
+
+**Custom chat list:** embed the banner at the top of your screen and refresh usage on open / pull-to-refresh:
+
+```dart
+Column(
+  children: [
+    const IsmChatStorageQuotaListBanner(),
+    Expanded(child: /* your list */),
+  ],
+)
+
+// On screen open or refresh:
+await IsmChat.i.getStorageUsage(forceRefresh: true);
+```
+
+`Manage storage` in the default banner calls `IsmChat.i.openStorageManagement()`.
+
+---
+
+## 6. Notes
 
 - Do **not** skip `IsmChatApp` / `IsmChatConversations` lifecycle. Always mount chat via `IsmChatApp` (or equivalent) so controllers initialize; only the **visual** tree is replaced.
 - Existing `header` / `cardBuilder` / FAB options still apply to apps that **omit** `conversationScreenBuilder`. They are ignored for layout when the host owns the full screen.

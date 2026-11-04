@@ -119,6 +119,24 @@ class IsmChatStorageQuotaController extends GetxController {
       .where((e) => _selectedMediaIds.contains(e.mediaId))
       .fold(0, (sum, e) => sum + e.size);
 
+  // ------------------------------------------- conversation-list banner
+
+  final _listBannerDismissed = false.obs;
+
+  /// Session-only dismiss for [IsmChatStorageQuotaListBanner]. Cleared when
+  /// usage drops below [IsmChatConversationProperties.storageQuotaWarningThreshold].
+  bool get listBannerDismissed => _listBannerDismissed.value;
+
+  void dismissStorageQuotaListBanner() => _listBannerDismissed.value = true;
+
+  void _syncListBannerDismissWithUsage(IsmChatStorageUsageModel? usage) {
+    final threshold =
+        IsmChatProperties.conversationProperties.storageQuotaWarningThreshold;
+    if (usage == null || !usage.shouldWarnNearQuota(threshold: threshold)) {
+      _listBannerDismissed.value = false;
+    }
+  }
+
   // --------------------------------------------------------------- actions
 
   /// Loads server-authoritative usage. Safe to call often; set [isLoading] to
@@ -129,6 +147,7 @@ class IsmChatStorageQuotaController extends GetxController {
       final result = await _viewModel.getStorageUsage(isLoading: isLoading);
       if (result != null) {
         _usage.value = result;
+        _syncListBannerDismissWithUsage(result);
       }
       return result;
     } finally {
@@ -375,6 +394,7 @@ class IsmChatStorageQuotaController extends GetxController {
       remainingBytes: remaining,
       canUpload: quota == null ? current.canUpload : usedBytes < quota,
     );
+    _syncListBannerDismissWithUsage(_usage.value);
   }
 
   /// A confirm dialog + delete for the selected rows. UI convenience.

@@ -53,6 +53,7 @@ mixin IsmChatConversationsLifecycleInitializationMixin on GetxController {
       ..intilizedContrller = true
       ..scrollListener()
       ..sendPendingMessgae();
+    unawaited(IsmChat.i.getStorageUsage());
     _controller.startMqttHealthCheckForChatList();
   }
 

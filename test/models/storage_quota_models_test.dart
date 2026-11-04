@@ -64,6 +64,50 @@ void main() {
       expect(usage.canUpload, isTrue);
     });
 
+    test('shouldWarnNearQuota respects threshold and quota state', () {
+      const quota = 100;
+      final at89 = IsmChatStorageUsageModel.fromMap(const {
+        'quotaEnabled': true,
+        'usedBytes': 89,
+        'quotaBytes': quota,
+        'remainingBytes': 11,
+        'canUpload': true,
+      });
+      expect(at89.shouldWarnNearQuota(threshold: 0.9), isFalse);
+
+      final at90 = IsmChatStorageUsageModel.fromMap(const {
+        'quotaEnabled': true,
+        'usedBytes': 90,
+        'quotaBytes': quota,
+        'remainingBytes': 10,
+        'canUpload': true,
+      });
+      expect(at90.shouldWarnNearQuota(threshold: 0.9), isTrue);
+
+      final full = IsmChatStorageUsageModel.fromMap(const {
+        'quotaEnabled': true,
+        'usedBytes': quota,
+        'quotaBytes': quota,
+        'remainingBytes': 0,
+        'canUpload': false,
+      });
+      expect(full.shouldWarnNearQuota(threshold: 0.9), isTrue);
+
+      final off = IsmChatStorageUsageModel.fromMap(const {
+        'quotaEnabled': false,
+        'usedBytes': quota,
+        'quotaBytes': quota,
+      });
+      expect(off.shouldWarnNearQuota(threshold: 0.9), isFalse);
+
+      final zeroQuota = IsmChatStorageUsageModel.fromMap(const {
+        'quotaEnabled': true,
+        'usedBytes': 50,
+        'quotaBytes': 0,
+      });
+      expect(zeroQuota.shouldWarnNearQuota(threshold: 0.9), isFalse);
+    });
+
     test('copyWith / toMap round-trip', () {
       final usage = IsmChatStorageUsageModel.fromMap(const {
         'quotaEnabled': true,

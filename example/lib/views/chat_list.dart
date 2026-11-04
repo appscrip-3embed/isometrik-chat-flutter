@@ -191,31 +191,24 @@ class ChatList extends StatelessWidget {
                 onCreateTap: () {},
                 shouldShowAppBar:
                     IsmChatResponsive.isWeb(context) ? false : true,
-                header: Column(
-                  children: [
-                    IsmChatListHeader(
-                      onSignOut: () {
-                        controller.onSignOut();
-                      },
-                      onSearchTap: (p0, p1, p2) {},
-                      showSearch: false,
-                      width: IsmChatResponsive.isWeb(context)
-                          ? IsmChatDimens.percentWidth(.3)
-                          : null,
-                    ),
-                    // Demo: open the SDK's built-in media storage quota screen.
-                    // Host apps can also call the data APIs directly, e.g.
-                    // `await IsmChat.i.getStorageUsage()`.
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: () => IsmChat.i.openStorageManagement(),
-                        icon: const Icon(Icons.sd_storage_outlined, size: 18),
-                        label: const Text('Manage storage'),
-                      ),
-                    ),
-                  ],
+                headerHeight: IsmChatDimens.appBarHeight,
+                header: IsmChatListHeader(
+                  onSignOut: () {
+                    controller.onSignOut();
+                  },
+                  onSearchTap: (p0, p1, p2) {},
+                  showSearch: false,
+                  width: IsmChatResponsive.isWeb(context)
+                      ? IsmChatDimens.percentWidth(.3)
+                      : null,
                 ),
+                // Customize banner copy / colors via storageQuotaListBannerProperties, e.g.:
+                // storageQuotaListBannerProperties: IsmChatStorageQuotaListBannerProperties(
+                //   title: 'Storage almost full',
+                //   actionLabel: 'Manage',
+                // ),
+                // Media storage warning banner appears above the conversation
+                // list when quota usage ≥ 90% (see enableStorageQuotaListBanner).
                 placeholder: const IsmChatEmptyView(
                   text: 'Create conversation',
                   icon: Icon(
