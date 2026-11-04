@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 import 'fake_api.dart';
+import 'ui_test_helpers.dart';
 
 /// Shared bootstrap for every SDK test.
 ///
@@ -234,6 +235,7 @@ void chatTestWidgets(
       useDatabase: useDatabase,
       messageEncrypted: messageEncrypted,
     );
+    applyUiTestPropertyOverrides();
     IsmChatDBWrapper? db;
     if (useDatabase) {
       db = await tester.runAsync(openTestDatabase);
@@ -251,6 +253,7 @@ void chatTestWidgets(
       common = controllers.common;
       conversations = controllers.conversations;
       page = controllers.page;
+      registerMqttForUiTests(api);
       final deadline = DateTime.now().add(const Duration(seconds: 8));
       while (!conversations.intilizedContrller &&
           DateTime.now().isBefore(deadline)) {
@@ -266,6 +269,7 @@ void chatTestWidgets(
       );
     } finally {
       conversations.stopMqttHealthCheckForChatList();
+      restoreUiTestPropertyOverrides();
       await tester.runAsync(resetChatSdk);
       await tester.pumpWidget(const SizedBox());
       // Fluttertoast schedules a 1s timer; typing indicators use 2s.
@@ -308,6 +312,25 @@ void mockPlatformChannels() {
   messenger.setMockMethodCallHandler(
     const MethodChannel('plugins.flutter.io/path_provider'),
     (call) async => Directory.systemTemp.path,
+  );
+  messenger.setMockMethodCallHandler(
+    const MethodChannel('plugins.flutter.io/shared_preferences'),
+    (call) async {
+      switch (call.method) {
+        case 'getAll':
+          return <String, Object>{};
+        case 'setBool':
+        case 'setDouble':
+        case 'setInt':
+        case 'setString':
+        case 'setStringList':
+        case 'remove':
+        case 'clear':
+          return true;
+        default:
+          return null;
+      }
+    },
   );
   for (final name in const [
     'fluttertoast',
