@@ -30,6 +30,8 @@ class IsmChatLinkMessage extends StatelessWidget {
             // [LinkPreviewView] lowercases + normalizes before fetch; keep raw body.
             url: message.body.trim(),
             message: message,
+            // Preview card already shows the URL at the bottom; skip duplicate top link.
+            embedded: true,
           ),
         ),
       ),

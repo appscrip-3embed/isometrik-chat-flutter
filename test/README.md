@@ -11,7 +11,8 @@
 | `view_models/` | Business rules on top of repositories |
 | `controllers/` | End-to-end flows: 1-to-1, group, attachments, reactions, broadcast, MQTT events |
 | `utilities/` | Extensions, utility helpers, masker, enums |
-| `widgets/` | Key widgets only (message bubbles per attachment type, input field) |
+| `widgets/` | Leaf widgets: bubbles, conversation card, headers, input field |
+| `views/` | Full screens: `IsmChatConversations`, `IsmChatPageView`, interactions |
 
 ## Reusable helpers
 
@@ -22,10 +23,19 @@
     (via `IsmChatDBWrapper.create(name, directoryPath)`).
   - `chatTestWidgets(...)` is the entry point for flow tests: config + host
     app + DB + `FakeChatApi` + all three controllers, cleaned up afterwards.
+    Also applies UI test property overrides (stub avatars, registers MQTT).
   - `settle`, `pumpUntil`, `drive`: Hive file IO does not progress inside
     `testWidgets`' fake-async zone on its own. Wrap any controller call that
     touches the DB in `drive(tester, () => ...)`.
   - `resetChatSdk()` clears GetX and config. Always call it in `tearDown`.
+- `helpers/ui_test_helpers.dart`
+  - `applyUiTestPropertyOverrides()` / `restoreUiTestPropertyOverrides()`:
+    stub profile images so `CachedNetworkImage` does not touch sqflite in the VM.
+  - `seedChatPageForUi`, `seedConversationListForUi`, `registerConversationListApi`:
+    put controllers in a renderable state.
+  - `pumpSdkScreen`: mount a full view with the same host app as `pumpChatHost`.
+  - `mountChatPageForUi`: open `IsmChatPageView` after `startInit`, then re-seed
+    messages (init clears the list while loading).
 - `helpers/fake_api.dart`: `FakeChatApi` is an in-memory HTTP backend.
   Register routes with `on('GET', '/chat/messages', FakeResponse.json(...))`,
   then assert on `requests` / `requestsTo(...)`. Pass `api.wrapper()` to any
@@ -44,6 +54,27 @@ production behaviour:
 - `IsmChatApiWrapper({http.Client? client, Duration timeout})`
 - `IsmChat*Repository({IsmChatApiWrapper? apiWrapper})`, for all five repositories
 - `IsmChatDBWrapper.create([String? databaseName, String? directoryPath])`
+
+## UI tests
+
+Business-logic coverage (`tool/coverage.sh`) and UI coverage are **separate**.
+Tests do not exercise login; they use `configureChatSdk()` with a fixed logged-in
+user (`kMeId` in `test_bootstrap.dart`).
+
+| When to use | Helper |
+| --- | --- |
+| Single widget, no GetX controllers | `configureChatSdk` + `pumpChatHost` |
+| Controllers + optional full screens | `chatTestWidgets` + `pumpSdkScreen` / `mountChatPageForUi` |
+
+```bash
+flutter test test/widgets test/views   # UI tests only
+flutter test --coverage
+dart run tool/ui_coverage.dart         # report: views + widgets + theme (no CI fail)
+```
+
+**Out of scope for UI widget tests** (platform-heavy; same rationale as
+`coverage:ignore-file` on camera/gallery mixins): camera, gallery picker, video
+trim/player, Giphy network panel, link-preview fetch.
 
 ## Running
 

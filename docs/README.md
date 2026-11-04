@@ -68,6 +68,12 @@ This directory contains comprehensive documentation for the Isometrik Chat Flutt
 
 ### Host app integration
 
+- **[NOTIFICATIONS.md](./NOTIFICATIONS.md)** - Local (MQTT) alerts and remote push (FCM)
+  - `showNotification` / `notificationBody` callbacks
+  - When alerts are shown or skipped, mute per conversation
+  - `handleNotificationPayload` for notification taps
+  - Example app wiring (`LocalNoticeService`, Firebase)
+
 - **[HOST_CUSTOM_COMPOSER.md](./HOST_CUSTOM_COMPOSER.md)** - Chat input area + sticky header banner
   - `chatPageProperties.chatInputAreaBuilder` (wins over deprecated `messageFieldBuilder`)
   - `header.bottom` for sticky strip under AppBar
