@@ -203,6 +203,17 @@ class ChatList extends StatelessWidget {
                           ? IsmChatDimens.percentWidth(.3)
                           : null,
                     ),
+                    // Demo: open the SDK's built-in media storage quota screen.
+                    // Host apps can also call the data APIs directly, e.g.
+                    // `await IsmChat.i.getStorageUsage()`.
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => IsmChat.i.openStorageManagement(),
+                        icon: const Icon(Icons.sd_storage_outlined, size: 18),
+                        label: const Text('Manage storage'),
+                      ),
+                    ),
                   ],
                 ),
                 placeholder: const IsmChatEmptyView(

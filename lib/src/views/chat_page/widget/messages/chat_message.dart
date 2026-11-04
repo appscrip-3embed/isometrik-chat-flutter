@@ -14,6 +14,12 @@ class IsmChatMessageWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Media-storage quota: when the server has blanked a media attachment
+    // (restricted), never render a broken image — show a placeholder and keep
+    // any caption. Non-media types (e.g. text) never carry restricted media.
+    if (message.hasRestrictedMedia && _isMediaMessageType(messageType)) {
+      return IsmChatRestrictedMediaMessage(message);
+    }
     if (message.isMultipleAttachmentsMessage) {
       return IsmChatMultipleAttachmentsMessage(message);
     }
@@ -104,6 +110,20 @@ class IsmChatMessageWrapper extends StatelessWidget {
         return IsmChatSocialMessage(message);
     }
   }
+
+  /// Message kinds whose body is a media attachment that can be restricted.
+  ///
+  /// Includes reply/forward: those only carry restricted attachments when the
+  /// reply/forward itself is a media message (a text reply has no attachments,
+  /// so `hasRestrictedMedia` stays false and this gate is never hit for it).
+  static bool _isMediaMessageType(IsmChatCustomMessageType type) =>
+      type == IsmChatCustomMessageType.image ||
+      type == IsmChatCustomMessageType.video ||
+      type == IsmChatCustomMessageType.audio ||
+      type == IsmChatCustomMessageType.file ||
+      type == IsmChatCustomMessageType.multipleAttachments ||
+      type == IsmChatCustomMessageType.reply ||
+      type == IsmChatCustomMessageType.forward;
 }
 
 class IsmChatMessageWrapperWithMetaData extends StatelessWidget {

@@ -31,6 +31,7 @@ export 'reaction_model.dart';
 export 'reply_message_model.dart';
 export 'response_model.dart';
 export 'selected_forward_user_model.dart';
+export 'storage_quota/storage_quota.dart';
 export 'typing_model.dart';
 export 'user_details_model.dart';
 export 'user_list_model.dart';

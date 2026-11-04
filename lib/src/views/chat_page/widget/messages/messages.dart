@@ -23,6 +23,7 @@ export 'message_card.dart';
 export 'observer_join_leave.dart';
 export 'ont_to_one_call_message.dart';
 export 'reply_message.dart';
+export 'restricted_media_message.dart';
 export 'social_link_message.dart';
 export 'text_message.dart';
 export 'video_message.dart';

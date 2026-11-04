@@ -134,6 +134,31 @@ class IsmChatAPI {
   /// GET: Get presigned URLs for messages
   static String presignedUrls = '$chatMessages/presignedurls';
 
+  // ==================== Media Storage Quota Endpoints ====================
+
+  /// Base path for per-user media storage quota endpoints.
+  static String chatQuota = '$baseUrl/chat/quota';
+
+  /// Storage usage endpoint.
+  /// GET: Server-authoritative `{ quotaEnabled, usedBytes, quotaBytes,
+  /// remainingBytes, tier, canUpload }` for the signed-in user.
+  static String storageQuotaUsage = '$chatQuota/storage/usage';
+
+  /// Storage media list endpoint.
+  /// GET: The user's charged media, newest first. Supports `conversationId`,
+  /// `limit` (1-20) and `skip` query params.
+  static String storageQuotaMedia = '$chatQuota/storage/media';
+
+  /// Delete selected media endpoint.
+  /// DELETE: Remove the messages that own the given `mediaIds` (for everyone)
+  /// and free their bytes. Body: `{ mediaIds: [...] }`.
+  static String deleteQuotaMedia = '$chatQuota/media';
+
+  /// Delete all of the user's media in one conversation.
+  /// DELETE: `/chat/quota/storage/conversation/{conversationId}/media`.
+  static String deleteConversationQuotaMedia(String conversationId) =>
+      '$chatQuota/storage/conversation/$conversationId/media';
+
   // ==================== Indicator Endpoints ====================
 
   /// Chat indicator endpoint.

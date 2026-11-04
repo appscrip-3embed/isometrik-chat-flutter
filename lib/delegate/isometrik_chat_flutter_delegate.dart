@@ -15,6 +15,7 @@ part of '../isometrik_chat_flutter.dart';
 /// - [IsmChatDelegatePaidMediaMixin]: Paid media handling for external processing
 /// - [IsmChatDelegateComposerMixin]: Host-app custom composer actions
 /// - [IsmChatDelegateChatListMixin]: Host-app custom chat-list screen actions
+/// - [IsmChatDelegateStorageMixin]: Per-user media storage quota surface
 class IsmChatDelegate
     with
         IsmChatDelegateInitializationMixin,
@@ -28,7 +29,8 @@ class IsmChatDelegate
         IsmChatDelegateNotificationMixin,
         IsmChatDelegatePaidMediaMixin,
         IsmChatDelegateComposerMixin,
-        IsmChatDelegateChatListMixin {
+        IsmChatDelegateChatListMixin,
+        IsmChatDelegateStorageMixin {
   IsmChatDelegate();
 
   // Configuration & State Management

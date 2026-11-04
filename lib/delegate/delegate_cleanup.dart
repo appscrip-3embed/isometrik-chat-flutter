@@ -15,6 +15,9 @@ mixin IsmChatDelegateCleanupMixin {
             tag: IsmChat.i.chatListPageTag, force: true),
         Get.delete<IsmChatCommonController>(force: true),
         Get.delete<IsmChatMqttController>(force: true),
+        // Drop cached storage-quota usage/media so the next user starts clean.
+        if (Get.isRegistered<IsmChatStorageQuotaController>())
+          Get.delete<IsmChatStorageQuotaController>(force: true),
       ]);
     } catch (e, st) {
       IsmChatLog.error('Error $e stackTree $st');

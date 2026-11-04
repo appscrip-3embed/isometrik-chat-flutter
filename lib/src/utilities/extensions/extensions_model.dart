@@ -1107,6 +1107,12 @@ extension MentionMessage on IsmChatMessageModel {
 
   static const _multipleBody = 'AttachmentMessage:Multiple';
 
+  /// `true` when any attachment is past the owner's storage allowance
+  /// (`restricted: true`): the server has blanked its media URLs, so the chat
+  /// should render a "media unavailable" placeholder instead of a broken image.
+  bool get hasRestrictedMedia =>
+      attachments?.any((a) => a.restricted == true) ?? false;
+
   bool get isMultipleAttachmentsMessage =>
       customType == IsmChatCustomMessageType.multipleAttachments ||
       (attachments != null &&

@@ -29,6 +29,16 @@ mixin IsmChatPageSendMessageMediaMixin {
       }
     }
     if (isMaxSize == false) {
+      // Media-storage quota: block the batch up front when it won't fit.
+      // Server still has the final say on send (errorCode 6).
+      final totalBytes = _controller.webMedia.fold<int>(
+        0,
+        (sum, media) => sum + (media.platformFile.size ?? 0),
+      );
+      final allowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
+        totalBytes: totalBytes,
+      );
+      if (!allowed) return;
       IsmChatRoute.goBack<void>();
       sendPhotoAndVideo();
     } else {
@@ -57,6 +67,15 @@ mixin IsmChatPageSendMessageMediaMixin {
     }
     if (isMaxSize == false) {
       _controller.showCloseLoaderForMoble(showLoader: false);
+      // Media-storage quota: block the batch up front when it won't fit.
+      final totalBytes = _controller.webMedia.fold<int>(
+        0,
+        (sum, media) => sum + (media.platformFile.size ?? 0),
+      );
+      final allowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
+        totalBytes: totalBytes,
+      );
+      if (!allowed) return;
       sendPhotoAndVideoForWeb();
     } else {
       IsmChatUtility.closeLoader();
