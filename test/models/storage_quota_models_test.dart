@@ -23,6 +23,33 @@ void main() {
       expect(usage.canUploadBytes(400000000), isFalse); // > remaining
     });
 
+    test('parses maxFileSizeBytes and isWithinMaxFileSize when quota on', () {
+      const max = 10485760; // 10 MB
+      final usage = IsmChatStorageUsageModel.fromMap(const {
+        'quotaEnabled': true,
+        'canUpload': true,
+        'maxFileSizeBytes': max,
+      });
+
+      expect(usage.maxFileSizeBytes, max);
+      expect(usage.isWithinMaxFileSize(max), isTrue);
+      expect(usage.isWithinMaxFileSize(max + 1), isFalse);
+    });
+
+    test('isWithinMaxFileSize ignored when quota off or max unset', () {
+      final off = IsmChatStorageUsageModel.fromMap(const {
+        'quotaEnabled': false,
+        'maxFileSizeBytes': 100,
+      });
+      expect(off.isWithinMaxFileSize(1 << 40), isTrue);
+
+      final noMax = IsmChatStorageUsageModel.fromMap(const {
+        'quotaEnabled': true,
+        'canUpload': true,
+      });
+      expect(noMax.isWithinMaxFileSize(1 << 40), isTrue);
+    });
+
     test('quota-off body keeps uploads allowed and figures null', () {
       final usage = IsmChatStorageUsageModel.fromMap(const {
         'quotaEnabled': false,

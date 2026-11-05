@@ -9,6 +9,9 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 /// [IsmChatStorageQuotaController]; host apps can push this screen with
 /// [IsmChat.openStorageManagement] or embed/restyle it as needed.
 ///
+/// Customize copy and empty UI via [IsmChatProperties.storageManagementProperties]
+/// and typography via [IsmChatThemeData.storageTheme].
+///
 /// Pass [conversationId] to open scoped to a single conversation.
 class IsmChatStorageView extends StatefulWidget {
   const IsmChatStorageView({this.conversationId, super.key});
@@ -24,6 +27,9 @@ class IsmChatStorageView extends StatefulWidget {
 class _IsmChatStorageViewState extends State<IsmChatStorageView> {
   final _scrollController = ScrollController();
   late final IsmChatStorageQuotaController _controller;
+
+  IsmChatStorageManagementProperties get _props =>
+      IsmChatProperties.storageManagementProperties;
 
   @override
   void initState() {
@@ -61,86 +67,112 @@ class _IsmChatStorageViewState extends State<IsmChatStorageView> {
     }
   }
 
-  Color get _primary =>
+  Color _primary(BuildContext context) =>
       IsmChatConfig.chatTheme.primaryColor ?? IsmChatColors.primaryColorLight;
 
-  @override
-  Widget build(BuildContext context) => Obx(
-        () {
-          final selectionMode = _controller.isSelectionMode;
-          return Scaffold(
-            appBar: _appBar(selectionMode),
-            body: Column(
-              children: [
-                IsmChatStorageUsageHeader(
-                  usage: _controller.usage,
-                  isLoading: _controller.isLoadingUsage,
-                ),
-                if (widget.conversationId != null &&
-                    widget.conversationId!.isNotEmpty)
-                  _conversationActions(),
-                _toolbar(),
-                Expanded(child: _mediaList()),
-              ],
-            ),
-            bottomNavigationBar:
-                selectionMode ? _selectionBar(context) : null,
-          );
-        },
+  Color get _headerIconColor =>
+      IsmChatConfig.chatTheme.chatPageHeaderTheme?.iconColor ??
+      IsmChatColors.whiteColor;
+
+  TextStyle get _headerTitleStyle =>
+      IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
+      IsmChatStyles.w600White18;
+
+  Widget _appBarIconButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    String? tooltip,
+  }) =>
+      IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon, color: _headerIconColor),
       );
 
-  PreferredSizeWidget _appBar(bool selectionMode) {
+  @override
+  Widget build(BuildContext context) {
+    final theme = IsmChatThemeResolver.storageFromConfig(context);
+    return Obx(
+      () {
+        final selectionMode = _controller.isSelectionMode;
+        return Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          appBar: _appBar(context, selectionMode),
+          body: Column(
+            children: [
+              IsmChatStorageUsageHeader(
+                usage: _controller.usage,
+                isLoading: _controller.isLoadingUsage,
+              ),
+              if (widget.conversationId != null &&
+                  widget.conversationId!.isNotEmpty)
+                _conversationActions(context, theme),
+              _toolbar(context, theme),
+              Expanded(child: _mediaList(context, theme)),
+            ],
+          ),
+          bottomNavigationBar:
+              selectionMode ? _selectionBar(context, theme) : null,
+        );
+      },
+    );
+  }
+
+  PreferredSizeWidget _appBar(BuildContext context, bool selectionMode) {
     if (selectionMode) {
       return IsmChatAppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
+        leading: _appBarIconButton(
+          icon: _props.closeIcon ?? Icons.close,
           onPressed: _controller.clearSelection,
         ),
         title: Text(
-          '${_controller.selectedMediaIds.length} selected',
-          style: IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
-              IsmChatStyles.w600White18,
+          _props.resolveSelectionTitle(
+            context,
+            _controller.selectedMediaIds.length,
+          ),
+          style: _headerTitleStyle,
         ),
         action: [
-          IconButton(
-            tooltip: 'Select all',
-            icon: const Icon(Icons.done_all),
+          _appBarIconButton(
+            icon: _props.selectAllIcon ?? Icons.done_all,
+            tooltip: _props.resolveSelectAllTooltip(),
             onPressed: _controller.selectAllVisible,
           ),
         ],
       );
     }
+    final sortBySize = _controller.sortBySizeDesc;
     return IsmChatAppBar(
       title: Text(
-        'Storage',
-        style: IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
-            IsmChatStyles.w600White18,
+        _props.resolveTitle(),
+        style: _headerTitleStyle,
       ),
       action: [
-        IconButton(
-          tooltip: _controller.sortBySizeDesc ? 'Newest first' : 'Largest first',
-          icon: Icon(
-            _controller.sortBySizeDesc
-                ? Icons.schedule
-                : Icons.sort,
-          ),
+        _appBarIconButton(
+          icon: sortBySize
+              ? (_props.sortByDateIcon ?? Icons.schedule)
+              : (_props.sortIcon ?? Icons.sort),
+          tooltip: sortBySize
+              ? _props.resolveSortNewestFirstTooltip()
+              : _props.resolveSortLargestFirstTooltip(),
           onPressed: _controller.toggleSortBySize,
         ),
       ],
     );
   }
 
-  Widget _conversationActions() => Padding(
+  Widget _conversationActions(
+    BuildContext context,
+    IsmChatStorageTheme theme,
+  ) =>
+      Padding(
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
         child: Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Showing one conversation',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: IsmChatColors.greyColor,
-                ),
+                _props.resolveConversationScopeLabel(),
+                style: theme.scopeHintStyle,
               ),
             ),
             TextButton.icon(
@@ -152,13 +184,13 @@ class _IsmChatStorageViewState extends State<IsmChatStorageView> {
               style: TextButton.styleFrom(
                 foregroundColor: IsmChatColors.redColor,
               ),
-              label: const Text('Delete all'),
+              label: Text(_props.resolveDeleteAllLabel()),
             ),
           ],
         ),
       );
 
-  Widget _toolbar() {
+  Widget _toolbar(BuildContext context, IsmChatStorageTheme theme) {
     // Build a simple set of type filters from what is loaded.
     final types = <IsmChatMediaType>{
       for (final m in _controller.media) m.attachmentType,
@@ -166,17 +198,27 @@ class _IsmChatStorageViewState extends State<IsmChatStorageView> {
     if (types.isEmpty && _controller.typeFilter == null) {
       return const SizedBox(height: 4);
     }
+    final primary = _primary(context);
     return SizedBox(
       height: 44,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         children: [
-          _filterChip('All', _controller.typeFilter == null,
-              () => _controller.setTypeFilter(null)),
+          _filterChip(
+            context,
+            theme,
+            primary,
+            _props.resolveFilterAllLabel(),
+            _controller.typeFilter == null,
+            () => _controller.setTypeFilter(null),
+          ),
           for (final t in types)
             _filterChip(
-              _typeLabel(t),
+              context,
+              theme,
+              primary,
+              _props.resolveTypeLabel(t),
               _controller.typeFilter == t,
               () => _controller.setTypeFilter(t),
             ),
@@ -185,30 +227,36 @@ class _IsmChatStorageViewState extends State<IsmChatStorageView> {
     );
   }
 
-  Widget _filterChip(String label, bool selected, VoidCallback onTap) =>
+  Widget _filterChip(
+    BuildContext context,
+    IsmChatStorageTheme theme,
+    Color primary,
+    String label,
+    bool selected,
+    VoidCallback onTap,
+  ) =>
       Padding(
         padding: const EdgeInsets.only(right: 8),
         child: ChoiceChip(
           label: Text(label),
           selected: selected,
           onSelected: (_) => onTap(),
-          selectedColor: _primary.withValues(alpha: 0.15),
-          labelStyle: TextStyle(
-            fontSize: 12.5,
-            color: selected ? _primary : null,
+          selectedColor: primary.withValues(alpha: 0.15),
+          labelStyle: theme.filterChipLabelStyle.copyWith(
+            color: selected ? primary : theme.filterChipLabelStyle.color,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
           ),
           showCheckmark: false,
         ),
       );
 
-  Widget _mediaList() {
+  Widget _mediaList(BuildContext context, IsmChatStorageTheme theme) {
     final items = _controller.visibleMedia;
     if (_controller.isLoadingMedia && items.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
     if (items.isEmpty) {
-      return _emptyState();
+      return _emptyState(context, theme);
     }
     return RefreshIndicator(
       onRefresh: _controller.reloadAll,
@@ -220,7 +268,7 @@ class _IsmChatStorageViewState extends State<IsmChatStorageView> {
           height: 1,
           thickness: 0.4,
           indent: 74,
-          color: IsmChatColors.greyColorLight.withValues(alpha: 0.4),
+          color: theme.dividerColor,
         ),
         itemBuilder: (_, index) {
           if (index >= items.length) {
@@ -248,29 +296,33 @@ class _IsmChatStorageViewState extends State<IsmChatStorageView> {
     );
   }
 
-  Widget _emptyState() => ListView(
-        // ListView so pull-to-refresh still works on an empty list.
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
+  Widget _emptyState(BuildContext context, IsmChatStorageTheme theme) {
+    final placeholder = _props.emptyPlaceholder;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        if (placeholder != null)
+          placeholder
+        else ...[
           SizedBox(height: IsmChatDimens.percentHeight(0.1)),
-          const Icon(
-            Icons.folder_open_outlined,
+          Icon(
+            _props.emptyIcon ?? Icons.folder_open_outlined,
             size: 64,
-            color: IsmChatColors.greyColorLight,
+            color: theme.emptyIconColor,
           ),
           const SizedBox(height: 12),
           Center(
             child: Text(
-              _controller.quotaEnabled
-                  ? 'No media uses your storage yet'
-                  : 'No media to show',
-              style: const TextStyle(color: IsmChatColors.greyColor),
+              _props.resolveEmptyTitle(quotaEnabled: _controller.quotaEnabled),
+              style: _props.emptyTitleStyle ?? theme.emptyTextStyle,
             ),
           ),
         ],
-      );
+      ],
+    );
+  }
 
-  Widget _selectionBar(BuildContext context) {
+  Widget _selectionBar(BuildContext context, IsmChatStorageTheme theme) {
     final count = _controller.selectedMediaIds.length;
     final bytes = _controller.selectedBytes;
     return SafeArea(
@@ -281,9 +333,9 @@ class _IsmChatStorageViewState extends State<IsmChatStorageView> {
             Expanded(
               child: Text(
                 bytes > 0
-                    ? '$count selected · ${IsmChatUtility.formatBytes(bytes)}'
+                    ? '$count selected · ${IsmChatUtility.formatBytesDecimal(bytes)}'
                     : '$count selected',
-                style: const TextStyle(fontWeight: FontWeight.w500),
+                style: theme.selectionSummaryStyle,
               ),
             ),
             ElevatedButton.icon(
@@ -291,36 +343,18 @@ class _IsmChatStorageViewState extends State<IsmChatStorageView> {
                   ? null
                   : () => _controller.confirmDeleteSelected(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: IsmChatColors.redColor,
-                foregroundColor: IsmChatColors.whiteColor,
+                backgroundColor: theme.deleteButtonBackgroundColor,
+                foregroundColor: theme.deleteButtonForegroundColor,
               ),
               icon: const Icon(Icons.delete_outline, size: 18),
-              label: const Text('Delete'),
+              label: Text(
+                _props.resolveDeleteSelectedLabel(),
+                style: theme.deleteButtonTextStyle,
+              ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  String _typeLabel(IsmChatMediaType type) {
-    switch (type) {
-      case IsmChatMediaType.image:
-        return 'Images';
-      case IsmChatMediaType.video:
-        return 'Videos';
-      case IsmChatMediaType.audio:
-        return 'Audio';
-      case IsmChatMediaType.file:
-        return 'Documents';
-      case IsmChatMediaType.gif:
-        return 'GIFs';
-      case IsmChatMediaType.sticker:
-        return 'Stickers';
-      case IsmChatMediaType.location:
-        return 'Location';
-      case IsmChatMediaType.adminMessage:
-        return 'Files';
-    }
   }
 }

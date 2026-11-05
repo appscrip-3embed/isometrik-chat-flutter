@@ -21,6 +21,7 @@ class IsmChatStorageUsageModel {
     this.quotaBytes,
     this.remainingBytes,
     this.tier,
+    this.maxFileSizeBytes,
   });
 
   factory IsmChatStorageUsageModel.fromJson(String source) =>
@@ -38,6 +39,7 @@ class IsmChatStorageUsageModel {
         quotaBytes: _asInt(map['quotaBytes']),
         remainingBytes: _asInt(map['remainingBytes']),
         tier: IsmChatStorageQuotaTier.fromValue(map['tier'] as String?),
+        maxFileSizeBytes: _asInt(map['maxFileSizeBytes']),
       );
 
   /// Parses a byte count that may arrive as `int`, `double`, `String` or null.
@@ -71,6 +73,10 @@ class IsmChatStorageUsageModel {
 
   /// The resolved allowance tier (`paid` / `free`). `null` when quota is off.
   final IsmChatStorageQuotaTier? tier;
+
+  /// Maximum size in bytes for a single attachment upload when quota is on.
+  /// `null` when quota is off or the server does not set a per-file cap.
+  final int? maxFileSizeBytes;
 
   /// Fraction of the allowance used, in `0.0..1.0`. Returns `0` when quota is
   /// off or the allowance is unknown/zero. Handy for a progress bar.
@@ -108,6 +114,15 @@ class IsmChatStorageUsageModel {
     return size <= remaining;
   }
 
+  /// When [quotaEnabled] and [maxFileSizeBytes] are set, true if [fileBytes]
+  /// is within the server per-file cap.
+  bool isWithinMaxFileSize(int fileBytes) {
+    if (!quotaEnabled) return true;
+    final max = maxFileSizeBytes;
+    if (max == null) return true;
+    return fileBytes <= max;
+  }
+
   IsmChatStorageUsageModel copyWith({
     bool? quotaEnabled,
     bool? canUpload,
@@ -115,6 +130,7 @@ class IsmChatStorageUsageModel {
     int? quotaBytes,
     int? remainingBytes,
     IsmChatStorageQuotaTier? tier,
+    int? maxFileSizeBytes,
   }) =>
       IsmChatStorageUsageModel(
         quotaEnabled: quotaEnabled ?? this.quotaEnabled,
@@ -123,6 +139,7 @@ class IsmChatStorageUsageModel {
         quotaBytes: quotaBytes ?? this.quotaBytes,
         remainingBytes: remainingBytes ?? this.remainingBytes,
         tier: tier ?? this.tier,
+        maxFileSizeBytes: maxFileSizeBytes ?? this.maxFileSizeBytes,
       );
 
   Map<String, dynamic> toMap() => <String, dynamic>{
@@ -132,13 +149,14 @@ class IsmChatStorageUsageModel {
         'quotaBytes': quotaBytes,
         'remainingBytes': remainingBytes,
         'tier': tier?.value,
+        'maxFileSizeBytes': maxFileSizeBytes,
       };
 
   String toJson() => json.encode(toMap());
 
   @override
   String toString() =>
-      'IsmChatStorageUsageModel(quotaEnabled: $quotaEnabled, canUpload: $canUpload, usedBytes: $usedBytes, quotaBytes: $quotaBytes, remainingBytes: $remainingBytes, tier: $tier)';
+      'IsmChatStorageUsageModel(quotaEnabled: $quotaEnabled, canUpload: $canUpload, usedBytes: $usedBytes, quotaBytes: $quotaBytes, remainingBytes: $remainingBytes, tier: $tier, maxFileSizeBytes: $maxFileSizeBytes)';
 
   @override
   bool operator ==(covariant IsmChatStorageUsageModel other) {
@@ -148,7 +166,8 @@ class IsmChatStorageUsageModel {
         other.usedBytes == usedBytes &&
         other.quotaBytes == quotaBytes &&
         other.remainingBytes == remainingBytes &&
-        other.tier == tier;
+        other.tier == tier &&
+        other.maxFileSizeBytes == maxFileSizeBytes;
   }
 
   @override
@@ -158,7 +177,8 @@ class IsmChatStorageUsageModel {
       usedBytes.hashCode ^
       quotaBytes.hashCode ^
       remainingBytes.hashCode ^
-      tier.hashCode;
+      tier.hashCode ^
+      maxFileSizeBytes.hashCode;
 }
 
 /// The resolved storage allowance tier for a user.

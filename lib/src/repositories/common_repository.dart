@@ -249,7 +249,7 @@ class IsmChatCommonRepository {
     bool isLoading = false,
   }) async {
     try {
-      var payload = {
+      final payload = <String, dynamic>{
         'typingEvents': typingEvents,
         'readEvents': readEvents,
         'pushNotifications': pushNotifications,
@@ -260,8 +260,11 @@ class IsmChatCommonRepository {
         'metaData': metaData,
         'customType': customType,
         'conversationTitle': conversationTitle,
-        'conversationImageUrl': conversationImageUrl,
       };
+      final imageUrl = conversationImageUrl?.trim();
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        payload['conversationImageUrl'] = imageUrl;
+      }
       var response = await _apiWrapper.post(IsmChatAPI.chatConversation,
           payload: payload,
           headers: IsmChatUtility.tokenCommonHeader(),

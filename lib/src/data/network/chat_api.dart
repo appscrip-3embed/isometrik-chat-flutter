@@ -141,7 +141,7 @@ class IsmChatAPI {
 
   /// Storage usage endpoint.
   /// GET: Server-authoritative `{ quotaEnabled, usedBytes, quotaBytes,
-  /// remainingBytes, tier, canUpload }` for the signed-in user.
+  /// remainingBytes, tier, canUpload, maxFileSizeBytes }` for the signed-in user.
   static String storageQuotaUsage = '$chatQuota/storage/usage';
 
   /// Storage media list endpoint.

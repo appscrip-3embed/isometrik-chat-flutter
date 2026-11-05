@@ -8,7 +8,8 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 /// - within quota → a progress meter with used / free figures,
 /// - over limit → the meter plus a non-blocking "storage full" banner.
 ///
-/// Purely presentational and theme-driven; all figures come from the server.
+/// Copy from [IsmChatProperties.storageManagementProperties]; styling from
+/// [IsmChatThemeResolver.storageFromConfig]. Figures come from the server.
 class IsmChatStorageUsageHeader extends StatelessWidget {
   const IsmChatStorageUsageHeader({
     required this.usage,
@@ -19,10 +20,14 @@ class IsmChatStorageUsageHeader extends StatelessWidget {
   final IsmChatStorageUsageModel? usage;
   final bool isLoading;
 
+  IsmChatStorageManagementProperties get _props =>
+      IsmChatProperties.storageManagementProperties;
+
   @override
   Widget build(BuildContext context) {
-    final primary = IsmChatConfig.chatTheme.primaryColor ??
-        IsmChatColors.primaryColorLight;
+    final theme = IsmChatThemeResolver.storageFromConfig(context);
+    final primary =
+        IsmChatConfig.chatTheme.primaryColor ?? IsmChatColors.primaryColorLight;
     final data = usage;
 
     if (data == null) {
@@ -42,14 +47,15 @@ class IsmChatStorageUsageHeader extends StatelessWidget {
 
     if (!data.quotaEnabled) {
       return _card(
-        context,
+        theme,
         child: Row(
           children: [
             Icon(Icons.cloud_done_outlined, color: primary),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Storage usage is not limited on this project.',
+                _props.resolveQuotaDisabledMessage(),
+                style: theme.usageSubtitleStyle,
               ),
             ),
           ],
@@ -64,16 +70,16 @@ class IsmChatStorageUsageHeader extends StatelessWidget {
     final barColor = overLimit ? IsmChatColors.redColor : primary;
 
     return _card(
-      context,
+      theme,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Storage',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  _props.resolveUsageCardTitle(),
+                  style: theme.usageTitleStyle,
                 ),
               ),
               _tierChip(data.tier, primary),
@@ -94,13 +100,12 @@ class IsmChatStorageUsageHeader extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${IsmChatUtility.formatBytes(used)} of ${IsmChatUtility.formatBytes(quota)} used',
-                style: const TextStyle(fontSize: 13),
+                '${IsmChatUtility.formatBytesDecimal(used)} of ${IsmChatUtility.formatBytesDecimal(quota)} used',
+                style: theme.usageSubtitleStyle,
               ),
               Text(
-                '${IsmChatUtility.formatBytes(remaining)} free',
-                style: TextStyle(
-                  fontSize: 13,
+                '${IsmChatUtility.formatBytesDecimal(remaining)} free',
+                style: theme.usageSubtitleStyle.copyWith(
                   color: overLimit ? IsmChatColors.redColor : null,
                   fontWeight: FontWeight.w500,
                 ),
@@ -109,22 +114,20 @@ class IsmChatStorageUsageHeader extends StatelessWidget {
           ),
           if (overLimit) ...[
             const SizedBox(height: 12),
-            _overLimitBanner(),
+            _overLimitBanner(theme),
           ],
         ],
       ),
     );
   }
 
-  Widget _card(BuildContext context, {required Widget child}) => Container(
+  Widget _card(IsmChatStorageTheme theme, {required Widget child}) => Container(
         margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: theme.usageCardBackgroundColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: IsmChatColors.greyColorLight.withValues(alpha: 0.4),
-          ),
+          border: Border.all(color: theme.usageCardBorderColor),
         ),
         child: child,
       );
@@ -151,7 +154,7 @@ class IsmChatStorageUsageHeader extends StatelessWidget {
     );
   }
 
-  Widget _overLimitBanner() => Container(
+  Widget _overLimitBanner(IsmChatStorageTheme theme) => Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: IsmChatColors.redColor.withValues(alpha: 0.08),
@@ -164,12 +167,8 @@ class IsmChatStorageUsageHeader extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Storage is full. Delete media to upload again. '
-                'You can still send and receive text.',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: IsmChatColors.redColor.withValues(alpha: 0.9),
-                ),
+                _props.resolveOverLimitMessage(),
+                style: theme.overLimitBannerTextStyle,
               ),
             ),
           ],

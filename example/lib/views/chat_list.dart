@@ -202,11 +202,18 @@ class ChatList extends StatelessWidget {
                       ? IsmChatDimens.percentWidth(.3)
                       : null,
                 ),
-                // Customize banner copy / colors via storageQuotaListBannerProperties, e.g.:
-                // storageQuotaListBannerProperties: IsmChatStorageQuotaListBannerProperties(
-                //   title: 'Storage almost full',
-                //   actionLabel: 'Manage',
-                // ),
+                // Banner (≥90% usage) + ⋮ menu "Manage storage" when below threshold:
+                enableManageStorageInChatListMenu: true,
+                storageQuotaListBannerProperties:
+                    const IsmChatStorageQuotaListBannerProperties(
+                  actionLabel: 'Manage storage',
+                  menuLabel: 'Manage storage',
+                ),
+                // Full Manage Storage screen (openStorageManagement):
+                // IsmChatProperties.storageManagementProperties =
+                //     const IsmChatStorageManagementProperties(
+                //   title: 'Manage storage',
+                // );
                 // Media storage warning banner appears above the conversation
                 // list when quota usage ≥ 90% (see enableStorageQuotaListBanner).
                 placeholder: const IsmChatEmptyView(

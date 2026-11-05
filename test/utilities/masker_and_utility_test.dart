@@ -99,6 +99,26 @@ void main() {
     test('isLoading defaults to false', () {
       expect(IsmChatUtility.isLoading, isFalse);
     });
+
+    test('formatBytesDecimal shows decimal MB for server limits', () {
+      expect(
+        IsmChatUtility.formatBytesDecimal(100000000),
+        '100 MB',
+      );
+      expect(
+        IsmChatUtility.formatBytesDecimal(200000000),
+        '200 MB',
+      );
+      // Binary formatter would mislabel the same byte counts.
+      expect(
+        IsmChatUtility.formatBytes(100000000),
+        '95.37 MB',
+      );
+      expect(
+        IsmChatUtility.formatBytes(200000000),
+        '190.73 MB',
+      );
+    });
   });
 
   group('IsmChatAPI', () {

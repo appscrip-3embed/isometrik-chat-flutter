@@ -7,6 +7,11 @@ class IsmChatProperties {
       IsmChatConversationProperties();
   static IsmChatPageProperties chatPageProperties = IsmChatPageProperties();
 
+  /// Copy, empty placeholder, and optional header icons for
+  /// [IsmChatStorageView] ([IsmChat.openStorageManagement]).
+  static IsmChatStorageManagementProperties storageManagementProperties =
+      IsmChatStorageManagementProperties.defaults;
+
   /// Icons / widgets for Group Info and 1:1 conversation info screens.
   /// Prefer this over stuffing icon overrides into [chatPageProperties].
   static IsmChatConversationInfoAssets conversationInfoAssets =

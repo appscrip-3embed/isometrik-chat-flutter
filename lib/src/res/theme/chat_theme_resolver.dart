@@ -8,6 +8,7 @@ import 'package:isometrik_chat_flutter/src/res/theme/contact_info_theme.dart';
 import 'package:isometrik_chat_flutter/src/res/theme/group_info_theme.dart';
 import 'package:isometrik_chat_flutter/src/res/theme/media_theme.dart';
 import 'package:isometrik_chat_flutter/src/res/theme/profile_theme.dart';
+import 'package:isometrik_chat_flutter/src/res/theme/storage_theme.dart';
 import 'package:isometrik_chat_flutter/src/utilities/config/chat_config.dart';
 
 /// Resolves SDK screen themes: custom override → [Theme.of] / [Get.isDarkMode].
@@ -109,6 +110,21 @@ class IsmChatThemeResolver {
 
   static IsmChatProfileTheme profileFromConfig(BuildContext context) =>
       profile(context, custom: IsmChatConfig.chatTheme.profileTheme);
+
+  static IsmChatStorageTheme storage(
+    BuildContext context, {
+    IsmChatStorageTheme? custom,
+    Brightness? mode,
+  }) {
+    if (custom != null) return custom;
+    return brightness(context, mode) == Brightness.dark
+        ? IsmChatStorageTheme.dark()
+        : IsmChatStorageTheme.light();
+  }
+
+  /// Manage Storage screen ([IsmChatStorageView]).
+  static IsmChatStorageTheme storageFromConfig(BuildContext context) =>
+      storage(context, custom: IsmChatConfig.chatTheme.storageTheme);
 
   static IsmChatDialogTheme dialog(
     BuildContext context, {

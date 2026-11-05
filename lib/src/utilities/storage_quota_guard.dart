@@ -72,6 +72,58 @@ class IsmChatStorageQuotaGuard {
     return allowed;
   }
 
+  /// Returns `true` when a single file of [fileBytes] is within the server
+  /// per-file cap ([IsmChatStorageUsageModel.maxFileSizeBytes] when quota is on).
+  static Future<bool> canUploadFileSize(int fileBytes) async {
+    final usage = await ensureUsage();
+    if (usage == null) return true;
+    return usage.isWithinMaxFileSize(fileBytes);
+  }
+
+  /// Pre-check for a single file against [maxFileSizeBytes]. When blocked and
+  /// [showPrompt] is `true`, shows a "file too large" dialog.
+  static Future<bool> ensureCanUploadFileSize({
+    required int fileBytes,
+    bool showPrompt = true,
+  }) async {
+    final allowed = await canUploadFileSize(fileBytes);
+    if (!allowed && showPrompt) {
+      final max = cachedUsage?.maxFileSizeBytes;
+      await showMaxFileSizeExceededDialog(maxBytes: max);
+    }
+    return allowed;
+  }
+
+  /// Pre-check for one attachment before send. When quota is on and the server
+  /// sets [maxFileSizeBytes], enforces that cap; otherwise uses the legacy
+  /// formatted-size limit ([SizeOfMedia.size], default 100 MB).
+  static Future<bool> ensureAttachmentSizeAllowed({
+    required int fileBytes,
+    bool showPrompt = true,
+  }) async {
+    final usage = await ensureUsage();
+    if (usage != null &&
+        usage.quotaEnabled &&
+        usage.maxFileSizeBytes != null) {
+      return ensureCanUploadFileSize(
+        fileBytes: fileBytes,
+        showPrompt: showPrompt,
+      );
+    }
+    if (IsmChatUtility.formatBytes(fileBytes).size()) {
+      return true;
+    }
+    if (showPrompt) {
+      await IsmChatContextWidget.showDialogContext(
+        content: IsmChatAlertDialogBox(
+          title: IsmChatStrings.youCanNotSend,
+          cancelLabel: IsmChatStrings.okay,
+        ),
+      );
+    }
+    return false;
+  }
+
   /// Parses `usedBytes` / `quotaBytes` from a successful API response that may
   /// carry freed-storage figures — e.g. the delete-message response when quota
   /// is on (`{ freedBytes, usedBytes, quotaBytes }`) — and updates the cached
@@ -155,6 +207,23 @@ class IsmChatStorageQuotaGuard {
             IsmChat.i.openStorageManagement();
           },
         ],
+        cancelLabel: IsmChatStrings.okay,
+      ),
+    );
+  }
+
+  /// Shows a dialog when an attachment exceeds [maxFileSizeBytes].
+  static Future<void> showMaxFileSizeExceededDialog({int? maxBytes}) async {
+    final limitText = maxBytes != null
+        ? IsmChatUtility.formatBytesDecimal(maxBytes)
+        : 'the allowed limit';
+    await IsmChatContextWidget.showDialogContext(
+      content: IsmChatAlertDialogBox(
+        title: 'File too large',
+        content: Text(
+          'This file exceeds the maximum upload size of $limitText. '
+          'Choose a smaller file or send multiple smaller attachments.',
+        ),
         cancelLabel: IsmChatStrings.okay,
       ),
     );

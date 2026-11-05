@@ -150,4 +150,85 @@ void main() {
       expect(await IsmChatStorageQuotaGuard.canUpload(totalBytes: 50), isFalse);
     });
   });
+
+  group('per-file max size', () {
+    const maxTenMb = 10485760;
+
+    test('canUploadFileSize uses maxFileSizeBytes when quota on', () async {
+      registerController().usage = const IsmChatStorageUsageModel(
+        quotaEnabled: true,
+        canUpload: true,
+        maxFileSizeBytes: maxTenMb,
+      );
+      expect(
+        await IsmChatStorageQuotaGuard.canUploadFileSize(maxTenMb),
+        isTrue,
+      );
+      expect(
+        await IsmChatStorageQuotaGuard.canUploadFileSize(maxTenMb + 1),
+        isFalse,
+      );
+    });
+
+    test('canUploadFileSize allows any size when quota off', () async {
+      registerController().usage = const IsmChatStorageUsageModel(
+        quotaEnabled: false,
+        canUpload: true,
+        maxFileSizeBytes: maxTenMb,
+      );
+      expect(
+        await IsmChatStorageQuotaGuard.canUploadFileSize(maxTenMb + 1),
+        isTrue,
+      );
+    });
+
+    test('ensureAttachmentSizeAllowed uses server cap when quota on', () async {
+      registerController().usage = const IsmChatStorageUsageModel(
+        quotaEnabled: true,
+        canUpload: true,
+        maxFileSizeBytes: maxTenMb,
+      );
+      expect(
+        await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+          fileBytes: maxTenMb,
+          showPrompt: false,
+        ),
+        isTrue,
+      );
+      expect(
+        await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+          fileBytes: maxTenMb + 1,
+          showPrompt: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('ensureAttachmentSizeAllowed falls back to legacy limit when max unset',
+        () async {
+      registerController().usage = const IsmChatStorageUsageModel(
+        quotaEnabled: true,
+        canUpload: true,
+        usedBytes: 0,
+        quotaBytes: 100,
+        remainingBytes: 100,
+      );
+      // 101 MB exceeds the default 100 MB string cap.
+      final overLegacy = 101 * 1024 * 1024;
+      expect(
+        await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+          fileBytes: overLegacy,
+          showPrompt: false,
+        ),
+        isFalse,
+      );
+      expect(
+        await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+          fileBytes: 10 * 1024 * 1024,
+          showPrompt: false,
+        ),
+        isTrue,
+      );
+    });
+  });
 }

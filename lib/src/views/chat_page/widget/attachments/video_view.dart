@@ -212,7 +212,10 @@ class _IsmChatVideoViewState extends State<IsmChatVideoView> {
               FloatingActionButton(
                 backgroundColor: IsmChatConfig.chatTheme.primaryColor,
                 onPressed: () async {
-                  if (webMediaModel?.dataSize.size() ?? false) {
+                  final fileBytes = webMediaModel?.platformFile.size ?? 0;
+                  final sizeAllowed = await IsmChatStorageQuotaGuard
+                      .ensureAttachmentSizeAllowed(fileBytes: fileBytes);
+                  if (sizeAllowed) {
                     // Paid media: delegate when user taps send
                     Map<String, dynamic>? paidMediaMetaData;
                     if (IsmChatProperties
@@ -255,13 +258,6 @@ class _IsmChatVideoViewState extends State<IsmChatVideoView> {
                         metaDataFromDelegate: paidMediaMetaData,
                       );
                     }
-                  } else {
-                    await IsmChatContextWidget.showDialogContext(
-                      content: IsmChatAlertDialogBox(
-                        title: IsmChatStrings.youCanNotSend,
-                        cancelLabel: IsmChatStrings.okay,
-                      ),
-                    );
                   }
                 },
                 child: const Icon(

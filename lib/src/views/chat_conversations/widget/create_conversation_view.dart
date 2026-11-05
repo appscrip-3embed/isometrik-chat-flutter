@@ -256,16 +256,12 @@ class IsmChatCreateConversationView extends StatelessWidget {
                                 color: IsmChatColors.whiteColor,
                               ),
                               onPressed: () async {
-                                if (controller.profileImage.isEmpty) {
-                                  controller.profileImage =
-                                      'https://admin-media1.isometrik.io/profile/def_group_profile.png';
-                                }
                                 if ((controller.forwardedList.selectedUsers
                                             .isEmpty &&
                                         controller.selectedUserList.isEmpty) ||
-                                    controller.profileImage.isEmpty ||
-                                    controller
-                                        .addGrouNameController.text.isEmpty) {
+                                    controller.addGrouNameController.text
+                                        .trim()
+                                        .isEmpty) {
                                   await IsmChatContextWidget.showDialogContext(
                                     content: IsmChatAlertDialogBox(
                                       cancelLabel: IsmChatStrings.okay,
@@ -284,8 +280,12 @@ class IsmChatCreateConversationView extends StatelessWidget {
                                   messagingDisabled: false,
                                   userIds: userIds,
                                   conversationTitle:
-                                      controller.addGrouNameController.text,
-                                  conversationImageUrl: controller.profileImage,
+                                      controller.addGrouNameController.text
+                                          .trim(),
+                                  conversationImageUrl: controller
+                                          .profileImage.isNotEmpty
+                                      ? controller.profileImage
+                                      : null,
                                   isGroup: true,
                                   opponentDetails: controller.userDetails,
                                   unreadMessagesCount: 0,

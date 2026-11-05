@@ -26,6 +26,8 @@ class IsmChatStorageQuotaListBannerProperties {
     this.titleBuilder,
     this.subtitleBuilder,
     this.actionLabelBuilder,
+    this.menuLabel,
+    this.menuIcon,
     this.leading,
     this.showDismissButton = true,
     this.dismissIcon,
@@ -67,6 +69,13 @@ class IsmChatStorageQuotaListBannerProperties {
 
   /// Dynamic action label. Takes precedence over [actionLabel].
   final StorageQuotaListBannerTextBuilder? actionLabelBuilder;
+
+  /// Overflow-menu label when usage is below the banner threshold. Falls back
+  /// to [actionLabel], then [defaultActionLabel].
+  final String? menuLabel;
+
+  /// Icon for the chat-list ⋮ menu entry. Default `Icons.sd_storage_outlined`.
+  final IconData? menuIcon;
 
   /// Replaces the default warning icon. `null` → amber warning icon.
   final Widget? leading;
@@ -119,4 +128,17 @@ class IsmChatStorageQuotaListBannerProperties {
       actionLabelBuilder?.call(context, usage) ??
       actionLabel ??
       defaultActionLabel;
+
+  String resolveMenuLabel(
+    BuildContext context,
+    IsmChatStorageUsageModel? usage,
+  ) {
+    if (usage != null) {
+      final fromBuilder = actionLabelBuilder?.call(context, usage);
+      if (fromBuilder != null && fromBuilder.isNotEmpty) {
+        return fromBuilder;
+      }
+    }
+    return menuLabel ?? actionLabel ?? defaultActionLabel;
+  }
 }

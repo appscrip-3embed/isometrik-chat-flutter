@@ -18,37 +18,25 @@ mixin IsmChatPageSendMessageMediaMixin {
     if (_controller.isProcessingMedia || _controller.webMedia.isEmpty) {
       return;
     }
-    var isMaxSize = false;
-    for (var media in _controller.webMedia) {
-      if (media.dataSize.split(' ').last == 'KB') {
-        continue;
-      }
-      if (!media.dataSize.size()) {
-        isMaxSize = true;
-        break;
-      }
-    }
-    if (isMaxSize == false) {
-      // Media-storage quota: block the batch up front when it won't fit.
-      // Server still has the final say on send (errorCode 6).
-      final totalBytes = _controller.webMedia.fold<int>(
-        0,
-        (sum, media) => sum + (media.platformFile.size ?? 0),
-      );
-      final allowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
-        totalBytes: totalBytes,
+    for (final media in _controller.webMedia) {
+      final fileBytes = media.platformFile.size ?? 0;
+      final allowed = await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+        fileBytes: fileBytes,
       );
       if (!allowed) return;
-      IsmChatRoute.goBack<void>();
-      sendPhotoAndVideo();
-    } else {
-      await IsmChatContextWidget.showDialogContext(
-        content: IsmChatAlertDialogBox(
-          title: IsmChatStrings.youCanNotSend,
-          cancelLabel: IsmChatStrings.okay,
-        ),
-      );
     }
+    // Media-storage quota: block the batch up front when it won't fit.
+    // Server still has the final say on send (errorCode 6).
+    final totalBytes = _controller.webMedia.fold<int>(
+      0,
+      (sum, media) => sum + (media.platformFile.size ?? 0),
+    );
+    final batchAllowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
+      totalBytes: totalBytes,
+    );
+    if (!batchAllowed) return;
+    IsmChatRoute.goBack<void>();
+    sendPhotoAndVideo();
   }
 
   /// Validates and sends media files (web).
@@ -56,36 +44,29 @@ mixin IsmChatPageSendMessageMediaMixin {
     if (_controller.isProcessingMedia || _controller.webMedia.isEmpty) {
       return;
     }
-    var isMaxSize = false;
     _controller.showCloseLoaderForMoble();
 
-    for (final x in _controller.webMedia) {
-      if (!x.dataSize.size()) {
-        isMaxSize = true;
-        break;
+    for (final media in _controller.webMedia) {
+      final fileBytes = media.platformFile.size ?? 0;
+      final allowed = await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+        fileBytes: fileBytes,
+      );
+      if (!allowed) {
+        _controller.showCloseLoaderForMoble(showLoader: false);
+        return;
       }
     }
-    if (isMaxSize == false) {
-      _controller.showCloseLoaderForMoble(showLoader: false);
-      // Media-storage quota: block the batch up front when it won't fit.
-      final totalBytes = _controller.webMedia.fold<int>(
-        0,
-        (sum, media) => sum + (media.platformFile.size ?? 0),
-      );
-      final allowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
-        totalBytes: totalBytes,
-      );
-      if (!allowed) return;
-      sendPhotoAndVideoForWeb();
-    } else {
-      IsmChatUtility.closeLoader();
-      await IsmChatContextWidget.showDialogContext(
-        content: IsmChatAlertDialogBox(
-          title: IsmChatStrings.youCanNotSend,
-          cancelLabel: IsmChatStrings.okay,
-        ),
-      );
-    }
+    _controller.showCloseLoaderForMoble(showLoader: false);
+    // Media-storage quota: block the batch up front when it won't fit.
+    final totalBytes = _controller.webMedia.fold<int>(
+      0,
+      (sum, media) => sum + (media.platformFile.size ?? 0),
+    );
+    final batchAllowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
+      totalBytes: totalBytes,
+    );
+    if (!batchAllowed) return;
+    sendPhotoAndVideoForWeb();
   }
 
   /// Sends photos and videos for web platform.
@@ -1461,13 +1442,11 @@ mixin IsmChatPageSendMessageMediaMixin {
     }
 
     final dataSize = IsmChatUtility.formatBytes(bytes.length);
-    if (!dataSize.size()) {
-      await IsmChatContextWidget.showDialogContext(
-        content: IsmChatAlertDialogBox(
-          title: IsmChatStrings.youCanNotSend,
-          cancelLabel: IsmChatStrings.okay,
-        ),
-      );
+    final sizeAllowed =
+        await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+      fileBytes: bytes.length,
+    );
+    if (!sizeAllowed) {
       return;
     }
 

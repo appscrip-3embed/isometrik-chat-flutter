@@ -35,6 +35,17 @@ typedef StorageQuotaListBannerTextBuilder = String? Function(
   IsmChatStorageUsageModel usage,
 );
 
+/// Selection-mode app bar title on [IsmChatStorageView].
+typedef StorageManagementSelectionTitleBuilder = String? Function(
+  BuildContext context,
+  int selectedCount,
+);
+
+/// Media type label for filters / tiles on the Manage Storage screen.
+typedef StorageManagementTypeLabelBuilder = String? Function(
+  IsmChatMediaType type,
+);
+
 typedef ConversationWidgetCallback = Widget? Function(
   BuildContext,
   IsmChatConversationModel?,

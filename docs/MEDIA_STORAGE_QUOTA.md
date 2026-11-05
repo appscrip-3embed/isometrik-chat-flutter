@@ -67,8 +67,9 @@ await IsmChat.i.openStorageManagement(conversationId: convId);
 
 ### `IsmChatStorageUsageModel`
 `quotaEnabled`, `canUpload`, `usedBytes?`, `quotaBytes?`, `remainingBytes?`,
-`tier?` (`IsmChatStorageQuotaTier.free | paid`). Helpers:
-`usedFraction` (0..1 for a progress bar), `isOverLimit`, `canUploadBytes(size)`.
+`maxFileSizeBytes?`, `tier?` (`IsmChatStorageQuotaTier.free | paid`). Helpers:
+`usedFraction` (0..1 for a progress bar), `isOverLimit`, `canUploadBytes(size)`,
+`isWithinMaxFileSize(fileBytes)` (per-file cap when quota is on).
 When quota is off, the byte fields and `tier` are `null` and `canUpload` is `true`.
 
 ### `IsmChatQuotaMediaModel`
@@ -85,15 +86,23 @@ the allowance — show it so the user can delete it, but don't open its media.
 
 ## Upload enforcement (built in)
 
-- **Before upload**, the SDK checks the picked batch against `remainingBytes`
-  and shows an "out of space" prompt (with a "Manage storage" action) when it
-  won't fit. The prompt never blocks text.
+- **Before upload**, the SDK checks each attachment against `maxFileSizeBytes`
+  when quota is on (and falls back to the legacy ~100 MB client cap otherwise),
+  then checks the picked batch against `remainingBytes` and shows an "out of
+  space" prompt (with a "Manage storage" action) when it won't fit. The prompt
+  never blocks text.
 - **On send**, if the server still rejects for quota (`HTTP 403`,
   `errorCode: 6`), the SDK surfaces the same prompt and refreshes usage.
 
 To run the pre-check yourself (e.g. a custom composer), use the guard:
 
 ```dart
+final sizeOk = await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+  fileBytes: file.lengthInBytes,
+  showPrompt: true,
+);
+if (!sizeOk) return;
+
 final ok = await IsmChatStorageQuotaGuard.ensureCanUpload(
   totalBytes: file.lengthInBytes,
   showPrompt: true,
@@ -105,11 +114,32 @@ if (!ok) return; // prompt already shown
 
 ## Restricting the UI's look
 
-The Manage Storage screen and placeholders use the SDK theme
-(`IsmChatConfig.chatTheme.primaryColor`, light/dark `cardColor`, etc.), so they
-inherit your existing `IsmChatThemeData`. Teams that want a fully custom screen
-can skip `openStorageManagement()` and build their own against the `IsmChat.i`
-methods above.
+The built-in Manage Storage screen ([`IsmChatStorageView`](lib/src/views/chat_storage/chat_storage_view.dart)) uses:
+
+- **App bar** — your existing [`IsmChatHeaderTheme`](lib/src/res/theme/chat_page_header.dart) (`titleStyle`, `iconColor`, `backgroundColor`). Custom header actions (sort, select all, close selection) respect `iconColor` like other SDK screens.
+- **Body typography & colors** — optional [`IsmChatStorageTheme`](lib/src/res/theme/storage_theme.dart) on [`IsmChatThemeData.storageTheme`](lib/src/res/theme/chat_theme.dart). Omit it for SDK light/dark defaults via [`IsmChatThemeResolver.storageFromConfig`](lib/src/res/theme/chat_theme_resolver.dart).
+- **Copy, empty state, header icons** — [`IsmChatProperties.storageManagementProperties`](lib/src/res/properties/storage_management_properties.dart) (`IsmChatStorageManagementProperties`).
+
+```dart
+IsmChatProperties.storageManagementProperties =
+    const IsmChatStorageManagementProperties(
+  title: 'My storage',
+  emptyTitle: 'No files counted toward your quota',
+  selectAllTooltip: 'Select all',
+);
+
+IsmChatConfig.chatLightTheme = IsmChatThemeData(
+  primaryColor: yourPrimary,
+  storageTheme: IsmChatStorageTheme.light(), // or a full custom instance
+);
+```
+
+Set `emptyPlaceholder` to a custom widget (same role as the chat page empty placeholder) to replace the default folder icon + message.
+
+The chat-list **storage warning banner** is configured separately via
+[`IsmChatConversationProperties.storageQuotaListBannerProperties`](lib/src/res/properties/storage_quota_list_banner_properties.dart).
+
+Teams that want a fully custom screen can skip `openStorageManagement()` and build their own against the `IsmChat.i` methods above.
 
 ---
 

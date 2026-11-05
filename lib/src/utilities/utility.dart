@@ -414,6 +414,35 @@ class IsmChatUtility {
     ][multiple]}';
   }
 
+  /// Formats [size] with decimal (SI) units: 1 KB = 1000 B, 1 MB = 1_000_000 B.
+  ///
+  /// Use for figures from the storage-quota API ([IsmChatStorageUsageModel]
+  /// `usedBytes`, `quotaBytes`, `remainingBytes`, `maxFileSizeBytes`, charged
+  /// [IsmChatQuotaMediaModel.size], delete `freedBytes`, etc.). Those limits
+  /// and totals are defined in decimal megabytes on the server.
+  /// [formatBytes] uses 1024-based units and would show 200_000_000 as 190.73 MB.
+  static String formatBytesDecimal(int size, [int fractionDigits = 2]) {
+    if (size <= 0) return '0 B';
+    const units = [
+      'B',
+      'KB',
+      'MB',
+      'GB',
+      'TB',
+      'PB',
+      'EB',
+      'ZB',
+      'YB',
+    ];
+    final multiple =
+        (log(size) / log(1000)).floor().clamp(0, units.length - 1);
+    final value = size / pow(1000, multiple);
+    final text = (value - value.round()).abs() < 0.001
+        ? value.round().toString()
+        : value.toStringAsFixed(fractionDigits);
+    return '$text ${units[multiple]}';
+  }
+
   /// Returns data size representation of a provided file
   static Future<String> fileToSize(File file) async {
     Uint8List? bytes;

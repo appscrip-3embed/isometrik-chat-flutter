@@ -91,18 +91,18 @@ mixin IsmChatPageSendMessageDocumentMixin {
 
     for (final file in files) {
       final bytes = file.bytes;
-      final sizeMedia = kIsWeb
-          ? IsmChatUtility.formatBytes(
-              int.parse((bytes?.length ?? 0).toString()),
-            )
-          : await IsmChatUtility.fileToSize(File(file.path ?? ''));
-      if (!sizeMedia.size()) {
-        await IsmChatContextWidget.showDialogContext(
-          content: IsmChatAlertDialogBox(
-            title: IsmChatStrings.youCanNotSend,
-            cancelLabel: IsmChatStrings.okay,
-          ),
-        );
+      var fileBytes = bytes?.length ?? 0;
+      if (fileBytes == 0 &&
+          !kIsWeb &&
+          file.path != null &&
+          file.path!.isNotEmpty) {
+        fileBytes = await File(file.path!).length();
+      }
+      final allowed =
+          await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+        fileBytes: fileBytes,
+      );
+      if (!allowed) {
         return;
       }
     }
@@ -376,20 +376,17 @@ mixin IsmChatPageSendMessageDocumentMixin {
     required PlatformFile file,
   }) async {
     final bytes = file.bytes;
-    final sizeMedia = kIsWeb
-        ? IsmChatUtility.formatBytes(
-            int.parse((bytes?.length ?? 0).toString()),
-          )
-        : await IsmChatUtility.fileToSize(File(file.path ?? ''));
-    if (!sizeMedia.size()) {
-      await IsmChatContextWidget.showDialogContext(
-        content: IsmChatAlertDialogBox(
-          title: IsmChatStrings.youCanNotSend,
-          cancelLabel: IsmChatStrings.okay,
-        ),
-      );
-      return;
+    var fileBytes = bytes?.length ?? 0;
+    if (fileBytes == 0 &&
+        !kIsWeb &&
+        file.path != null &&
+        file.path!.isNotEmpty) {
+      fileBytes = await File(file.path!).length();
     }
+    final allowed = await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+      fileBytes: fileBytes,
+    );
+    if (!allowed) return;
 
     final sentAt = DateTime.now().millisecondsSinceEpoch;
     final mediaId = sentAt.toString();

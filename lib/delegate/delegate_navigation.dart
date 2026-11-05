@@ -58,7 +58,9 @@ mixin IsmChatDelegateNavigationMixin {
     final conversation = IsmChatConversationModel(
       userIds: members,
       messagingDisabled: false,
-      conversationImageUrl: uploadedConversationImageUrl,
+      conversationImageUrl: uploadedConversationImageUrl.isNotEmpty
+          ? uploadedConversationImageUrl
+          : null,
       conversationTitle: groupTitle,
       isGroup: true,
       unreadMessagesCount: 0,

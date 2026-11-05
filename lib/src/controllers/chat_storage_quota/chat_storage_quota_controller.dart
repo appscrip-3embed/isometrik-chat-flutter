@@ -305,7 +305,7 @@ class IsmChatStorageQuotaController extends GetxController {
     _applyDeleteResult(result, removedMediaIds: mediaIds);
     IsmChatUtility.showToast(
       result.freedBytes > 0
-          ? 'Freed ${IsmChatUtility.formatBytes(result.freedBytes)}'
+          ? 'Freed ${IsmChatUtility.formatBytesDecimal(result.freedBytes)}'
           : 'Media removed',
     );
     return result;
@@ -337,7 +337,7 @@ class IsmChatStorageQuotaController extends GetxController {
     _applyDeleteResult(result, removedMediaIds: removed);
     IsmChatUtility.showToast(
       result.freedBytes > 0
-          ? 'Freed ${IsmChatUtility.formatBytes(result.freedBytes)}'
+          ? 'Freed ${IsmChatUtility.formatBytesDecimal(result.freedBytes)}'
           : 'No media to remove',
     );
     return result;

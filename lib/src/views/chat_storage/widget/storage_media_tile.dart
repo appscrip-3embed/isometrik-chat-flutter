@@ -24,10 +24,15 @@ class IsmChatStorageMediaTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
+  IsmChatStorageManagementProperties get _props =>
+      IsmChatProperties.storageManagementProperties;
+
   @override
   Widget build(BuildContext context) {
+    final theme = IsmChatThemeResolver.storageFromConfig(context);
     final primary = IsmChatConfig.chatTheme.primaryColor ??
         IsmChatColors.primaryColorLight;
+    final typeLabel = _props.resolveTypeLabelShort(media.attachmentType);
     return InkWell(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -43,27 +48,21 @@ class IsmChatStorageMediaTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    media.name.isEmpty ? _typeLabel : media.name,
+                    media.name.isEmpty ? typeLabel : media.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: theme.mediaTitleStyle,
                   ),
                   const SizedBox(height: 3),
                   Row(
                     children: [
                       Text(
-                        '$_typeLabel · ${IsmChatUtility.formatBytes(media.size)}',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: IsmChatColors.greyColor,
-                        ),
+                        '$typeLabel · ${IsmChatUtility.formatBytesDecimal(media.size)}',
+                        style: theme.mediaSubtitleStyle,
                       ),
                       if (media.restricted) ...[
                         const SizedBox(width: 8),
-                        _restrictedChip(),
+                        _restrictedChip(theme),
                       ],
                     ],
                   ),
@@ -112,19 +111,15 @@ class IsmChatStorageMediaTile extends StatelessWidget {
         child: Icon(_typeIcon, color: primary, size: 24),
       );
 
-  Widget _restrictedChip() => Container(
+  Widget _restrictedChip(IsmChatStorageTheme theme) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: IsmChatColors.redColor.withValues(alpha: 0.12),
+          color: theme.restrictedChipBackgroundColor,
           borderRadius: BorderRadius.circular(6),
         ),
-        child: const Text(
-          'Restricted',
-          style: TextStyle(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w600,
-            color: IsmChatColors.redColor,
-          ),
+        child: Text(
+          _props.resolveRestrictedLabel(),
+          style: theme.restrictedChipTextStyle,
         ),
       );
 
@@ -146,27 +141,6 @@ class IsmChatStorageMediaTile extends StatelessWidget {
         return Icons.location_on_outlined;
       case IsmChatMediaType.adminMessage:
         return Icons.attachment_outlined;
-    }
-  }
-
-  String get _typeLabel {
-    switch (media.attachmentType) {
-      case IsmChatMediaType.image:
-        return 'Image';
-      case IsmChatMediaType.video:
-        return 'Video';
-      case IsmChatMediaType.audio:
-        return 'Audio';
-      case IsmChatMediaType.file:
-        return 'Document';
-      case IsmChatMediaType.gif:
-        return 'GIF';
-      case IsmChatMediaType.sticker:
-        return 'Sticker';
-      case IsmChatMediaType.location:
-        return 'Location';
-      case IsmChatMediaType.adminMessage:
-        return 'File';
     }
   }
 }

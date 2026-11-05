@@ -48,6 +48,7 @@ class IsmChatConversationProperties {
     this.storageQuotaListBannerBuilder,
     this.storageQuotaListBannerProperties =
         IsmChatStorageQuotaListBannerProperties.defaults,
+    this.enableManageStorageInChatListMenu = true,
   }) {
     assert(
       (showCreateChatIcon && onCreateTap != null) || !showCreateChatIcon,
@@ -299,4 +300,10 @@ class IsmChatConversationProperties {
   /// Text, icons, colors, and padding for the default list banner. Use
   /// [storageQuotaListBannerBuilder] only when the host needs a fully custom widget.
   final IsmChatStorageQuotaListBannerProperties storageQuotaListBannerProperties;
+
+  /// When `true` (default), adds **Manage storage** to the chat-list app bar
+  /// overflow (⋮) menu so users can open storage management even when usage is
+  /// below [storageQuotaWarningThreshold] (banner hidden). Label/icon follow
+  /// [storageQuotaListBannerProperties].
+  final bool enableManageStorageInChatListMenu;
 }

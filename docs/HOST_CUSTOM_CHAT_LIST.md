@@ -409,6 +409,7 @@ When you **omit** `conversationScreenBuilder`, the SDK shows [`IsmChatStorageQuo
 - Disable: `enableStorageQuotaListBanner: false`
 - Change threshold: `storageQuotaWarningThreshold: 0.85` (85%)
 - **Texts & default banner look:** `storageQuotaListBannerProperties: IsmChatStorageQuotaListBannerProperties(...)` — title, subtitle, action label, colors, padding, custom leading icon, or `*Builder` callbacks with `IsmChatStorageUsageModel` for dynamic copy
+- **Below 90% usage:** banner is hidden; users can still open storage via the chat-list **⋮** menu when `enableManageStorageInChatListMenu: true` (default). Menu label uses `menuLabel` / `actionLabel` on `storageQuotaListBannerProperties`.
 - **Fully custom widget:** `storageQuotaListBannerBuilder: (context, usage, onManage, onDismiss) => ...`
 
 ```dart
@@ -440,6 +441,16 @@ await IsmChat.i.getStorageUsage(forceRefresh: true);
 ```
 
 `Manage storage` in the default banner calls `IsmChat.i.openStorageManagement()`.
+
+### Manage Storage screen (full page)
+
+The banner only styles the chat-list warning strip. The **Manage Storage** page opened by `openStorageManagement()` is customized separately:
+
+- **Strings / empty placeholder / header icons:** [`IsmChatProperties.storageManagementProperties`](lib/src/res/properties/storage_management_properties.dart) (`IsmChatStorageManagementProperties`)
+- **Fonts & screen colors:** [`IsmChatThemeData.storageTheme`](lib/src/res/theme/chat_theme.dart) (`IsmChatStorageTheme` + `IsmChatThemeResolver.storageFromConfig`)
+- **App bar title & action icon colors:** existing `chatPageHeaderTheme` on your light/dark theme
+
+See [MEDIA_STORAGE_QUOTA.md — Restricting the UI's look](MEDIA_STORAGE_QUOTA.md#restricting-the-uis-look) for examples.
 
 ---
 
