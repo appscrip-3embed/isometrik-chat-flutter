@@ -19,6 +19,7 @@ class IsmChatThemeData with Diagnosticable {
     this.chatListCardThemData,
     this.cardTheme,
     this.profileTheme,
+    this.storageTheme,
   })  : primaryColor = primaryColor ?? IsmChatThemeData.light().primaryColor,
         backgroundColor =
             backgroundColor ?? IsmChatThemeData.light().backgroundColor,
@@ -108,6 +109,10 @@ class IsmChatThemeData with Diagnosticable {
   /// Profile / user-info screens ([IsmChatUserView], [IsmChatUserInfo]).
   /// Null → SDK light/dark default via [IsmChatThemeResolver.profileFromConfig].
   final IsmChatProfileTheme? profileTheme;
+
+  /// Manage Storage screen ([IsmChatStorageView]).
+  /// Null → SDK light/dark default via [IsmChatThemeResolver.storageFromConfig].
+  final IsmChatStorageTheme? storageTheme;
 
   // ignore: strict_top_level_inference
   lerp(IsmChatThemeData? theme, double t) {}

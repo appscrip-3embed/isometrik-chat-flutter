@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
@@ -164,6 +166,9 @@ class _StartMessage extends StatelessWidget {
 class _MoreIcon extends StatelessWidget {
   _MoreIcon(this.onSignOut);
 
+  /// Popup value for **Manage storage** (must not collide with 1–5 or type indices).
+  static const int manageStorageMenuValue = 900;
+
   final VoidCallback? onSignOut;
   final controller = IsmChatUtility.conversationController;
   @override
@@ -185,6 +190,10 @@ class _MoreIcon extends StatelessWidget {
         color: IsmChatConfig.chatTheme.primaryColor,
       ),
       onSelected: (index) async {
+        if (index == manageStorageMenuValue) {
+          unawaited(IsmChat.i.openStorageManagement());
+          return;
+        }
         if (index == 1) {
           if (IsmChatResponsive.isWeb(context)) {
             controller.isRenderScreen =
@@ -234,6 +243,36 @@ class _MoreIcon extends StatelessWidget {
         }
       },
       itemBuilder: (_) => [
+        if (IsmChatProperties
+            .conversationProperties.enableManageStorageInChatListMenu) ...[
+          PopupMenuItem(
+            value: manageStorageMenuValue,
+            child: Row(
+              children: [
+                Icon(
+                  IsmChatProperties
+                          .conversationProperties
+                          .storageQuotaListBannerProperties
+                          .menuIcon ??
+                      Icons.sd_storage_outlined,
+                  color: IsmChatConfig.chatTheme.primaryColor,
+                ),
+                IsmChatDimens.boxWidth8,
+                Text(
+                  IsmChatProperties
+                      .conversationProperties
+                      .storageQuotaListBannerProperties
+                      .resolveMenuLabel(
+                    _,
+                    Get.isRegistered<IsmChatStorageQuotaController>()
+                        ? Get.find<IsmChatStorageQuotaController>().usage
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (IsmChatResponsive.isWeb(context)) ...[
           PopupMenuItem(
             value: 1,

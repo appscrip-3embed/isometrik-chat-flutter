@@ -233,6 +233,7 @@ class IsmChatCommonController extends GetxController {
     if (isGroup) {
       userId = conversation.userIds ?? [];
     }
+    final groupImageUrl = conversation.conversationImageUrl?.trim();
     final response = await viewModel.createConversation(
       isLoading: isLoading,
       typingEvents: true,
@@ -244,8 +245,11 @@ class IsmChatCommonController extends GetxController {
       searchableTags: searchableTags,
       metaData: metaData != null ? metaData.toMap() : {},
       customType: conversation.customType,
-      conversationImageUrl:
-          isGroup ? conversation.conversationImageUrl ?? '' : '',
+      conversationImageUrl: isGroup &&
+              groupImageUrl != null &&
+              groupImageUrl.isNotEmpty
+          ? groupImageUrl
+          : null,
       conversationTitle: isGroup ? conversation.conversationTitle ?? '' : '',
     );
 

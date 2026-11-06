@@ -24,6 +24,7 @@ class AttachmentModel {
     this.stillUrl,
     this.mediaWidth,
     this.mediaHeight,
+    this.restricted = false,
   });
 
   factory AttachmentModel.fromMap(Map<String, dynamic> map) => AttachmentModel(
@@ -49,6 +50,8 @@ class AttachmentModel {
         // Prefer base64 (see [toMap]); still accepts legacy list-string form.
         bytes: _parseBytes(map['bytes']),
         attachmentType: _resolveMediaTypeFromMap(map),
+        // Media-storage quota: server hides the file past the allowance.
+        restricted: map['restricted'] as bool? ?? false,
       );
 
   /// API may send both [mediaType] and [attachmentType]; prefer [mediaType].
@@ -82,6 +85,11 @@ class AttachmentModel {
   /// Intrinsic height in pixels (e.g. from Giphy). Used for stable GIF layout.
   int? mediaHeight;
   final IsmChatMediaType? attachmentType;
+
+  /// Media-storage quota flag. `true` when the file is past the owner's current
+  /// allowance: [mediaUrl]/[thumbnailUrl] are blanked server-side, so render a
+  /// placeholder instead of a broken image. The message text is still shown.
+  bool restricted;
 
   /// Parses width/height that may arrive as int, double, or string.
   static int? _parseDimension(dynamic value) {
@@ -173,6 +181,7 @@ class AttachmentModel {
     String? stillUrl,
     int? mediaWidth,
     int? mediaHeight,
+    bool? restricted,
   }) =>
       AttachmentModel(
         thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
@@ -191,6 +200,7 @@ class AttachmentModel {
         stillUrl: stillUrl ?? this.stillUrl,
         mediaWidth: mediaWidth ?? this.mediaWidth,
         mediaHeight: mediaHeight ?? this.mediaHeight,
+        restricted: restricted ?? this.restricted,
       );
 
   Map<String, dynamic> toMap() => <String, dynamic>{
@@ -208,6 +218,7 @@ class AttachmentModel {
         'stillUrl': stillUrl,
         'mediaWidth': mediaWidth,
         'mediaHeight': mediaHeight,
+        if (restricted) 'restricted': restricted,
         // Base64 preserves binary; see [_encodeBytes] / [_parseBytes].
         'bytes': _encodeBytes(bytes),
         'attachmentType': attachmentType?.value,
@@ -250,7 +261,7 @@ class AttachmentModel {
 
   @override
   String toString() =>
-      'AttachmentModel(thumbnailUrl: $thumbnailUrl, size: $size, name: $name, mimeType: $mimeType, mediaUrl: $mediaUrl, mediaId: $mediaId, extension: $extension, latitude: $latitude, longitude: $longitude, title: $title, address: $address, attachmentType: $attachmentType, stillUrl: $stillUrl, mediaWidth: $mediaWidth, mediaHeight: $mediaHeight, bytes: $bytes)';
+      'AttachmentModel(thumbnailUrl: $thumbnailUrl, size: $size, name: $name, mimeType: $mimeType, mediaUrl: $mediaUrl, mediaId: $mediaId, extension: $extension, latitude: $latitude, longitude: $longitude, title: $title, address: $address, attachmentType: $attachmentType, stillUrl: $stillUrl, mediaWidth: $mediaWidth, mediaHeight: $mediaHeight, restricted: $restricted, bytes: $bytes)';
 
   @override
   bool operator ==(covariant AttachmentModel other) {
@@ -270,6 +281,7 @@ class AttachmentModel {
         other.stillUrl == stillUrl &&
         other.mediaWidth == mediaWidth &&
         other.mediaHeight == mediaHeight &&
+        other.restricted == restricted &&
         other.bytes == bytes &&
         other.attachmentType == attachmentType;
   }
@@ -290,6 +302,7 @@ class AttachmentModel {
       stillUrl.hashCode ^
       mediaWidth.hashCode ^
       mediaHeight.hashCode ^
+      restricted.hashCode ^
       bytes.hashCode ^
       attachmentType.hashCode;
 }

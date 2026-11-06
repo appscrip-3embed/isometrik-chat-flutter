@@ -328,6 +328,9 @@ class IsmChatPageViewModel {
       if (response == null || response.hasError) {
         return;
       }
+      // Media-storage quota: when quota is on the delete frees bytes; keep the
+      // cached usage in sync (no-op when quota is off / no figures returned).
+      IsmChatStorageQuotaGuard.syncUsageFromResponse(response);
     }
 
     var conversation =
@@ -394,6 +397,8 @@ class IsmChatPageViewModel {
       if (response == null || response.hasError) {
         return;
       }
+      // Media-storage quota: sync freed bytes into cached usage when quota is on.
+      IsmChatStorageQuotaGuard.syncUsageFromResponse(response);
     }
     var conversation =
         await IsmChatConfig.dbWrapper?.getConversation(conversationId);

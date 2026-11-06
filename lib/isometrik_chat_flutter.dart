@@ -38,6 +38,7 @@ part 'delegate/delegate_notification.dart';
 part 'delegate/delegate_paid_media.dart';
 part 'delegate/delegate_composer.dart';
 part 'delegate/delegate_chat_list.dart';
+part 'delegate/delegate_storage.dart';
 part 'delegate/delegate_ui.dart';
 part 'delegate/delegate_user.dart';
 
@@ -53,6 +54,7 @@ part 'mixins/notification_operations.dart';
 part 'mixins/paid_media_operations.dart';
 part 'mixins/composer_operations.dart';
 part 'mixins/chat_list_operations.dart';
+part 'mixins/storage_operations.dart';
 part 'mixins/cleanup_operations.dart';
 part 'mixins/update_operations.dart';
 
@@ -93,6 +95,7 @@ part 'mixins/update_operations.dart';
 /// - [IsmChatPaidMediaOperationsMixin] - Paid media callback
 /// - [IsmChatComposerOperationsMixin] - Custom composer actions
 /// - [IsmChatChatListOperationsMixin] - Custom chat-list screen actions
+/// - [IsmChatStorageOperationsMixin] - Media storage quota surface
 /// - [IsmChatCleanupOperationsMixin] - Resource cleanup
 /// - [IsmChatUpdateOperationsMixin] - Chat page updates
 ///
@@ -111,6 +114,7 @@ class IsmChat
         IsmChatPaidMediaOperationsMixin,
         IsmChatComposerOperationsMixin,
         IsmChatChatListOperationsMixin,
+        IsmChatStorageOperationsMixin,
         IsmChatCleanupOperationsMixin,
         IsmChatUpdateOperationsMixin {
   /// Factory constructor for creating a new instance of [IsmChat].

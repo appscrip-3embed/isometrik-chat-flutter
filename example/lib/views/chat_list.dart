@@ -191,20 +191,31 @@ class ChatList extends StatelessWidget {
                 onCreateTap: () {},
                 shouldShowAppBar:
                     IsmChatResponsive.isWeb(context) ? false : true,
-                header: Column(
-                  children: [
-                    IsmChatListHeader(
-                      onSignOut: () {
-                        controller.onSignOut();
-                      },
-                      onSearchTap: (p0, p1, p2) {},
-                      showSearch: false,
-                      width: IsmChatResponsive.isWeb(context)
-                          ? IsmChatDimens.percentWidth(.3)
-                          : null,
-                    ),
-                  ],
+                headerHeight: IsmChatDimens.appBarHeight,
+                header: IsmChatListHeader(
+                  onSignOut: () {
+                    controller.onSignOut();
+                  },
+                  onSearchTap: (p0, p1, p2) {},
+                  showSearch: false,
+                  width: IsmChatResponsive.isWeb(context)
+                      ? IsmChatDimens.percentWidth(.3)
+                      : null,
                 ),
+                // Banner (≥90% usage) + ⋮ menu "Manage storage" when below threshold:
+                enableManageStorageInChatListMenu: true,
+                storageQuotaListBannerProperties:
+                    const IsmChatStorageQuotaListBannerProperties(
+                  actionLabel: 'Manage storage',
+                  menuLabel: 'Manage storage',
+                ),
+                // Full Manage Storage screen (openStorageManagement):
+                // IsmChatProperties.storageManagementProperties =
+                //     const IsmChatStorageManagementProperties(
+                //   title: 'Manage storage',
+                // );
+                // Media storage warning banner appears above the conversation
+                // list when quota usage ≥ 90% (see enableStorageQuotaListBanner).
                 placeholder: const IsmChatEmptyView(
                   text: 'Create conversation',
                   icon: Icon(

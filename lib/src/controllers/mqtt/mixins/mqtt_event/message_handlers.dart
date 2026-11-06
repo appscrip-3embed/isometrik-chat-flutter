@@ -274,12 +274,30 @@ String _resolveNotificationBody(
   }
   final notification = message.notificationBody?.trim() ?? '';
   final content = message.body.trim();
+  // Web PDF sends store the file name in body. Alerts should say "Document".
+  if (_isDocumentAlert(message)) {
+    return IsmChatUtility.resolveDocumentNotificationBody(
+      body: content,
+      attachmentName: message.attachments?.firstOrNull?.name,
+      notificationBody: notification,
+    );
+  }
   // MQTT often sends plaintext in [body] while [notificationBody] is empty.
   // Prefer explicit notification copy when present (e.g. "Sent an image").
   if (preferNotificationBody) {
     return notification.isNotEmpty ? notification : content;
   }
   return content.isNotEmpty ? content : notification;
+}
+
+bool _isDocumentAlert(IsmChatMessageModel message) {
+  if (message.customType == IsmChatCustomMessageType.file) return true;
+  final attachment = message.attachments?.firstOrNull;
+  if (attachment == null) return false;
+  final mime = (attachment.mimeType ?? '').toLowerCase();
+  final extension = (attachment.extension ?? '').toLowerCase();
+  final name = (attachment.name ?? '').toLowerCase();
+  return mime.contains('pdf') || extension == 'pdf' || name.endsWith('.pdf');
 }
 
 String _decryptedNotificationBody(IsmChatMessageModel message) {

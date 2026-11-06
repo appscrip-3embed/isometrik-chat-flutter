@@ -91,7 +91,7 @@ const Map<String, String> kIsmChatLocaleEn = {
   'deleteChat': 'Delete chat',
   'deleteGroup': 'Delete group',
   'createGroupAlert':
-      'Select at least one user, add group name and choose one photo',
+      'Select at least one user and add a group name',
   'youCreatedGroup': 'You created group',
   'admin': 'Admin',
   'add': 'Add',

@@ -514,7 +514,14 @@ class _MicOrSendButton extends StatelessWidget {
                           await IsmChatUtility.fileToSize(File(audioPath));
                     }
 
-                    if (sizeMedia.size()) {
+                    final audioFileBytes = kIsWeb
+                        ? (webMediaModel?.platformFile.size ?? 0)
+                        : await File(audioPath).length();
+                    final sizeAllowed = await IsmChatStorageQuotaGuard
+                        .ensureAttachmentSizeAllowed(
+                      fileBytes: audioFileBytes,
+                    );
+                    if (sizeAllowed) {
                       controller
                         ..sendAudio(
                           webMediaModel: webMediaModel,
@@ -527,13 +534,6 @@ class _MicOrSendButton extends StatelessWidget {
                           duration: Duration(seconds: controller.seconds),
                         )
                         ..seconds = 0;
-                    } else {
-                      await Get.dialog(
-                        IsmChatAlertDialogBox(
-                          title: IsmChatStrings.youCanNotSend,
-                          cancelLabel: IsmChatStrings.okay,
-                        ),
-                      );
                     }
                   }
                 } else {

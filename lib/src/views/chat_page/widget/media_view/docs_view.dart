@@ -91,7 +91,9 @@ class _IsmDocsViewState extends State<IsmDocsView>
                               style: mediaTheme.docTrailingTextStyle,
                             ),
                             leading: SvgPicture.asset(
-                              IsmChatAssets.pdfSvg,
+                              IsmChatDocumentIcon.assetFor(
+                                value[index].attachments?.first,
+                              ),
                               height: IsmChatDimens.thirtyTwo,
                               width: IsmChatDimens.thirtyTwo,
                             ),

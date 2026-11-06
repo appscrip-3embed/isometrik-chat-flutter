@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -25,6 +27,7 @@ class IsmChatConversationList extends StatelessWidget {
     if (Get.isRegistered<IsmChatMqttController>()) {
       await Get.find<IsmChatMqttController>().getChatConversationsUnreadCount();
     }
+    unawaited(IsmChat.i.getStorageUsage(forceRefresh: true));
   }
 
   Future<bool> _onLoading() async {
@@ -84,14 +87,26 @@ class IsmChatConversationList extends StatelessWidget {
     );
 
     if (kIsWeb) {
-      return content;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const IsmChatStorageQuotaListBanner(),
+          Expanded(child: content),
+        ],
+      );
     }
 
     return IsmChatPullToRefresh(
       footer: const RefreshFooter(),
       onRefresh: _onRefresh,
       onLoading: _onLoading,
-      child: content,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const IsmChatStorageQuotaListBanner(),
+          Expanded(child: content),
+        ],
+      ),
     );
   }
 }

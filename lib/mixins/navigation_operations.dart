@@ -71,10 +71,9 @@ mixin IsmChatNavigationOperationsMixin {
     );
     if (isCreateGroupFromOutSide) {
       assert(
-        [conversationImageUrl ?? '', conversationTitle ?? '']
-            .every((e) => e.isNotEmpty),
+        (conversationTitle ?? '').trim().isNotEmpty,
         '''Input Error: Please make sure that all required fields are filled out.
-      ConversationImageUrl, and ConversationTitle cannot be empty.''',
+      ConversationTitle cannot be empty.''',
       );
     }
 
@@ -130,14 +129,6 @@ mixin IsmChatNavigationOperationsMixin {
       members.isNotEmpty && groupTitle.isNotEmpty,
       '''Input Error: Please make sure that required fields are filled out.
       members and groupTitle cannot be empty.''',
-    );
-    assert(
-      groupImage.isNotEmpty ||
-          (groupImageBytes != null &&
-              groupImageBytes.isNotEmpty &&
-              (groupImageExtension?.isNotEmpty == true)),
-      '''Input Error: Please provide either conversationImageUrl or both
-      groupImageBytes and groupImageExtension.''',
     );
 
     return await _delegate.createGroup(
@@ -277,10 +268,9 @@ mixin IsmChatNavigationOperationsMixin {
     );
     if (isGroup) {
       assert(
-        [conversationImageUrl ?? '', conversationTitle ?? '']
-            .every((e) => e.isNotEmpty),
+        (conversationTitle ?? '').trim().isNotEmpty,
         '''Input Error: Please make sure that all required fields are filled out.
-      ConversationImageUrl, and ConversationTitle cannot be empty for groups.''',
+      ConversationTitle cannot be empty for groups.''',
       );
     }
 

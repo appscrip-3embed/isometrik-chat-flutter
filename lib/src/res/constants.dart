@@ -13,6 +13,10 @@ class IsmChatAssets {
   static const String txtSvg = '$_svgBase/txt.svg';
   static const String xlsSvg = '$_svgBase/xls.svg';
 
+  /// Word badge. Excel reuses [xlsSvg]. Pick this from IsmChatDocumentIcon
+  /// so the bubble, multi-doc row, and docs tab stay on the same asset.
+  static const String docSvg = '$_svgBase/doc.svg';
+
   static const String gallarySvg = '$_svgBase/gallary.svg';
   static const String placeHolderSvg = '$_svgBase/placeholder.svg';
   static const String publicGroupSvg = '$_svgBase/public_group.svg';

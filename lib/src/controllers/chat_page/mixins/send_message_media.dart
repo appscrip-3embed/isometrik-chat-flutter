@@ -18,27 +18,26 @@ mixin IsmChatPageSendMessageMediaMixin {
     if (_controller.isProcessingMedia || _controller.webMedia.isEmpty) {
       return;
     }
-    var isMaxSize = false;
-    for (var media in _controller.webMedia) {
-      if (media.dataSize.split(' ').last == 'KB') {
-        continue;
-      }
-      if (!media.dataSize.size()) {
-        isMaxSize = true;
-        break;
-      }
-    }
-    if (isMaxSize == false) {
-      IsmChatRoute.goBack<void>();
-      sendPhotoAndVideo();
-    } else {
-      await IsmChatContextWidget.showDialogContext(
-        content: IsmChatAlertDialogBox(
-          title: IsmChatStrings.youCanNotSend,
-          cancelLabel: IsmChatStrings.okay,
-        ),
+    for (final media in _controller.webMedia) {
+      final fileBytes = media.platformFile.size ?? 0;
+      final allowed =
+          await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+        fileBytes: fileBytes,
       );
+      if (!allowed) return;
     }
+    // Media-storage quota: block the batch up front when it won't fit.
+    // Server still has the final say on send (errorCode 6).
+    final totalBytes = _controller.webMedia.fold<int>(
+      0,
+      (sum, media) => sum + (media.platformFile.size ?? 0),
+    );
+    final batchAllowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
+      totalBytes: totalBytes,
+    );
+    if (!batchAllowed) return;
+    IsmChatRoute.goBack<void>();
+    sendPhotoAndVideo();
   }
 
   /// Validates and sends media files (web).
@@ -46,27 +45,30 @@ mixin IsmChatPageSendMessageMediaMixin {
     if (_controller.isProcessingMedia || _controller.webMedia.isEmpty) {
       return;
     }
-    var isMaxSize = false;
     _controller.showCloseLoaderForMoble();
 
-    for (final x in _controller.webMedia) {
-      if (!x.dataSize.size()) {
-        isMaxSize = true;
-        break;
+    for (final media in _controller.webMedia) {
+      final fileBytes = media.platformFile.size ?? 0;
+      final allowed =
+          await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+        fileBytes: fileBytes,
+      );
+      if (!allowed) {
+        _controller.showCloseLoaderForMoble(showLoader: false);
+        return;
       }
     }
-    if (isMaxSize == false) {
-      _controller.showCloseLoaderForMoble(showLoader: false);
-      sendPhotoAndVideoForWeb();
-    } else {
-      IsmChatUtility.closeLoader();
-      await IsmChatContextWidget.showDialogContext(
-        content: IsmChatAlertDialogBox(
-          title: IsmChatStrings.youCanNotSend,
-          cancelLabel: IsmChatStrings.okay,
-        ),
-      );
-    }
+    _controller.showCloseLoaderForMoble(showLoader: false);
+    // Media-storage quota: block the batch up front when it won't fit.
+    final totalBytes = _controller.webMedia.fold<int>(
+      0,
+      (sum, media) => sum + (media.platformFile.size ?? 0),
+    );
+    final batchAllowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
+      totalBytes: totalBytes,
+    );
+    if (!batchAllowed) return;
+    sendPhotoAndVideoForWeb();
   }
 
   /// Sends photos and videos for web platform.
@@ -320,9 +322,8 @@ mixin IsmChatPageSendMessageMediaMixin {
       );
     }
 
-    final multipleBody =
-        IsmChatUtility.multipleMediaBatchLabelFromWebMedia(mediaList);
-    final body = caption.isNotEmpty ? caption.trim() : multipleBody;
+    // Caption lives in metadata only; body is the batch preview placeholder.
+    final body = mediaPreviewLabel;
 
     final mediaMessage = IsmChatMessageModel(
       body: body,
@@ -1147,6 +1148,9 @@ mixin IsmChatPageSendMessageMediaMixin {
     int? thumbanilMediaType,
     Uint8List? thumbnailBytes,
     bool isLoading = false,
+    // Set only when there are no thumbnail bytes. Word and Excel pass a JPEG
+    // (`{mediaId}-thumb.jpg`), the same shape web uses for thumbnailUrl.
+    bool skipThumbnail = false,
   }) async {
     try {
       PresignedUrlModel? presignedUrlModel;
@@ -1174,7 +1178,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
       mediaId =
           _controller.isBroadcast ? mediaId : presignedUrlModel?.mediaId ?? '';
-      if (!(imageAndFile ?? false)) {
+      if (!(imageAndFile ?? false) && !skipThumbnail) {
         PresignedUrlModel? presignedUrlModel;
         if (_controller.isBroadcast) {
           presignedUrlModel =
@@ -1202,15 +1206,18 @@ mixin IsmChatPageSendMessageMediaMixin {
             : presignedUrlModel?.thumbnailUrl ?? '';
       }
       if (mediaUrlPath.isNotEmpty) {
+        // PDF uses the page image. Word/Excel and other files without one use
+        // the file URL, which is what a PDF sends when the page render is empty.
+        final resolvedThumbnail = !skipThumbnail && !(imageAndFile ?? false)
+            ? thumbnailUrlPath
+            : mediaUrlPath;
         _updateUploadingMessageMediaUrl(
           createdAt: createdAt,
           mediaUrl: mediaUrlPath,
-          thumbnailUrl:
-              !(imageAndFile ?? false) ? thumbnailUrlPath : mediaUrlPath,
+          thumbnailUrl: resolvedThumbnail,
         );
         final uploadedAttachment = AttachmentModel(
-          thumbnailUrl:
-              !(imageAndFile ?? false) ? thumbnailUrlPath : mediaUrlPath,
+          thumbnailUrl: resolvedThumbnail,
           size: ismChatChatMessageModel.attachments?.first.size ?? 0,
           name: ismChatChatMessageModel.attachments?.first.name,
           mimeType: ismChatChatMessageModel.attachments?.first.mimeType,
@@ -1266,6 +1273,7 @@ mixin IsmChatPageSendMessageMediaMixin {
     required int createdAt,
     required String mediaUrl,
     required String thumbnailUrl,
+    bool fallbackThumbnailToMedia = true,
   }) {
     final index = _controller.messages.indexWhere(
       (message) =>
@@ -1282,7 +1290,9 @@ mixin IsmChatPageSendMessageMediaMixin {
     current.attachments = [
       attachment.copyWith(
         mediaUrl: mediaUrl,
-        thumbnailUrl: thumbnailUrl.isNotEmpty ? thumbnailUrl : mediaUrl,
+        thumbnailUrl: thumbnailUrl.isNotEmpty
+            ? thumbnailUrl
+            : (fallbackThumbnailToMedia ? mediaUrl : ''),
         stillUrl: thumbnailUrl.isNotEmpty ? thumbnailUrl : mediaUrl,
       ),
     ];
@@ -1442,13 +1452,11 @@ mixin IsmChatPageSendMessageMediaMixin {
     }
 
     final dataSize = IsmChatUtility.formatBytes(bytes.length);
-    if (!dataSize.size()) {
-      await IsmChatContextWidget.showDialogContext(
-        content: IsmChatAlertDialogBox(
-          title: IsmChatStrings.youCanNotSend,
-          cancelLabel: IsmChatStrings.okay,
-        ),
-      );
+    final sizeAllowed =
+        await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
+      fileBytes: bytes.length,
+    );
+    if (!sizeAllowed) {
       return;
     }
 
@@ -1885,6 +1893,16 @@ String mimeTypeForAttachmentExtension(
       return 'audio/wav';
     case 'pdf':
       return 'application/pdf';
+    case 'doc':
+      return 'application/msword';
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xls':
+      return 'application/vnd.ms-excel';
+    case 'xlsx':
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'txt':
+      return 'text/plain';
     default:
       switch (mediaType) {
         case IsmChatMediaType.video:

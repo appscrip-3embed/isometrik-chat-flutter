@@ -217,6 +217,51 @@ class IsmChatUtility {
     }
   }
 
+  /// Alert copy for a document.
+  ///
+  /// Web and the app keep the file name in the message body (`report.pdf`) so
+  /// the bubble can show it. In-app notifications were reading that body and
+  /// showing the file name. Use this so the alert says "Document" instead.
+  /// A real caption (body that is not the file name) is left as-is.
+  ///
+  /// Reuse from MQTT local alerts. Do not use it for the chat bubble title —
+  /// that still reads the attachment name.
+  static String resolveDocumentNotificationBody({
+    required String body,
+    String? attachmentName,
+    String? notificationBody,
+  }) {
+    final content = body.trim();
+    final name = (attachmentName ?? '').trim();
+    final notification = (notificationBody ?? '').trim();
+    final isFileName = content.isNotEmpty &&
+        (content == name || _looksLikeDocumentFileName(content));
+    if (!isFileName) {
+      if (content.isNotEmpty) return content;
+      if (notification.isNotEmpty && !_looksLikeDocumentFileName(notification)) {
+        return notification;
+      }
+    }
+    return IsmChatStrings.document;
+  }
+
+  static bool _looksLikeDocumentFileName(String value) {
+    final lower = value.trim().toLowerCase();
+    const extensions = <String>[
+      '.pdf',
+      '.doc',
+      '.docx',
+      '.xls',
+      '.xlsx',
+      '.ppt',
+      '.pptx',
+      '.txt',
+      '.csv',
+      '.rtf',
+    ];
+    return extensions.any(lower.endsWith);
+  }
+
   /// Truncates notification preview text for FCM / local notifications.
   static String truncateNotificationBody(String text, {int maxLength = 10}) {
     if (text.length <= maxLength) return text;
@@ -412,6 +457,35 @@ class IsmChatUtility {
       'ZB',
       'YB'
     ][multiple]}';
+  }
+
+  /// Formats [size] with decimal (SI) units: 1 KB = 1000 B, 1 MB = 1_000_000 B.
+  ///
+  /// Use for figures from the storage-quota API ([IsmChatStorageUsageModel]
+  /// `usedBytes`, `quotaBytes`, `remainingBytes`, `maxFileSizeBytes`, charged
+  /// [IsmChatQuotaMediaModel.size], delete `freedBytes`, etc.). Those limits
+  /// and totals are defined in decimal megabytes on the server.
+  /// [formatBytes] uses 1024-based units and would show 200_000_000 as 190.73 MB.
+  static String formatBytesDecimal(int size, [int fractionDigits = 2]) {
+    if (size <= 0) return '0 B';
+    const units = [
+      'B',
+      'KB',
+      'MB',
+      'GB',
+      'TB',
+      'PB',
+      'EB',
+      'ZB',
+      'YB',
+    ];
+    final multiple =
+        (log(size) / log(1000)).floor().clamp(0, units.length - 1);
+    final value = size / pow(1000, multiple);
+    final text = (value - value.round()).abs() < 0.001
+        ? value.round().toString()
+        : value.toStringAsFixed(fractionDigits);
+    return '$text ${units[multiple]}';
   }
 
   /// Returns data size representation of a provided file

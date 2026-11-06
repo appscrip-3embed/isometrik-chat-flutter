@@ -182,6 +182,11 @@ class IsmChatCommonViewModel {
             pendingMessage
               ..messageId = ''
               ..isInvalidMessage = true;
+            // Media-storage quota backstop: if the server blocked this send for
+            // being over quota (errorCode 6), prompt the user and refresh usage.
+            unawaited(
+              IsmChatStorageQuotaGuard.handleResponseIfQuota(response.respone),
+            );
           }
           chatPendingMessages?.messages
               ?.removeWhere((key, value) => key == '$createdAt');

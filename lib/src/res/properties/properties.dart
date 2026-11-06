@@ -7,3 +7,5 @@ export 'conversation_card_properties.dart';
 export 'conversation_info_properties.dart';
 export 'message_status_properties.dart';
 export 'mqtt_properties.dart';
+export 'storage_management_properties.dart';
+export 'storage_quota_list_banner_properties.dart';

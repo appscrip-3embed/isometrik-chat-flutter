@@ -84,6 +84,11 @@ This directory contains comprehensive documentation for the Isometrik Chat Flutt
   - `IsmChat.i` refresh / search / openConversation APIs
   - Minimum host-app sample
 
+- **[MEDIA_STORAGE_QUOTA.md](./MEDIA_STORAGE_QUOTA.md)** - Per-user media storage quotas
+  - `IsmChat.i` usage / media list / delete APIs
+  - Built-in `openStorageManagement()` screen
+  - Upload enforcement + restricted-media placeholders
+
 ### Feature & Issue Tracking
 
 - **[FEATURES.md](./FEATURES.md)** - Feature list and status

@@ -1107,32 +1107,21 @@ extension MentionMessage on IsmChatMessageModel {
 
   static const _multipleBody = 'AttachmentMessage:Multiple';
 
+  /// `true` when any attachment is past the owner's storage allowance
+  /// (`restricted: true`): the server has blanked its media URLs, so the chat
+  /// should render a "media unavailable" placeholder instead of a broken image.
+  bool get hasRestrictedMedia =>
+      attachments?.any((a) => a.restricted == true) ?? false;
+
   bool get isMultipleAttachmentsMessage =>
       customType == IsmChatCustomMessageType.multipleAttachments ||
       (attachments != null &&
           attachments!.length > 1 &&
           (body == _multipleBody || customType?.value == _multipleBody));
 
-  /// Caption shown under a multi-attachment bubble.
-  ///
-  /// Prefer [IsmChatMetaData.caption]. Web puts the caption in [body] and uses
-  /// [body] `AttachmentMessage:Multiple` only when there is no caption.
-  /// Single image/video with a caption also mirror it in [body]; otherwise
-  /// [body] is empty and the caption lives only in metadata when present.
-  String get multipleAttachmentCaption {
-    final fromMeta = metaData?.caption?.trim() ?? '';
-    if (!isMultipleAttachmentsMessage) {
-      return fromMeta;
-    }
-    if (fromMeta.isNotEmpty) {
-      return fromMeta;
-    }
-    final fromBody = body.trim();
-    if (fromBody.isEmpty || fromBody == _multipleBody) {
-      return '';
-    }
-    return fromBody;
-  }
+  /// Caption shown under a multi-attachment bubble ([IsmChatMetaData.caption] only).
+  String get multipleAttachmentCaption =>
+      metaData?.caption?.trim() ?? '';
 
   /// Homogeneous layout for multipleAttachments messages.
   ///

@@ -83,7 +83,7 @@ const Map<String, String> kIsmChatLocaleFr = {
   'archive': 'Archiver',
   'deleteChat': 'Supprimer la discussion',
   'deleteGroup': 'Supprimer le groupe',
-  'createGroupAlert': 'Sélectionnez au moins un utilisateur, ajoutez un nom de groupe et choisissez une photo',
+  'createGroupAlert': 'Sélectionnez au moins un utilisateur et ajoutez un nom de groupe',
   'youCreatedGroup': 'Vous avez créé le groupe',
   'admin': 'Admin',
   'add': 'Ajouter',

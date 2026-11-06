@@ -11,5 +11,6 @@ export 'enums.dart';
 export 'extensions/extensions.dart';
 export 'sensitive_content_masker.dart';
 export 'show_context.dart';
+export 'storage_quota_guard.dart';
 export 'typedef.dart';
 export 'utility.dart';
