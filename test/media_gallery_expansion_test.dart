@@ -187,12 +187,13 @@ void main() {
       expect(message.syntheticMessagesForGrid.length, 2);
     });
 
-    test('caption in body is the visible caption', () {
+    test('caption in metadata is the visible caption', () {
       final message = IsmChatMessageModel(
         body: 'Look at these',
         sentAt: 1,
         sentByMe: true,
         customType: IsmChatCustomMessageType.multipleAttachments,
+        metaData: IsmChatMetaData(caption: 'Look at these'),
         attachments: [
           AttachmentModel(
             attachmentType: IsmChatMediaType.image,

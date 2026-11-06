@@ -217,6 +217,51 @@ class IsmChatUtility {
     }
   }
 
+  /// Alert copy for a document.
+  ///
+  /// Web and the app keep the file name in the message body (`report.pdf`) so
+  /// the bubble can show it. In-app notifications were reading that body and
+  /// showing the file name. Use this so the alert says "Document" instead.
+  /// A real caption (body that is not the file name) is left as-is.
+  ///
+  /// Reuse from MQTT local alerts. Do not use it for the chat bubble title —
+  /// that still reads the attachment name.
+  static String resolveDocumentNotificationBody({
+    required String body,
+    String? attachmentName,
+    String? notificationBody,
+  }) {
+    final content = body.trim();
+    final name = (attachmentName ?? '').trim();
+    final notification = (notificationBody ?? '').trim();
+    final isFileName = content.isNotEmpty &&
+        (content == name || _looksLikeDocumentFileName(content));
+    if (!isFileName) {
+      if (content.isNotEmpty) return content;
+      if (notification.isNotEmpty && !_looksLikeDocumentFileName(notification)) {
+        return notification;
+      }
+    }
+    return IsmChatStrings.document;
+  }
+
+  static bool _looksLikeDocumentFileName(String value) {
+    final lower = value.trim().toLowerCase();
+    const extensions = <String>[
+      '.pdf',
+      '.doc',
+      '.docx',
+      '.xls',
+      '.xlsx',
+      '.ppt',
+      '.pptx',
+      '.txt',
+      '.csv',
+      '.rtf',
+    ];
+    return extensions.any(lower.endsWith);
+  }
+
   /// Truncates notification preview text for FCM / local notifications.
   static String truncateNotificationBody(String text, {int maxLength = 10}) {
     if (text.length <= maxLength) return text;

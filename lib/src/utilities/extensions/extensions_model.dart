@@ -1119,26 +1119,9 @@ extension MentionMessage on IsmChatMessageModel {
           attachments!.length > 1 &&
           (body == _multipleBody || customType?.value == _multipleBody));
 
-  /// Caption shown under a multi-attachment bubble.
-  ///
-  /// Prefer [IsmChatMetaData.caption]. Web puts the caption in [body] and uses
-  /// [body] `AttachmentMessage:Multiple` only when there is no caption.
-  /// Single image/video with a caption also mirror it in [body]; otherwise
-  /// [body] is empty and the caption lives only in metadata when present.
-  String get multipleAttachmentCaption {
-    final fromMeta = metaData?.caption?.trim() ?? '';
-    if (!isMultipleAttachmentsMessage) {
-      return fromMeta;
-    }
-    if (fromMeta.isNotEmpty) {
-      return fromMeta;
-    }
-    final fromBody = body.trim();
-    if (fromBody.isEmpty || fromBody == _multipleBody) {
-      return '';
-    }
-    return fromBody;
-  }
+  /// Caption shown under a multi-attachment bubble ([IsmChatMetaData.caption] only).
+  String get multipleAttachmentCaption =>
+      metaData?.caption?.trim() ?? '';
 
   /// Homogeneous layout for multipleAttachments messages.
   ///

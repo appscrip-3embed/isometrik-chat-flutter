@@ -4,7 +4,10 @@ part of '../chat_page_controller.dart';
 
 /// Mixin for handling document message sending in the chat page controller.
 ///
-/// This mixin provides functionality for sending document (PDF) messages.
+/// Sends PDF, Word (doc/docx), Excel (xls/xlsx), and plain text (.txt). PDFs
+/// use a pdfx page image. Office and text files upload a JPEG named
+/// `{mediaId}-thumb.jpg`, which is what web puts in `thumbnailUrl` (under
+/// Attachments/Images). A `.doc`/`.txt` URL in that field is rejected.
 /// It depends on:
 /// - `createConversation()` from send_message_core mixin
 /// - `ismPostMediaUrl()` from send_message_media mixin
@@ -12,12 +15,12 @@ mixin IsmChatPageSendMessageDocumentMixin {
   /// Gets the controller instance.
   IsmChatPageController get _controller => this as IsmChatPageController;
 
-  /// Sends a document (PDF) message.
+  /// Sends a document message.
   ///
   /// [conversationId] - ID of the conversation
   /// [userId] - ID of the user
   ///
-  /// Opens a file picker to select PDF files and sends them as messages.
+  /// Opens a file picker for PDF, Word, Excel, and .txt files and sends them.
   /// Note: This method requires `createConversation` and `ismPostMediaUrl`
   /// to be available through other mixins on the controller.
   void sendDocument({
@@ -54,7 +57,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: ['pdf'],
+      allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'],
       withData: true,
     );
 
@@ -248,6 +251,75 @@ mixin IsmChatPageSendMessageDocumentMixin {
     _controller.update();
   }
 
+  /// True for a picked PDF. Word and Excel must not be opened with pdfx.
+  bool _pickedDocumentIsPdf(PlatformFile file) {
+    final extension =
+        (file.extension ?? '').toLowerCase().replaceAll('.', '');
+    if (extension.isNotEmpty) return extension == 'pdf';
+    return file.name.toLowerCase().endsWith('.pdf');
+  }
+
+  /// JPEG badge for Word, Excel, and plain text.
+  ///
+  /// Web's Doc payload uses `thumbnailUrl` ending in `{mediaId}-thumb.jpg`,
+  /// not the document URL. Reuse this for both the single-file and
+  /// multi-file upload paths.
+  Uint8List _officeDocumentThumbnailJpeg(PlatformFile file) {
+    final extension =
+        (file.extension ?? file.name.split('.').last).toLowerCase();
+    final isExcel = extension == 'xls' || extension == 'xlsx';
+    final isTxt = extension == 'txt';
+    final canvas = img.Image(width: 640, height: 360);
+    if (isTxt) {
+      img.fill(canvas, color: img.ColorRgb8(244, 246, 248));
+      img.drawString(
+        canvas,
+        'TXT',
+        font: img.arial48,
+        color: img.ColorRgb8(87, 109, 126),
+      );
+    } else {
+      img.fill(
+        canvas,
+        color: isExcel
+            ? img.ColorRgb8(33, 115, 70)
+            : img.ColorRgb8(43, 87, 154),
+      );
+      // x and y omitted so the label is centered.
+      img.drawString(
+        canvas,
+        isExcel ? 'XLS' : 'DOC',
+        font: img.arial48,
+        color: img.ColorRgb8(255, 255, 255),
+      );
+    }
+    return Uint8List.fromList(img.encodeJpg(canvas, quality: 85));
+  }
+
+  /// First-page image for a PDF. Returns null for Word and Excel.
+  Future<({Uint8List bytes, String name})?> _renderPdfPageThumbnail(
+    PlatformFile file,
+    Uint8List bytes,
+  ) async {
+    final document = kIsWeb
+        ? await PdfDocument.openData(bytes)
+        : await PdfDocument.openFile(file.path ?? '');
+    final page = await document.getPage(1);
+    final pdfImage = await page.render(
+      width: page.width,
+      height: page.height,
+      backgroundColor: '#ffffff',
+    );
+    await page.close();
+    await document.close();
+    final thumbnailBytes = pdfImage?.bytes;
+    if (thumbnailBytes == null || thumbnailBytes.isEmpty) return null;
+    return (
+      bytes: thumbnailBytes,
+      name: pdfImage?.format.toString() ?? 'png',
+    );
+  }
+
   /// Presigned upload for one document; returns API attachment map.
   Future<Map<String, dynamic>?> _uploadDocumentAttachmentMap({
     required String conversationId,
@@ -256,31 +328,26 @@ mixin IsmChatPageSendMessageDocumentMixin {
   }) async {
     try {
       final bytes = file.bytes ?? Uint8List(0);
-      final bytesForPdf = Uint8List.fromList(bytes);
-      final document = kIsWeb
-          ? await PdfDocument.openData(bytesForPdf)
-          : await PdfDocument.openFile(file.path ?? '');
-      final page = await document.getPage(1);
-      final pdfImage = await page.render(
-        width: page.width,
-        height: page.height,
-        backgroundColor: '#ffffff',
-      );
-      await page.close();
-      await document.close();
-
-      final thumbnailBytes = pdfImage?.bytes ?? Uint8List(0);
-      final thumbnailNameWithExtension = pdfImage?.format.toString() ?? 'png';
+      final bytesForUpload = Uint8List.fromList(bytes);
+      final isPdf = _pickedDocumentIsPdf(file);
+      // pdfx throws on docx/xlsx. Office files get a JPEG, same role as
+      // web's `{mediaId}-thumb.jpg`.
+      final pdfThumbnail =
+          isPdf ? await _renderPdfPageThumbnail(file, bytesForUpload) : null;
+      final thumbnailBytes = pdfThumbnail?.bytes ??
+          (isPdf ? Uint8List(0) : _officeDocumentThumbnailJpeg(file));
+      final thumbnailNameWithExtension =
+          pdfThumbnail?.name ?? '$mediaId-thumb.jpg';
       final nameWithExtension = file.name;
 
       PresignedUrlModel? presignedUrlModel;
       if (_controller.isBroadcast) {
         presignedUrlModel = await _controller.commonController.getPresignedUrl(
           isLoading: false,
-          mediaExtension: file.extension ?? 'pdf',
+          mediaExtension: file.extension ?? (isPdf ? 'pdf' : ''),
           userIdentifier:
               IsmChatConfig.communicationConfig.userConfig.userEmail ?? '',
-          bytes: bytesForPdf,
+          bytes: bytesForUpload,
         );
       } else {
         presignedUrlModel = await _controller.commonController.postMediaUrl(
@@ -288,7 +355,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
           nameWithExtension: nameWithExtension,
           mediaType: IsmChatMediaType.file.value,
           mediaId: mediaId,
-          bytes: bytesForPdf,
+          bytes: bytesForUpload,
           isLoading: false,
         );
       }
@@ -306,7 +373,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
         presignedUrl: _controller.isBroadcast
             ? presignedUrlModel?.presignedUrl
             : presignedUrlModel?.mediaPresignedUrl,
-        bytes: bytesForPdf,
+        bytes: bytesForUpload,
         isLoading: false,
       );
       if (mediaResponse != 200) {
@@ -314,44 +381,53 @@ mixin IsmChatPageSendMessageDocumentMixin {
       }
 
       var thumbnailUrlPath = '';
-      PresignedUrlModel? thumbPresigned;
-      if (_controller.isBroadcast) {
-        thumbPresigned = await _controller.commonController.getPresignedUrl(
-          isLoading: false,
-          mediaExtension: thumbnailNameWithExtension.split('.').last,
-          userIdentifier:
-              IsmChatConfig.communicationConfig.userConfig.userEmail ?? '',
-          bytes: thumbnailBytes,
-        );
-        thumbnailUrlPath = thumbPresigned?.mediaUrl ?? '';
-      } else {
-        thumbPresigned = await _controller.commonController.postMediaUrl(
-          conversationId: conversationId,
-          nameWithExtension: thumbnailNameWithExtension,
-          mediaType: IsmChatMediaType.image.value,
-          mediaId: mediaId,
-          bytes: thumbnailBytes,
-          isLoading: false,
-          isUpdateThumbnail: true,
-        );
-        thumbnailUrlPath = thumbPresigned?.thumbnailUrl ?? '';
+      if (thumbnailBytes.isNotEmpty) {
+        PresignedUrlModel? thumbPresigned;
+        if (_controller.isBroadcast) {
+          thumbPresigned = await _controller.commonController.getPresignedUrl(
+            isLoading: false,
+            mediaExtension: thumbnailNameWithExtension.split('.').last,
+            userIdentifier:
+                IsmChatConfig.communicationConfig.userConfig.userEmail ?? '',
+            bytes: thumbnailBytes,
+          );
+          thumbnailUrlPath = thumbPresigned?.mediaUrl ?? '';
+        } else {
+          thumbPresigned = await _controller.commonController.postMediaUrl(
+            conversationId: conversationId,
+            nameWithExtension: thumbnailNameWithExtension,
+            mediaType: IsmChatMediaType.image.value,
+            mediaId: mediaId,
+            bytes: thumbnailBytes,
+            isLoading: false,
+            isUpdateThumbnail: true,
+          );
+          thumbnailUrlPath = thumbPresigned?.thumbnailUrl ?? '';
+        }
+
+        if (thumbnailUrlPath.isNotEmpty) {
+          await _controller.commonController.updatePresignedUrl(
+            presignedUrl: _controller.isBroadcast
+                ? thumbPresigned?.presignedUrl
+                : thumbPresigned?.thumbnailPresignedUrl,
+            bytes: thumbnailBytes,
+            isLoading: false,
+          );
+        }
       }
 
-      if (thumbnailUrlPath.isNotEmpty) {
-        await _controller.commonController.updatePresignedUrl(
-          presignedUrl: _controller.isBroadcast
-              ? thumbPresigned?.presignedUrl
-              : thumbPresigned?.thumbnailPresignedUrl,
-          bytes: thumbnailBytes,
-          isLoading: false,
-        );
+      // Web always sends an Images/*.jpg thumbnail. Do not fall back to the
+      // .doc/.xls URL; that attachment is rejected.
+      if (!isPdf && thumbnailUrlPath.isEmpty) {
+        return null;
       }
 
       return {
         'mediaId': resolvedMediaId,
         'mediaUrl': mediaUrlPath,
-        'thumbnailUrl':
-            thumbnailUrlPath.isNotEmpty ? thumbnailUrlPath : mediaUrlPath,
+        'thumbnailUrl': thumbnailUrlPath.isNotEmpty
+            ? thumbnailUrlPath
+            : mediaUrlPath,
         'mediaType': IsmChatMediaType.file.value,
         'nameWithExtension': nameWithExtension,
         'name': nameWithExtension,
@@ -359,7 +435,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
           file.extension,
           mediaType: IsmChatMediaType.file,
         ),
-        'extension': file.extension ?? 'pdf',
+        'extension': file.extension ?? (isPdf ? 'pdf' : ''),
         'size': bytes.length,
         // 3 = doc. 0 is image and must not be sent for a document.
         'attachmentType': IsmChatMediaType.file.value,
@@ -370,7 +446,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
     }
   }
 
-  /// Builds and uploads one picked PDF as a chat message.
+  /// Builds and uploads one picked document as a chat message.
   Future<void> _sendPickedDocumentFile({
     required String conversationId,
     required PlatformFile file,
@@ -390,21 +466,17 @@ mixin IsmChatPageSendMessageDocumentMixin {
 
     final sentAt = DateTime.now().millisecondsSinceEpoch;
     final mediaId = sentAt.toString();
-    final bytesForPdf = Uint8List.fromList(bytes ?? []);
-    final document = kIsWeb
-        ? await PdfDocument.openData(bytesForPdf)
-        : await PdfDocument.openFile(file.path ?? '');
-    final page = await document.getPage(1);
-    final pdfImage = await page.render(
-      width: page.width,
-      height: page.height,
-      backgroundColor: '#ffffff',
-    );
-    await page.close();
-    await document.close();
-
-    final thumbnailBytes = pdfImage?.bytes;
-    final thumbnailNameWithExtension = pdfImage?.format.toString();
+    final isPdf = _pickedDocumentIsPdf(file);
+    final pdfThumbnail = isPdf
+        ? await _renderPdfPageThumbnail(
+            file,
+            Uint8List.fromList(bytes ?? []),
+          )
+        : null;
+    final thumbnailBytes =
+        pdfThumbnail?.bytes ?? (isPdf ? null : _officeDocumentThumbnailJpeg(file));
+    final thumbnailNameWithExtension =
+        pdfThumbnail?.name ?? '$mediaId-thumb.jpg';
     final thumbnailMediaId = mediaId;
     final nameWithExtension = file.name;
 
@@ -418,10 +490,13 @@ mixin IsmChatPageSendMessageDocumentMixin {
       attachments: [
         AttachmentModel(
           attachmentType: IsmChatMediaType.file,
-          thumbnailUrl: pdfImage?.bytes.toString(),
+          thumbnailUrl: thumbnailBytes?.toString(),
           size: bytes?.length,
           name: nameWithExtension,
-          mimeType: file.extension,
+          mimeType: mimeTypeForAttachmentExtension(
+            file.extension,
+            mediaType: IsmChatMediaType.file,
+          ),
           mediaUrl: kIsWeb ? (bytes).toString() : file.path,
           mediaId: mediaId,
           extension: file.extension,
@@ -492,6 +567,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
       thumbnailMediaId: thumbnailMediaId,
       thumbnailBytes: thumbnailBytes,
       thumbanilMediaType: IsmChatMediaType.image.value,
+      skipThumbnail: thumbnailBytes == null || thumbnailBytes.isEmpty,
     );
   }
 }

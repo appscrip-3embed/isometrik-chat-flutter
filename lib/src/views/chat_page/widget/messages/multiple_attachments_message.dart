@@ -218,7 +218,7 @@ class _DocumentAttachmentRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SvgPicture.asset(
-                IsmChatAssets.pdfSvg,
+                IsmChatDocumentIcon.assetFor(attachment),
                 height: IsmChatDimens.thirtyTwo,
                 width: IsmChatDimens.thirtyTwo,
               ),
