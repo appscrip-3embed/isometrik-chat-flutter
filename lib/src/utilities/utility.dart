@@ -122,6 +122,9 @@ class IsmChatUtility {
 
   static Future<void> showErrorDialog(String message,
       {void Function()? onCancel}) async {
+    if (IsmChatContextWidget.tryDialogContext() == null) {
+      return;
+    }
     await IsmChatContextWidget.showDialogContext(
       content: IsmChatAlertDialogBox(
         title: message,

@@ -182,11 +182,21 @@ class IsmChatCommonViewModel {
             pendingMessage
               ..messageId = ''
               ..isInvalidMessage = true;
-            // Media-storage quota backstop: if the server blocked this send for
-            // being over quota (errorCode 6), prompt the user and refresh usage.
-            unawaited(
-              IsmChatStorageQuotaGuard.handleResponseIfQuota(response.respone),
+            // Quota (`errorCode` 6) dialog — unchanged. Profanity (`errorCode` 3):
+            // message is already marked failed; only surface the API error text.
+            final quotaHandled =
+                await IsmChatStorageQuotaGuard.handleResponseIfQuota(
+              response.respone,
             );
+            if (!quotaHandled && response.respone.isProfanityBlocked) {
+              unawaited(
+                IsmChatUtility.showErrorDialog(
+                  response.respone.apiErrorMessage(
+                    fallback: 'Message not sent',
+                  ),
+                ),
+              );
+            }
           }
           chatPendingMessages?.messages
               ?.removeWhere((key, value) => key == '$createdAt');

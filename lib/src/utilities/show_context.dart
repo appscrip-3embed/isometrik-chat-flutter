@@ -6,10 +6,28 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 class IsmChatContextWidget {
   IsmChatContextWidget._();
 
+  /// Navigator / config context when present; `null` in headless tests.
+  static BuildContext? tryDialogContext([BuildContext? context]) {
+    if (context != null) {
+      return context;
+    }
+    final fromKey = IsmChatConfig.kNavigatorKey.currentContext;
+    if (fromKey != null) {
+      return fromKey;
+    }
+    try {
+      return IsmChatConfig.context;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static BuildContext _dialogContext(BuildContext? context) =>
-      context ??
-      IsmChatConfig.kNavigatorKey.currentContext ??
-      IsmChatConfig.context;
+      tryDialogContext(context) ??
+      (throw FlutterError(
+        'IsmChat cannot show a dialog: no Navigator context. '
+        'Call after the chat UI is mounted or pass an explicit context.',
+      ));
 
   /// Themed alert used by [IsmChatShowDialogMixin] and confirmation flows.
   static Future<void> showThemedAlertDialog({
