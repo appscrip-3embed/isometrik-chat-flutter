@@ -36,6 +36,35 @@ void main() {
       expect(err.errorCode, 1000);
     });
 
+    test('applicationErrorCode and profanity flag', () {
+      const profanity = IsmChatResponseModel(
+        data: '{"error":"Dropping message due to- Profanity words ","errorCode":3}',
+        hasError: true,
+        errorCode: 403,
+      );
+      expect(profanity.applicationErrorCode, 3);
+      expect(profanity.isProfanityBlocked, isTrue);
+      expect(
+        profanity.apiErrorMessage(),
+        'Dropping message due to- Profanity words',
+      );
+      const quota = IsmChatResponseModel(
+        data: '{"errorCode":6,"error":"Storage quota exceeded."}',
+        hasError: true,
+        errorCode: 403,
+      );
+      expect(quota.applicationErrorCode, 6);
+      expect(quota.isProfanityBlocked, isFalse);
+      expect(
+        const IsmChatResponseModel(
+          data: '{"messageId":"m1"}',
+          hasError: false,
+          errorCode: 200,
+        ).applicationErrorCode,
+        isNull,
+      );
+    });
+
     test('apiErrorMessage reads nested and raw bodies', () {
       expect(
         const IsmChatResponseModel(

@@ -102,9 +102,7 @@ class IsmChatStorageQuotaGuard {
     bool showPrompt = true,
   }) async {
     final usage = await ensureUsage();
-    if (usage != null &&
-        usage.quotaEnabled &&
-        usage.maxFileSizeBytes != null) {
+    if (usage != null && usage.quotaEnabled && usage.maxFileSizeBytes != null) {
       return ensureCanUploadFileSize(
         fileBytes: fileBytes,
         showPrompt: showPrompt,
@@ -161,17 +159,7 @@ class IsmChatStorageQuotaGuard {
   /// Whether [response] is a storage-quota rejection (app `errorCode` 6).
   static bool isQuotaError(IsmChatResponseModel response) {
     if (!response.hasError) return false;
-    final body = response.data.trim();
-    if (body.isEmpty) return false;
-    try {
-      final decoded = jsonDecode(body);
-      if (decoded is Map && decoded['errorCode'] == quotaExceededCode) {
-        return true;
-      }
-    } catch (_) {
-      // Non-JSON body — fall through.
-    }
-    return false;
+    return response.applicationErrorCode == quotaExceededCode;
   }
 
   /// If [response] is a quota rejection, refreshes usage, shows the prompt and

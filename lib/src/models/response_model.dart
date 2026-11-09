@@ -32,9 +32,44 @@ class IsmChatResponseModel {
     required this.errorCode,
   });
 
+  /// App-level send rejection: profanity filter (distinct from HTTP status).
+  ///
+  /// Body example: `{ "errorCode": 3, "error": "Dropping message due to…" }`.
+  /// See also [IsmChatStorageQuotaGuard.quotaExceededCode] (`6`).
+  static const int profanityBlockedCode = 3;
+
   final String data;
   final bool hasError;
   final int errorCode;
+
+  /// Isometrik app `errorCode` inside the JSON [data] body (not [errorCode]).
+  ///
+  /// Reuse for send-time policies (profanity `3`, storage quota `6`, etc.).
+  int? get applicationErrorCode {
+    final body = data.trim();
+    if (body.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map) {
+        return _coerceApplicationErrorCode(decoded['errorCode']);
+      }
+    } catch (_) {
+      // Non-JSON body.
+    }
+    return null;
+  }
+
+  /// Whether the server blocked the send for profanity ([profanityBlockedCode]).
+  bool get isProfanityBlocked =>
+      applicationErrorCode == profanityBlockedCode;
+
+  static int? _coerceApplicationErrorCode(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
 
   /// Prefer the server error text over a static fallback.
   ///
