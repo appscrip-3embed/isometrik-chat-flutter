@@ -11,6 +11,28 @@ class ChatList extends StatelessWidget {
 
   static const String route = AppRoutes.chatList;
 
+  /// Demo sheet for SDK-level switches.
+  ///
+  /// [IsmChatThreadsToggleTile] calls `IsmChat.i.setThreadsEnabled`, which
+  /// turns the Slack-style thread UI on/off at runtime: replies move into a
+  /// thread panel, roots get an "N replies" footer, and the channel is fetched
+  /// with `feedType=main`. Off (the default) = the classic inline-reply chat.
+  ///
+  /// Hosts can also pass `threadsEnabled: true` to `IsmChat.i.initialize`.
+  static void _showChatSettings(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            IsmChatThreadsToggleTile(),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => GetBuilder<ChatListController>(
         initState: (state) {
@@ -198,6 +220,15 @@ class ChatList extends StatelessWidget {
                   },
                   onSearchTap: (p0, p1, p2) {},
                   showSearch: false,
+                  // Slack-style threads demo: flip the SDK's threads switch at
+                  // runtime (IsmChat.i.setThreadsEnabled) — see docs/THREADS.md.
+                  actions: [
+                    IconButton(
+                      tooltip: 'Chat settings',
+                      icon: const Icon(Icons.tune_rounded),
+                      onPressed: () => _showChatSettings(context),
+                    ),
+                  ],
                   width: IsmChatResponsive.isWeb(context)
                       ? IsmChatDimens.percentWidth(.3)
                       : null,

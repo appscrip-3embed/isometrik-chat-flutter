@@ -20,6 +20,7 @@ class IsmChatThemeData with Diagnosticable {
     this.cardTheme,
     this.profileTheme,
     this.storageTheme,
+    this.threadTheme,
   })  : primaryColor = primaryColor ?? IsmChatThemeData.light().primaryColor,
         backgroundColor =
             backgroundColor ?? IsmChatThemeData.light().backgroundColor,
@@ -113,6 +114,12 @@ class IsmChatThemeData with Diagnosticable {
   /// Manage Storage screen ([IsmChatStorageView]).
   /// Null → SDK light/dark default via [IsmChatThemeResolver.storageFromConfig].
   final IsmChatStorageTheme? storageTheme;
+
+  /// Slack-style thread surfaces: the "N replies" footer and the thread panel.
+  ///
+  /// Null → SDK light/dark default via [IsmChatThemeResolver.threadFromConfig].
+  /// Only used while [IsmChatConfig.threadsEnabled] is `true`.
+  final IsmChatThreadTheme? threadTheme;
 
   // ignore: strict_top_level_inference
   lerp(IsmChatThemeData? theme, double t) {}

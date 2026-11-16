@@ -195,4 +195,20 @@ const Map<String, String> kIsmChatLocaleFr = {
   'focusMenuSelectMessage': 'Sélectionner le message',
   'focusMenuReply': 'Répondre',
   'focusMenuForward': 'Transférer',
+
+  // ---- Slack-style threads (IsmChatConfig.threadsEnabled) ----
+  'threadTitle': 'Fil',
+  'threadsLabel': 'Fils de discussion',
+  'threadsToggleSubtitle': 'Afficher les réponses dans un panneau de fil',
+  'replyInThread': 'Répondre dans le fil',
+  'threadReplySingular': 'réponse',
+  'threadReplyPlural': 'réponses',
+  'threadNoReplies': 'Aucune réponse pour le moment. Lancez le fil.',
+  'threadAlsoSendToChannel': 'Envoyer aussi dans la conversation',
+  'threadReplyHint': 'Répondre…',
+  'threadRootDeleteBlocked': 'Ce message ne peut pas être supprimé car son fil contient des réponses.',
+  'threadLoadFailed': 'Impossible de charger ce fil. Tirez pour réessayer.',
+  'threadSendFailed': 'Réponse non envoyée. Réessayez.',
+  'threadRetry': 'Réessayer',
+  'threadReplyQueued': 'Réponse en file — elle sera envoyée dès le retour de la connexion.',
 };

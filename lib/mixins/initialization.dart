@@ -69,6 +69,11 @@ mixin IsmChatInitializationMixin {
   ///   local UI/DB on send, but still POST the original body to the API.
   ///   Defaults to `false` (no masking).
   /// - `notificationBody`: Callback for custom notification body (optional).
+  /// - `threadsEnabled`: Turns on the Slack-style thread interface (thread
+  ///   panel, "N replies" footer, `feedType=main` timeline). Defaults to
+  ///   `false`, which keeps today's inline-reply chat exactly as it is. Needs
+  ///   backend `chat-messages` v1.1.0+. Can be flipped later with
+  ///   [IsmChat.setThreadsEnabled]. See `docs/THREADS.md`.
   ///
   /// **Throws:**
   /// - `AssertionError`: If paid wallet callbacks are provided without required config.
@@ -109,6 +114,7 @@ mixin IsmChatInitializationMixin {
     bool messageEncrypted = false,
     bool maskSensitiveContent = false,
     NotificationBodyCallback? notificationBody,
+    bool threadsEnabled = false,
   }) async {
     if (sendPaidWalletMessage != null) {
       assert(
@@ -148,6 +154,7 @@ mixin IsmChatInitializationMixin {
       messageEncrypted: messageEncrypted,
       maskSensitiveContent: maskSensitiveContent,
       notificationBody: notificationBody,
+      threadsEnabled: threadsEnabled,
     );
     // Set static field - IsmChat is defined in the same library (part of)
     IsmChat._initialized = true;

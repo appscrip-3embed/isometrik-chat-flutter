@@ -227,6 +227,15 @@ class _MessageCardState extends State<MessageCard>
                           ),
                       ],
                     ),
+                    // Slack-style threads: "N replies" under the root bubble.
+                    // [IsmChatThreadCoordinator.shouldShowFooter] is false
+                    // whenever threading is off, so nothing changes for
+                    // existing integrations.
+                    if (!widget.showMessageInCenter &&
+                        IsmChatThreadCoordinator.shouldShowFooter(
+                          widget.message,
+                        ))
+                      IsmChatThreadFooter(message: widget.message),
                     if (!widget.showMessageInCenter &&
                         (IsmChatProperties.chatPageProperties.messageStatus
                                 ?.shouldShowTimeStatusOuter ??

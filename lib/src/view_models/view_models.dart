@@ -2,5 +2,6 @@ export 'chat_broadcast_view_model.dart';
 export 'chat_conversations_view_model.dart';
 export 'chat_page_view_model.dart';
 export 'chat_storage_quota_view_model.dart';
+export 'chat_thread_view_model.dart';
 export 'common_model.dart';
 export 'mqtt_view_model.dart';

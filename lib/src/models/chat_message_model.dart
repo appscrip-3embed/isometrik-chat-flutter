@@ -99,6 +99,9 @@ class IsmChatMessageModel {
     this.conversationImageUrl,
     this.conversationId,
     this.parentMessageId,
+    this.threadRootId,
+    this.replyCount,
+    this.lastThreadReplyAt,
     this.messageId,
     this.deviceId,
     this.adminCount,
@@ -420,6 +423,12 @@ class IsmChatMessageModel {
       messageId: map['messageId'] as String? ?? '',
       deviceId: map['deviceId'] as String? ?? '',
       parentMessageId: map['parentMessageId'] as String? ?? '',
+      // Slack-style threading (`chat-messages` v1.1.0+). Absent on legacy
+      // messages and on every message when threads are off — kept null so
+      // `toMap()` (removeNullValues) stays identical to today's payload.
+      threadRootId: map['threadRootId'] as String?,
+      replyCount: (map['replyCount'] as num?)?.toInt(),
+      lastThreadReplyAt: (map['lastThreadReplyAt'] as num?)?.toInt(),
       adminCount: map['adminCount'] as int? ?? 0,
       messageType:
           IsmChatMessageType.fromValue(map['messageType'] as int? ?? 0),
@@ -698,6 +707,9 @@ class IsmChatMessageModel {
         'conversationImageUrl': conversationImageUrl,
         'conversationId': conversationId,
         'parentMessageId': parentMessageId,
+        'threadRootId': threadRootId,
+        'replyCount': replyCount,
+        'lastThreadReplyAt': lastThreadReplyAt,
         'messageId': messageId,
         'deviceId': deviceId,
         'adminCount': adminCount,
@@ -754,6 +766,21 @@ class IsmChatMessageModel {
   String? conversationImageUrl;
   String? conversationId;
   String? parentMessageId;
+
+  /// Root message of the thread this reply belongs to. **Server-set** on every
+  /// `messageType: 2` message; `null` on roots and on legacy replies.
+  ///
+  /// Use it (not [parentMessageId]) to load a whole thread, because
+  /// [parentMessageId] only points at the immediate parent.
+  String? threadRootId;
+
+  /// Number of replies in the thread this message roots. **Server-maintained**,
+  /// present on root messages only; `null` when unknown / not a root.
+  int? replyCount;
+
+  /// Timestamp (ms) of the newest reply in the thread this message roots.
+  /// **Server-set** on root messages; `null` when the thread is empty.
+  int? lastThreadReplyAt;
   String? initiatorId;
   String? messageId;
   String? deviceId;
@@ -841,6 +868,9 @@ class IsmChatMessageModel {
     String? conversationImageUrl,
     String? conversationId,
     String? parentMessageId,
+    String? threadRootId,
+    int? replyCount,
+    int? lastThreadReplyAt,
     String? initiatorId,
     String? messageId,
     String? initiatorName,
@@ -901,6 +931,9 @@ class IsmChatMessageModel {
         conversationImageUrl: conversationImageUrl ?? this.conversationImageUrl,
         conversationId: conversationId ?? this.conversationId,
         parentMessageId: parentMessageId ?? this.parentMessageId,
+        threadRootId: threadRootId ?? this.threadRootId,
+        replyCount: replyCount ?? this.replyCount,
+        lastThreadReplyAt: lastThreadReplyAt ?? this.lastThreadReplyAt,
         initiatorId: initiatorId ?? this.initiatorId,
         messageId: messageId ?? this.messageId,
         deviceId: deviceId ?? this.deviceId,
@@ -936,7 +969,7 @@ class IsmChatMessageModel {
 
   @override
   String toString() =>
-      'IsmChatMessageModel(body: $body, action: $action, updatedAt: $updatedAt, sentAt: $sentAt, unreadMessagesCount: $unreadMessagesCount, userName: $userName, userId: $userId, searchableTags: $searchableTags, privateOneToOne: $privateOneToOne, showInConversation: $showInConversation, readByAll: $readByAll, senderInfo: $senderInfo, metaData: $metaData, messagingDisabled: $messagingDisabled, membersCount: $membersCount, lastReadAt: $lastReadAt, attachments: $attachments, lastMessageSentAt: $lastMessageSentAt, isGroup: $isGroup, deliveredToAll: $deliveredToAll, customType: $customType, createdByUserName: $createdByUserName, createdByUserImageUrl: $createdByUserImageUrl, createdBy: $createdBy, conversationType: $conversationType, conversationTitle: $conversationTitle, conversationImageUrl: $conversationImageUrl, conversationId: $conversationId, parentMessageId: $parentMessageId, initiatorId : $initiatorId  messageId: $messageId, deviceId: $deviceId, adminCount: $adminCount, messageType: $messageType, sentByMe: $sentByMe, mentionedUsers: $mentionedUsers, initiatorName : $initiatorName, members: $members, memberId: $memberId, memberName: $memberName, reactions : $reactions, readBy : $readBy, deliveredTo : $deliveredTo, isUploading : $isUploading, conversationDetails : $conversationDetails, events : $events, callDurations:$callDurations, meetingId :$meetingId, meetingType :$meetingType ,audioOnly:$audioOnly, isInvalidMessage: $isInvalidMessage, encrypted: $encrypted)';
+      'IsmChatMessageModel(body: $body, action: $action, updatedAt: $updatedAt, sentAt: $sentAt, unreadMessagesCount: $unreadMessagesCount, userName: $userName, userId: $userId, searchableTags: $searchableTags, privateOneToOne: $privateOneToOne, showInConversation: $showInConversation, readByAll: $readByAll, senderInfo: $senderInfo, metaData: $metaData, messagingDisabled: $messagingDisabled, membersCount: $membersCount, lastReadAt: $lastReadAt, attachments: $attachments, lastMessageSentAt: $lastMessageSentAt, isGroup: $isGroup, deliveredToAll: $deliveredToAll, customType: $customType, createdByUserName: $createdByUserName, createdByUserImageUrl: $createdByUserImageUrl, createdBy: $createdBy, conversationType: $conversationType, conversationTitle: $conversationTitle, conversationImageUrl: $conversationImageUrl, conversationId: $conversationId, parentMessageId: $parentMessageId, threadRootId: $threadRootId, replyCount: $replyCount, lastThreadReplyAt: $lastThreadReplyAt, initiatorId : $initiatorId  messageId: $messageId, deviceId: $deviceId, adminCount: $adminCount, messageType: $messageType, sentByMe: $sentByMe, mentionedUsers: $mentionedUsers, initiatorName : $initiatorName, members: $members, memberId: $memberId, memberName: $memberName, reactions : $reactions, readBy : $readBy, deliveredTo : $deliveredTo, isUploading : $isUploading, conversationDetails : $conversationDetails, events : $events, callDurations:$callDurations, meetingId :$meetingId, meetingType :$meetingType ,audioOnly:$audioOnly, isInvalidMessage: $isInvalidMessage, encrypted: $encrypted)';
 
   @override
   bool operator ==(Object other) {
@@ -973,6 +1006,9 @@ class IsmChatMessageModel {
         other.conversationImageUrl == conversationImageUrl &&
         other.conversationId == conversationId &&
         other.parentMessageId == parentMessageId &&
+        other.threadRootId == threadRootId &&
+        other.replyCount == replyCount &&
+        other.lastThreadReplyAt == lastThreadReplyAt &&
         other.initiatorId == initiatorId &&
         other.messageId == messageId &&
         other.deviceId == deviceId &&
@@ -1028,6 +1064,9 @@ class IsmChatMessageModel {
       conversationImageUrl.hashCode ^
       conversationId.hashCode ^
       parentMessageId.hashCode ^
+      threadRootId.hashCode ^
+      replyCount.hashCode ^
+      lastThreadReplyAt.hashCode ^
       initiatorId.hashCode ^
       messageId.hashCode ^
       deviceId.hashCode ^

@@ -16,6 +16,7 @@ part of '../isometrik_chat_flutter.dart';
 /// - [IsmChatDelegateComposerMixin]: Host-app custom composer actions
 /// - [IsmChatDelegateChatListMixin]: Host-app custom chat-list screen actions
 /// - [IsmChatDelegateStorageMixin]: Per-user media storage quota surface
+/// - [IsmChatDelegateThreadsMixin]: Slack-style message threads
 class IsmChatDelegate
     with
         IsmChatDelegateInitializationMixin,
@@ -30,7 +31,8 @@ class IsmChatDelegate
         IsmChatDelegatePaidMediaMixin,
         IsmChatDelegateComposerMixin,
         IsmChatDelegateChatListMixin,
-        IsmChatDelegateStorageMixin {
+        IsmChatDelegateStorageMixin,
+        IsmChatDelegateThreadsMixin {
   IsmChatDelegate();
 
   // Configuration & State Management

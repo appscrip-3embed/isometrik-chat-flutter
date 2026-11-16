@@ -408,6 +408,32 @@ Real-time messaging using MQTT protocol for instant message delivery.
 - File picker uses browser API
 - Camera/microphone require browser permissions
 
+### 22. Slack-Style Threads ✅ (opt-in)
+
+**Status:** ✅ Fully Supported — **off by default**  
+**Platforms:** Android, iOS, Web  
+**Requires:** backend `chat-messages` v1.1.0+
+
+**Features:**
+- ✅ Thread panel per root message (root card, replies, composer)
+- ✅ "N replies" footer on root messages in the channel
+- ✅ Nested replies (reply to a reply, same thread)
+- ✅ "Also send to channel" (reply visible in thread **and** channel)
+- ✅ Attachments in threads (photos, videos, camera, voice notes, documents,
+  location, contacts) through the channel's own pipelines
+- ✅ Offline queue: thread replies are retried on reconnect as thread replies
+- ✅ Realtime routing of thread replies (badge-only in the channel)
+- ✅ Runtime switch: `IsmChat.i.setThreadsEnabled` / `IsmChatThreadsToggleTile`
+- ✅ Headless APIs for custom thread UIs
+- ✅ Themeable (`IsmChatThreadTheme`) and overridable (`IsmChatThreadProperties`)
+
+**Limitations:**
+- Message search stays on the main timeline while threads are on
+- Reactions / copy / delete are not wired to the panel's rows yet
+- Deleting a root with replies is refused by the server (`errorCode: 4`)
+
+**Docs:** [THREADS.md](./THREADS.md)
+
 ---
 
 ## Partially Supported Features
@@ -472,6 +498,8 @@ enum IsmChatFeature {
   selectMessage,      // ✅ Supported
   emojiIcon,          // ✅ Supported
   audioMessage,       // ✅ Supported
+  giphyPicker,        // ✅ Supported
+  threadReply,        // ✅ Supported (needs IsmChatConfig.threadsEnabled)
   // mediaDownload,   // 📝 Planned (commented out)
 }
 ```
@@ -485,6 +513,8 @@ enum IsmChatFeature {
 3. **Web Permissions**: Some features require explicit browser permissions
 4. **Offline Storage**: Web uses IndexedDB (browser-dependent)
 5. **Media Download**: Currently not available (planned feature)
+6. **Threads**: In-panel reactions / copy / delete and thread-scoped search are
+   not wired yet — see [THREADS.md](./THREADS.md)
 
 ---
 

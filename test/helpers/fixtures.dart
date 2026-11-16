@@ -113,6 +113,10 @@ IsmChatMessageModel message({
   bool isGroup = false,
   List<UserDetails>? mentionedUsers,
   List<MessageReactionModel>? reactions,
+  String? threadRootId,
+  int? replyCount,
+  int? lastThreadReplyAt,
+  bool? showInConversation,
 }) =>
     IsmChatMessageModel(
       body: body,
@@ -125,6 +129,10 @@ IsmChatMessageModel message({
       metaData: metaData ?? IsmChatMetaData(),
       messageType: messageType,
       parentMessageId: parentMessageId,
+      threadRootId: threadRootId,
+      replyCount: replyCount,
+      lastThreadReplyAt: lastThreadReplyAt,
+      showInConversation: showInConversation,
       isGroup: isGroup,
       senderInfo: sentByMe ? me() : user(),
       mentionedUsers: mentionedUsers,
@@ -133,6 +141,81 @@ IsmChatMessageModel message({
       readBy: const [],
       lastReadAt: const [],
     );
+
+/// A Slack-style thread **root**: a normal channel message that already has
+/// [replyCount] replies.
+IsmChatMessageModel threadRoot({
+  String messageId = 'root-1',
+  int replyCount = 2,
+  int sentAt = 1000,
+  int? lastThreadReplyAt,
+  String conversationId = kDirectConversationId,
+  bool sentByMe = true,
+}) =>
+    message(
+      body: 'root message',
+      messageId: messageId,
+      sentAt: sentAt,
+      sentByMe: sentByMe,
+      conversationId: conversationId,
+      replyCount: replyCount,
+      lastThreadReplyAt: lastThreadReplyAt ?? sentAt + 100,
+      showInConversation: true,
+    );
+
+/// A thread **reply** (`messageType: 2`, server-set `threadRootId`).
+///
+/// [alsoSentToChannel] mirrors Slack's "Also send to channel"
+/// (`showInConversation: true`).
+IsmChatMessageModel threadReply({
+  String messageId = 'reply-1',
+  String threadRootId = 'root-1',
+  String? parentMessageId,
+  int sentAt = 2000,
+  String body = 'a reply',
+  bool sentByMe = false,
+  bool alsoSentToChannel = false,
+  String conversationId = kDirectConversationId,
+}) =>
+    message(
+      body: body,
+      messageId: messageId,
+      sentAt: sentAt,
+      sentByMe: sentByMe,
+      conversationId: conversationId,
+      messageType: IsmChatMessageType.reply,
+      parentMessageId: parentMessageId ?? threadRootId,
+      threadRootId: threadRootId,
+      showInConversation: alsoSentToChannel,
+    );
+
+/// Raw API JSON for a thread reply, as `GET /chat/messages?feedType=thread`
+/// returns it.
+Map<String, dynamic> threadReplyJson({
+  String messageId = 'reply-1',
+  String threadRootId = 'root-1',
+  String? parentMessageId,
+  int sentAt = 2000,
+  String body = 'a reply',
+  String senderId = kOpponentId,
+  bool alsoSentToChannel = false,
+  String conversationId = kDirectConversationId,
+  String? action,
+}) =>
+    {
+      ...messageJson(
+        messageId: messageId,
+        body: body,
+        sentAt: sentAt,
+        conversationId: conversationId,
+        senderId: senderId,
+        action: action,
+      ),
+      'messageType': IsmChatMessageType.reply.value,
+      'parentMessageId': parentMessageId ?? threadRootId,
+      'threadRootId': threadRootId,
+      'showInConversation': alsoSentToChannel,
+    };
 
 /// [Reaction] payload for repository / view-model tests and mocktail `any()`.
 Reaction reaction({

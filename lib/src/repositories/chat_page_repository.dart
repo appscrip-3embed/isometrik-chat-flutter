@@ -81,6 +81,15 @@ class IsmChatPageRepository {
   ///
   /// **Note:** If `searchText` is provided, the API uses a different endpoint
   /// that supports text search. Otherwise, it uses pagination based on timestamp.
+  ///
+  /// **Threading (optional):**
+  /// - `feedType`: sent as `feedType=main|thread|all`. `null` (the default)
+  ///   sends nothing, which is the request this SDK has always made. The chat
+  ///   page passes [IsmChatThreadCoordinator.timelineFeedType], so the param
+  ///   only appears once [IsmChatConfig.threadsEnabled] is on.
+  /// - `threadRootId`: with `feedType=thread`, returns the whole thread
+  ///   (including replies-to-replies). Prefer [IsmChatThreadRepository] for
+  ///   thread panels; this hook exists for host apps and search reuse.
   Future<List<IsmChatMessageModel>?> getChatMessages({
     required String conversationId,
     int? lastMessageTimestamp,
@@ -88,18 +97,26 @@ class IsmChatPageRepository {
     int skip = 0,
     String? searchText,
     bool isLoading = false,
+    IsmChatFeedType? feedType,
+    String? threadRootId,
   }) async {
     try {
       String? url;
+      // Empty while threads are off → URLs stay identical to pre-threading.
+      final threadQuery = [
+        if (feedType != null) '&feedType=${feedType.queryValue}',
+        if ((threadRootId ?? '').trim().isNotEmpty)
+          '&threadRootId=${threadRootId!.trim()}',
+      ].join();
       if (searchText != null && searchText.isNotEmpty) {
         url =
-            '${IsmChatAPI.chatMessages}?conversationId=$conversationId&searchTag=$searchText&sort=-1&limit=$limit&skip=$skip';
+            '${IsmChatAPI.chatMessages}?conversationId=$conversationId&searchTag=$searchText&sort=-1&limit=$limit&skip=$skip$threadQuery';
       } else {
         final timestampQuery = lastMessageTimestamp != null && lastMessageTimestamp > 0
             ? '&lastMessageTimestamp=$lastMessageTimestamp'
             : '';
         url =
-            '${IsmChatAPI.chatMessages}?conversationId=$conversationId&limit=$limit&skip=$skip$timestampQuery';
+            '${IsmChatAPI.chatMessages}?conversationId=$conversationId&limit=$limit&skip=$skip$timestampQuery$threadQuery';
       }
       var response = await _apiWrapper.get(url,
           headers: IsmChatUtility.tokenCommonHeader(), showLoader: isLoading);

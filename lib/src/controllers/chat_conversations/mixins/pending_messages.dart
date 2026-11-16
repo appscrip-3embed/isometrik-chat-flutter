@@ -116,7 +116,10 @@ mixin IsmChatConversationsPendingMessagesMixin on GetxController {
         }
       }
       final isMessageSent = await _controller.commonController.sendMessage(
-        showInConversation: true,
+        // Slack-style threads: a queued thread reply must be retried as a
+        // thread reply. Stored rows default to `true`, so channel messages
+        // keep the exact behaviour they had before threading existed.
+        showInConversation: x.showInConversation ?? true,
         encrypted: x.customType == IsmChatCustomMessageType.text
             ? (IsmChatConfig.messageEncrypted ?? false)
             : false,

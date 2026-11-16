@@ -206,21 +206,36 @@ class IsmChatCommonViewModel {
             await dbBox?.pendingMessageBox
                 .delete(chatPendingMessages?.conversationId ?? '');
           }
+          // Slack-style threads: a reply that lives only in a thread is stored
+          // like any message (so it survives a restart and the panel can show
+          // it), but it must not become the conversation's preview — the
+          // channel timeline filters it out either way.
+          final isThreadOnlyReply =
+              IsmChatThreadCoordinator.isThreadOnlyReply(pendingMessage);
           var conversationModel = await dbBox?.getConversation(conversationId);
           if (conversationModel != null) {
             final messages = (conversationModel.messages ?? {})
               ..addEntries({'$createdAt': pendingMessage}.entries);
             conversationModel = conversationModel.copyWith(
-              lastMessageDetails:
-                  conversationModel.lastMessageDetails?.copyWith(
-                reactionType: '',
-                messageId: pendingMessage.messageId,
-                action: '',
-              ),
+              lastMessageDetails: isThreadOnlyReply
+                  ? conversationModel.lastMessageDetails
+                  : conversationModel.lastMessageDetails?.copyWith(
+                      reactionType: '',
+                      messageId: pendingMessage.messageId,
+                      action: '',
+                    ),
               messages: messages,
             );
           }
           await dbBox?.saveConversation(conversation: conversationModel!);
+          // Hand the server id to the open thread panel so its optimistic row
+          // becomes a real message and the root badge moves once.
+          if (isThreadOnlyReply && response.messageId.isNotEmpty) {
+            IsmChatThreadController.instance?.confirmLocalReply(
+              sentAt: createdAt,
+              messageId: response.messageId,
+            );
+          }
           return true;
         }
         // Server rejected message -> mark it failed so UI shows error icon
@@ -230,6 +245,20 @@ class IsmChatCommonViewModel {
             ..messageId = ''
             ..isInvalidMessage = true
             ..isUploading = false;
+          // Same failure UI inside the thread panel.
+          if (IsmChatThreadCoordinator.isThreadOnlyReply(pendingMessage)) {
+            IsmChatThreadController.instance?.mutateLocalReply(
+              createdAt,
+              (row) {
+                row
+                  ..messageId = ''
+                  ..isInvalidMessage = true
+                  ..isUploading = false;
+                return true;
+              },
+              onlyUnsent: true,
+            );
+          }
 
           chatPendingMessages?.messages
               ?.removeWhere((key, value) => key == '$createdAt');

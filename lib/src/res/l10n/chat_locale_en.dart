@@ -207,4 +207,20 @@ const Map<String, String> kIsmChatLocaleEn = {
   'focusMenuSelectMessage': 'Select Message',
   'focusMenuReply': 'Reply',
   'focusMenuForward': 'Forward',
+
+  // ---- Slack-style threads (IsmChatConfig.threadsEnabled) ----
+  'threadTitle': 'Thread',
+  'threadsLabel': 'Threads',
+  'threadsToggleSubtitle': 'Show replies in a thread panel instead of the chat',
+  'replyInThread': 'Reply in thread',
+  'threadReplySingular': 'reply',
+  'threadReplyPlural': 'replies',
+  'threadNoReplies': 'No replies yet. Start the thread.',
+  'threadAlsoSendToChannel': 'Also send to channel',
+  'threadReplyHint': 'Reply…',
+  'threadRootDeleteBlocked': "This message can't be deleted because its thread has replies.",
+  'threadLoadFailed': 'Could not load this thread. Pull to retry.',
+  'threadSendFailed': 'Reply not sent. Try again.',
+  'threadRetry': 'Retry',
+  'threadReplyQueued': "Reply queued — it will send when you're back online.",
 };

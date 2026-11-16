@@ -223,4 +223,46 @@ class IsmChatStrings {
   static String get focusMenuSelectMessage => IsmChatL10n.get('focusMenuSelectMessage');
   static String get focusMenuReply => IsmChatL10n.get('focusMenuReply');
   static String get focusMenuForward => IsmChatL10n.get('focusMenuForward');
+
+  // ------------------------- Slack-style threads -------------------------
+  // Only reachable while [IsmChatConfig.threadsEnabled] is true.
+
+  /// Title of [IsmChatThreadView].
+  static String get threadTitle => IsmChatL10n.get('threadTitle');
+
+  /// Label for the threads on/off switch ([IsmChatThreadsToggleTile]).
+  static String get threadsLabel => IsmChatL10n.get('threadsLabel');
+  static String get threadsToggleSubtitle =>
+      IsmChatL10n.get('threadsToggleSubtitle');
+
+  /// "Reply in thread" focus-menu action.
+  static String get replyInThread => IsmChatL10n.get('replyInThread');
+
+  /// Singular / plural noun used by [threadReplyCountLabel].
+  static String get threadReplySingular =>
+      IsmChatL10n.get('threadReplySingular');
+  static String get threadReplyPlural => IsmChatL10n.get('threadReplyPlural');
+
+  /// `3 replies` / `1 reply`, localized. Used by the root-message footer.
+  static String threadReplyCountLabel(int count) =>
+      '$count ${count == 1 ? threadReplySingular : threadReplyPlural}';
+
+  static String get threadNoReplies => IsmChatL10n.get('threadNoReplies');
+  static String get threadAlsoSendToChannel =>
+      IsmChatL10n.get('threadAlsoSendToChannel');
+  static String get threadReplyHint => IsmChatL10n.get('threadReplyHint');
+
+  /// Shown when the server rejects deleting a root that still has replies
+  /// (`errorCode: 4`).
+  static String get threadRootDeleteBlocked =>
+      IsmChatL10n.get('threadRootDeleteBlocked');
+  static String get threadLoadFailed => IsmChatL10n.get('threadLoadFailed');
+  static String get threadSendFailed => IsmChatL10n.get('threadSendFailed');
+
+  /// Retry button in the thread panel's error state.
+  static String get threadRetry => IsmChatL10n.get('threadRetry');
+
+  /// Shown when a thread reply could not reach the server and was queued for
+  /// retry (offline send).
+  static String get threadReplyQueued => IsmChatL10n.get('threadReplyQueued');
 }

@@ -352,7 +352,13 @@ mixin IsmChatPageSendMessageMediaMixin {
       ),
     );
 
-    _controller.messages.add(mediaMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      mediaMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(mediaMessage);
     unawaited(_controller.scrollDown());
 
     if (!_controller.isBroadcast) {
@@ -403,6 +409,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       customType: IsmChatCustomMessageType.multipleAttachments.value,
       metaData: mediaMessage.metaData,
       isBroadcast: _controller.isBroadcast,
+      localEcho: mediaMessage,
     );
     _clearMessageUploadingState(sentAt);
   }
@@ -594,24 +601,17 @@ mixin IsmChatPageSendMessageMediaMixin {
     required int index,
     required AttachmentModel attachment,
   }) {
-    final messageIndex = _controller.messages.indexWhere(
-      (message) => message.sentAt == sentAt,
-    );
-    if (messageIndex == -1) {
-      return;
-    }
-    final current = _controller.messages[messageIndex];
-    final list = List<AttachmentModel>.from(current.attachments ?? const []);
-    if (index < 0 || index >= list.length) {
-      return;
-    }
-    list[index] = attachment;
-    current.attachments = list;
-    _controller.messages[messageIndex] = current;
-    if (_controller.messages is RxList<IsmChatMessageModel>) {
-      (_controller.messages as RxList<IsmChatMessageModel>).refresh();
-    }
-    _controller.update();
+    // Routes to the channel list or the open thread panel, whichever holds
+    // this echo (see [IsmChatPageController.mutateLocalRow]).
+    _controller.mutateLocalRow(sentAt, (current) {
+      final list = List<AttachmentModel>.from(current.attachments ?? const []);
+      if (index < 0 || index >= list.length) {
+        return false;
+      }
+      list[index] = attachment;
+      current.attachments = list;
+      return true;
+    });
   }
 
   /// Sends a video message.
@@ -710,7 +710,13 @@ mixin IsmChatPageSendMessageMediaMixin {
       ),
     );
 
-    _controller.messages.add(videoMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      videoMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(videoMessage);
     if (!deferUpload) {
       unawaited(_controller.scrollDown());
       _controller.isreplying = false;
@@ -745,13 +751,10 @@ mixin IsmChatPageSendMessageMediaMixin {
   }) async {
     final bytes = await _bytesForOutgoingMedia(webMediaModel);
 
-    final index = _controller.messages.indexWhere(
-      (message) => message.sentAt == sentAt,
-    );
-    if (index == -1) {
+    final videoMessage = _controller.localOutgoingRow(sentAt);
+    if (videoMessage == null) {
       return;
     }
-    final videoMessage = _controller.messages[index];
     final thumbnailBytes = webMediaModel.platformFile.thumbnailBytes;
     final thumbnailNameWithExtension = '$sentAt.png';
     final thumbnailMediaId = '$sentAt';
@@ -870,7 +873,13 @@ mixin IsmChatPageSendMessageMediaMixin {
       ),
     );
 
-    _controller.messages.add(imageMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      imageMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(imageMessage);
     if (!deferUpload) {
       unawaited(_controller.scrollDown());
       _controller.isreplying = false;
@@ -901,13 +910,10 @@ mixin IsmChatPageSendMessageMediaMixin {
     required int sentAt,
     required WebMediaModel webMediaModel,
   }) async {
-    final index = _controller.messages.indexWhere(
-      (message) => message.sentAt == sentAt,
-    );
-    if (index == -1) {
+    final imageMessage = _controller.localOutgoingRow(sentAt);
+    if (imageMessage == null) {
       return;
     }
-    final imageMessage = _controller.messages[index];
     final bytes = webMediaModel.platformFile.bytes;
     final nameWithExtension = webMediaModel.platformFile.name;
     final mediaId = sentAt.toString();
@@ -1036,7 +1042,13 @@ mixin IsmChatPageSendMessageMediaMixin {
       ),
     );
 
-    _controller.messages.add(mediaMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      mediaMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(mediaMessage);
     unawaited(_controller.scrollDown());
     _controller.isreplying = false;
     if (!_controller.isBroadcast) {
@@ -1070,6 +1082,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       attachments: [attachment],
       isBroadcast: _controller.isBroadcast,
       parentMessageId: mediaMessage.parentMessageId,
+      localEcho: mediaMessage,
       sendPushNotification: sendPushNotification,
       searchableTags: searchableTags ??
           _gifStickerSearchableTags(mediaType, nameWithExtension),
@@ -1249,6 +1262,7 @@ mixin IsmChatPageSendMessageMediaMixin {
           metaData: ismChatChatMessageModel.metaData,
           isBroadcast: _controller.isBroadcast,
           parentMessageId: ismChatChatMessageModel.parentMessageId,
+          localEcho: ismChatChatMessageModel,
           searchableTags: _gifStickerSearchableTags(
             attachmentType,
             attachmentName,
@@ -1275,52 +1289,34 @@ mixin IsmChatPageSendMessageMediaMixin {
     required String thumbnailUrl,
     bool fallbackThumbnailToMedia = true,
   }) {
-    final index = _controller.messages.indexWhere(
-      (message) =>
-          message.sentAt == createdAt && message.messageId?.isEmpty == true,
-    );
-    if (index == -1) {
-      return;
-    }
-    final current = _controller.messages[index];
-    final attachment = current.attachments?.firstOrNull;
-    if (attachment == null) {
-      return;
-    }
-    current.attachments = [
-      attachment.copyWith(
-        mediaUrl: mediaUrl,
-        thumbnailUrl: thumbnailUrl.isNotEmpty
-            ? thumbnailUrl
-            : (fallbackThumbnailToMedia ? mediaUrl : ''),
-        stillUrl: thumbnailUrl.isNotEmpty ? thumbnailUrl : mediaUrl,
-      ),
-    ];
-    current.isUploading = false;
-    _controller.messages[index] = current;
-    if (_controller.messages is RxList<IsmChatMessageModel>) {
-      (_controller.messages as RxList<IsmChatMessageModel>).refresh();
-    }
-    _controller.update();
+    _controller.mutateLocalRow(createdAt, onlyUnsent: true, (current) {
+      final attachment = current.attachments?.firstOrNull;
+      if (attachment == null) {
+        return false;
+      }
+      current
+        ..attachments = [
+          attachment.copyWith(
+            mediaUrl: mediaUrl,
+            thumbnailUrl: thumbnailUrl.isNotEmpty
+                ? thumbnailUrl
+                : (fallbackThumbnailToMedia ? mediaUrl : ''),
+            stillUrl: thumbnailUrl.isNotEmpty ? thumbnailUrl : mediaUrl,
+          ),
+        ]
+        ..isUploading = false;
+      return true;
+    });
   }
 
   void _clearMessageUploadingState(int createdAt) {
-    final index = _controller.messages.indexWhere(
-      (message) => message.sentAt == createdAt,
-    );
-    if (index == -1) {
-      return;
-    }
-    final current = _controller.messages[index];
-    if (current.isUploading != true) {
-      return;
-    }
-    current.isUploading = false;
-    _controller.messages[index] = current;
-    if (_controller.messages is RxList<IsmChatMessageModel>) {
-      (_controller.messages as RxList<IsmChatMessageModel>).refresh();
-    }
-    _controller.update();
+    _controller.mutateLocalRow(createdAt, (current) {
+      if (current.isUploading != true) {
+        return false;
+      }
+      current.isUploading = false;
+      return true;
+    });
   }
 
   bool _isGifExtension(String? extension) => extension?.toLowerCase() == 'gif';
@@ -1693,7 +1689,13 @@ mixin IsmChatPageSendMessageMediaMixin {
       ),
     );
 
-    _controller.messages.add(visualMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      visualMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(visualMessage);
     if (!deferUpload) {
       unawaited(_controller.scrollDown());
       _controller.isreplying = false;
@@ -1726,13 +1728,10 @@ mixin IsmChatPageSendMessageMediaMixin {
     required WebMediaModel webMediaModel,
     required String notificationBody,
   }) async {
-    final index = _controller.messages.indexWhere(
-      (message) => message.sentAt == sentAt,
-    );
-    if (index == -1) {
+    final visualMessage = _controller.localOutgoingRow(sentAt);
+    if (visualMessage == null) {
       return;
     }
-    final visualMessage = _controller.messages[index];
     final bytes = webMediaModel.platformFile.bytes ?? Uint8List(0);
     final nameWithExtension = webMediaModel.platformFile.name;
     final mediaId = sentAt.toString();
@@ -1755,21 +1754,12 @@ mixin IsmChatPageSendMessageMediaMixin {
 
   void _markUploadFailed(int createdAt) {
     _clearMessageUploadingState(createdAt);
-    final index = _controller.messages.indexWhere(
-      (message) => message.sentAt == createdAt,
-    );
-    if (index == -1) {
-      return;
-    }
-    final current = _controller.messages[index];
-    current
-      ..isInvalidMessage = true
-      ..messageId = '';
-    _controller.messages[index] = current;
-    if (_controller.messages is RxList<IsmChatMessageModel>) {
-      (_controller.messages as RxList<IsmChatMessageModel>).refresh();
-    }
-    _controller.update();
+    _controller.mutateLocalRow(createdAt, (current) {
+      current
+        ..isInvalidMessage = true
+        ..messageId = '';
+      return true;
+    });
   }
 }
 

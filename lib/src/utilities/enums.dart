@@ -766,6 +766,15 @@ enum IsmChatFocusMenuType {
   copy,
   selectMessage,
   reply,
+
+  /// Slack-style "Reply in thread" — opens [IsmChatThreadView] for the message.
+  ///
+  /// Only offered when [IsmChatConfig.threadsEnabled] is `true` and the host
+  /// keeps [IsmChatFeature.threadReply] in
+  /// `IsmChatPageProperties.features`; otherwise
+  /// `IsmChatMessageModel.focusMenuList` removes it, so chats without threads
+  /// show exactly the menu they show today.
+  replyInThread,
   forward,
   save,
   delete;
@@ -781,6 +790,8 @@ enum IsmChatFocusMenuType {
         return IsmChatStrings.focusMenuSelectMessage;
       case IsmChatFocusMenuType.reply:
         return IsmChatStrings.focusMenuReply;
+      case IsmChatFocusMenuType.replyInThread:
+        return IsmChatStrings.replyInThread;
       case IsmChatFocusMenuType.forward:
         return IsmChatStrings.focusMenuForward;
       case IsmChatFocusMenuType.save:
@@ -905,7 +916,33 @@ enum IsmChatFeature {
   selectMessage,
   emojiIcon,
   audioMessage,
-  giphyPicker;
+  giphyPicker,
+
+  /// Shows the "Reply in thread" focus-menu action and the "N replies" footer.
+  ///
+  /// Included in [IsmChatFeature.values] (so default integrations get it), but
+  /// both surfaces stay hidden until [IsmChatConfig.threadsEnabled] is `true`.
+  threadReply;
+}
+
+/// Which slice of a conversation a message fetch should return.
+///
+/// Maps 1:1 to the backend `feedType` query param on `GET /chat/messages`
+/// (`chat-messages` v1.1.0+). The SDK only sends the param when
+/// [IsmChatConfig.threadsEnabled] is `true`; with threads off the request is
+/// byte-for-byte the one the SDK has always sent (server default = [all]).
+enum IsmChatFeedType {
+  /// Channel timeline only: messages with `showInConversation: true`.
+  main,
+
+  /// A single thread. Requires `threadRootId` (preferred) or `parentMessageId`.
+  thread,
+
+  /// Legacy behavior — no extra filter (thread replies appear inline).
+  all;
+
+  /// Value sent as `feedType=...`.
+  String get queryValue => name;
 }
 
 /// Tabs shown in the emoji/GIF/sticker input panel.

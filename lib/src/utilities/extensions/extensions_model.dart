@@ -978,8 +978,41 @@ extension MentionMessage on IsmChatMessageModel {
       menu.remove(IsmChatFocusMenuType.reply);
     }
 
+    // Slack-style threads: hidden unless the feature is on for this app and
+    // this row can actually root a thread. With threads off the menu is
+    // byte-for-byte what it has always been.
+    if (!IsmChatThreadCoordinator.isUiEnabled ||
+        !IsmChatThreadCoordinator.canOpenThread(this)) {
+      menu.remove(IsmChatFocusMenuType.replyInThread);
+    }
+
     return menu;
   }
+
+  // ------------------------------ threads ------------------------------
+  // [isThreadReply] / [isThreadOnlyReply] / [threadId] / [threadReplyCount]
+  // classify the message itself and work regardless of the feature flag.
+  // [showThreadFooter] is the UI gate and is always false while
+  // [IsmChatConfig.threadsEnabled] is off.
+
+  /// Whether this message is a reply that belongs to a thread
+  /// ([IsmChatThreadCoordinator.isThreadReply]).
+  bool get isThreadReply => IsmChatThreadCoordinator.isThreadReply(this);
+
+  /// Whether this is a thread reply that was not also posted to the channel.
+  bool get isThreadOnlyReply =>
+      IsmChatThreadCoordinator.isThreadOnlyReply(this);
+
+  /// Thread this message belongs to: its `threadRootId`, or its own id when it
+  /// is the root. Empty when neither is known.
+  String get threadId => IsmChatThreadCoordinator.threadIdOf(this);
+
+  /// Replies in the thread this message roots (`0` when none / unknown).
+  int get threadReplyCount => IsmChatThreadCoordinator.replyCountOf(this);
+
+  /// Whether the "N replies" footer should be shown under this message.
+  bool get showThreadFooter =>
+      IsmChatThreadCoordinator.shouldShowFooter(this);
 
   /// Returns the text style for the message based on sender.
   TextStyle get style {

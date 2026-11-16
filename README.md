@@ -507,6 +507,36 @@ print(IsmChat.i.chatPageTag);
 IsmChat.i..chatPageTag = 'new-tag';
 ```
 
+## Slack-style threads (optional)
+
+Replies grouped under a root message, in their own thread panel, with a
+"N replies" badge in the channel. **Off by default** — existing integrations
+keep the current inline-reply chat unchanged.
+
+```dart
+// Turn it on at init…
+await IsmChat.i.initialize(
+  communicationConfig: config,
+  kNavigatorKey: navigatorKey,
+  threadsEnabled: true,
+);
+
+// …or at runtime (e.g. from a settings switch)
+await IsmChat.i.setThreadsEnabled(true);
+
+// Open a thread, or drive one from your own UI
+await IsmChat.i.openThread(message);
+await IsmChat.i.sendThreadReply(parent: message, text: 'On it');
+```
+
+Threads support everything the channel does: photos, videos, camera, voice
+notes, documents, location and contacts (the composer opens the same attachment
+sheet), "Also send to channel", nested replies, and offline queueing with
+retry.
+
+Requires backend `chat-messages` v1.1.0+. Full guide:
+[docs/THREADS.md](docs/THREADS.md).
+
 <!-- ## Contributing
 
 We welcome contributions to the Isometrik Chat Flutter SDK! Please follow these steps:

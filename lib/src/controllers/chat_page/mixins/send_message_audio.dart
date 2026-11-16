@@ -111,7 +111,13 @@ mixin IsmChatPageSendMessageAudioMixin {
       ),
     );
 
-    _controller.messages.add(audioMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      audioMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(audioMessage);
     unawaited(_controller.scrollDown());
 
     if (!_controller.isBroadcast) {

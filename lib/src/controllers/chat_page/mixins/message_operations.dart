@@ -31,6 +31,12 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
       case IsmChatFocusMenuType.reply:
         _controller.onReplyTap(message);
         break;
+      case IsmChatFocusMenuType.replyInThread:
+        // Slack-style: open the thread panel instead of quoting inline. Only
+        // offered while IsmChatConfig.threadsEnabled is true (see
+        // IsmChatMessageModel.focusMenuList).
+        await IsmChat.i.openThread(message, conversation: _controller.conversation);
+        break;
       case IsmChatFocusMenuType.forward:
         _controller.conversationController.forwardedList.clear();
         // If host app provides custom forward handling, delegate and skip

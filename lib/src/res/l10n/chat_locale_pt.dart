@@ -195,4 +195,20 @@ const Map<String, String> kIsmChatLocalePt = {
   'focusMenuSelectMessage': 'Selecionar mensagem',
   'focusMenuReply': 'Responder',
   'focusMenuForward': 'Encaminhar',
+
+  // ---- Slack-style threads (IsmChatConfig.threadsEnabled) ----
+  'threadTitle': 'Tópico',
+  'threadsLabel': 'Tópicos',
+  'threadsToggleSubtitle': 'Mostrar respostas num painel de tópico',
+  'replyInThread': 'Responder no tópico',
+  'threadReplySingular': 'resposta',
+  'threadReplyPlural': 'respostas',
+  'threadNoReplies': 'Ainda sem respostas. Comece o tópico.',
+  'threadAlsoSendToChannel': 'Enviar também para a conversa',
+  'threadReplyHint': 'Responder…',
+  'threadRootDeleteBlocked': 'Esta mensagem não pode ser eliminada porque o tópico tem respostas.',
+  'threadLoadFailed': 'Não foi possível carregar este tópico. Puxe para tentar novamente.',
+  'threadSendFailed': 'Resposta não enviada. Tente novamente.',
+  'threadRetry': 'Tentar novamente',
+  'threadReplyQueued': 'Resposta em fila — será enviada quando voltar a ligação.',
 };

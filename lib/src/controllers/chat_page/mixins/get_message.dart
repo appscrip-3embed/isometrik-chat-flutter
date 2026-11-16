@@ -192,6 +192,10 @@ mixin IsmChatPageGetMessageMixin on GetxController {
     messages.removeWhere(
       (m) => !m.isVisibleInGroupChat(_controller.conversation),
     );
+    // Slack-style threads: replies that live only in a thread never belong in
+    // the channel list. No-op while IsmChatConfig.threadsEnabled is false, so
+    // cached inline replies keep rendering as they do today.
+    messages.removeWhere(IsmChatThreadCoordinator.shouldHideFromTimeline);
     return messages;
   }
 
@@ -612,6 +616,12 @@ mixin IsmChatPageGetMessageMixin on GetxController {
   }
 
   void updateLastMessagOnCurrentTime(IsmChatMessageModel message) async {
+    // Slack-style threads: a reply that lives only in a thread is not the
+    // conversation's latest message, so it must not move the preview or the
+    // sort time. No-op while threads are off.
+    if (IsmChatThreadCoordinator.isThreadOnlyReply(message)) {
+      return;
+    }
     final conversationController = IsmChatUtility.conversationController;
     var conversation = await IsmChatConfig.dbWrapper
         ?.getConversation(message.conversationId ?? '');

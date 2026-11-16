@@ -27,6 +27,7 @@ mixin IsmChatDelegateInitializationMixin {
     bool messageEncrypted = false,
     bool maskSensitiveContent = false,
     NotificationBodyCallback? notificationBody,
+    bool threadsEnabled = false,
   }) async {
     final initTimer = IsmChatInitTimer(
       'SDK.initialize',
@@ -35,6 +36,8 @@ mixin IsmChatDelegateInitializationMixin {
     IsmChatConfig.kNavigatorKey = kNavigatorKey;
     IsmChatConfig.messageEncrypted = messageEncrypted;
     IsmChatConfig.maskSensitiveContent = maskSensitiveContent;
+    // Slack-style threads. Default false → the classic chat experience.
+    IsmChatConfig.threadsEnabled = threadsEnabled;
     IsmChatConfig.notificationBody = notificationBody;
     IsmChatConfig.dbName = databaseName;
     IsmChatConfig.useDatabase = !kIsWeb && useDatabase;
