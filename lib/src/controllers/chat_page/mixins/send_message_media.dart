@@ -13,6 +13,9 @@ mixin IsmChatPageSendMessageMediaMixin {
   /// Gets the controller instance.
   IsmChatPageController get _controller => this as IsmChatPageController;
 
+  /// API `conversationType` for message presign (`0` chat, `1` bulk).
+  int get _messagePresignConversationType => _controller.isBroadcast ? 1 : 0;
+
   /// Validates and sends media files (mobile).
   void sendMedia() async {
     if (_controller.isProcessingMedia || _controller.webMedia.isEmpty) {
@@ -26,16 +29,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       );
       if (!allowed) return;
     }
-    // Media-storage quota: block the batch up front when it won't fit.
-    // Server still has the final say on send (errorCode 6).
-    final totalBytes = _controller.webMedia.fold<int>(
-      0,
-      (sum, media) => sum + (media.platformFile.size ?? 0),
-    );
-    final batchAllowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
-      totalBytes: totalBytes,
-    );
-    if (!batchAllowed) return;
+    // Same-name reshares add 0 bytes — do not block the batch before presign.
     IsmChatRoute.goBack<void>();
     sendPhotoAndVideo();
   }
@@ -59,15 +53,6 @@ mixin IsmChatPageSendMessageMediaMixin {
       }
     }
     _controller.showCloseLoaderForMoble(showLoader: false);
-    // Media-storage quota: block the batch up front when it won't fit.
-    final totalBytes = _controller.webMedia.fold<int>(
-      0,
-      (sum, media) => sum + (media.platformFile.size ?? 0),
-    );
-    final batchAllowed = await IsmChatStorageQuotaGuard.ensureCanUpload(
-      totalBytes: totalBytes,
-    );
-    if (!batchAllowed) return;
     sendPhotoAndVideoForWeb();
   }
 
@@ -496,6 +481,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       final needsThumbnail = mediaType == IsmChatMediaType.video;
 
       PresignedUrlModel? presignedUrlModel;
+      var forceUploadOnMessage = false;
       if (_controller.isBroadcast) {
         presignedUrlModel = await _controller.commonController.getPresignedUrl(
           isLoading: false,
@@ -505,14 +491,21 @@ mixin IsmChatPageSendMessageMediaMixin {
           bytes: bytes,
         );
       } else {
-        presignedUrlModel = await _controller.commonController.postMediaUrl(
+        final outcome =
+            await _controller.commonController.postMediaUrlWithSameNameHandling(
           conversationId: conversationId,
           nameWithExtension: nameWithExtension,
           mediaType: mediaType.value,
           mediaId: mediaId,
           bytes: bytes,
           isLoading: false,
+          conversationType: _messagePresignConversationType,
         );
+        if (outcome == null || outcome.cancelled) {
+          return null;
+        }
+        presignedUrlModel = outcome.presigned;
+        forceUploadOnMessage = outcome.forceUploadOnMessage;
       }
 
       final mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
@@ -537,7 +530,8 @@ mixin IsmChatPageSendMessageMediaMixin {
           );
           thumbnailUrlPath = thumbPresigned?.mediaUrl ?? mediaUrlPath;
         } else {
-          thumbPresigned = await _controller.commonController.postMediaUrl(
+          final thumbOutcome = await _controller.commonController
+              .postMediaUrlWithSameNameHandling(
             conversationId: conversationId,
             nameWithExtension: '$mediaId.png',
             mediaType: IsmChatMediaType.image.value,
@@ -545,7 +539,12 @@ mixin IsmChatPageSendMessageMediaMixin {
             bytes: thumbnailBytes,
             isLoading: false,
             isUpdateThumbnail: true,
+            conversationType: _messagePresignConversationType,
           );
+          if (thumbOutcome == null || thumbOutcome.cancelled) {
+            return null;
+          }
+          thumbPresigned = thumbOutcome.presigned;
           thumbnailUrlPath = thumbPresigned?.thumbnailUrl ?? '';
           if (thumbnailUrlPath.isEmpty) {
             thumbnailUrlPath = mediaUrlPath;
@@ -563,6 +562,7 @@ mixin IsmChatPageSendMessageMediaMixin {
         extension: local.extension,
         attachmentType: mediaType,
         stillUrl: thumbnailUrlPath,
+        forceUpload: forceUploadOnMessage ? true : null,
       ).toOutgoingMap();
     } catch (e, st) {
       IsmChatLog.error(e, st);
@@ -1154,6 +1154,7 @@ mixin IsmChatPageSendMessageMediaMixin {
   }) async {
     try {
       PresignedUrlModel? presignedUrlModel;
+      var forceUploadOnMessage = false;
       if (_controller.isBroadcast) {
         presignedUrlModel = await _controller.commonController.getPresignedUrl(
           isLoading: isLoading,
@@ -1164,14 +1165,22 @@ mixin IsmChatPageSendMessageMediaMixin {
           bytes: bytes,
         );
       } else {
-        presignedUrlModel = await _controller.commonController.postMediaUrl(
+        final outcome =
+            await _controller.commonController.postMediaUrlWithSameNameHandling(
           conversationId: ismChatChatMessageModel.conversationId ?? '',
           nameWithExtension: nameWithExtension,
           mediaType: mediaType,
           mediaId: mediaId,
           bytes: bytes,
           isLoading: isLoading,
+          conversationType: _messagePresignConversationType,
         );
+        if (outcome == null || outcome.cancelled) {
+          _markUploadFailed(createdAt);
+          return;
+        }
+        presignedUrlModel = outcome.presigned;
+        forceUploadOnMessage = outcome.forceUploadOnMessage;
       }
       var mediaUrlPath = '';
       var thumbnailUrlPath = '';
@@ -1191,7 +1200,8 @@ mixin IsmChatPageSendMessageMediaMixin {
             bytes: thumbnailBytes ?? Uint8List(0),
           );
         } else {
-          presignedUrlModel = await _controller.commonController.postMediaUrl(
+          final thumbOutcome = await _controller.commonController
+              .postMediaUrlWithSameNameHandling(
             conversationId: ismChatChatMessageModel.conversationId ?? '',
             nameWithExtension: thumbnailNameWithExtension ?? '',
             mediaType: thumbanilMediaType ?? 0,
@@ -1199,7 +1209,13 @@ mixin IsmChatPageSendMessageMediaMixin {
             isLoading: isLoading,
             bytes: thumbnailBytes ?? Uint8List(0),
             isUpdateThumbnail: true,
+            conversationType: _messagePresignConversationType,
           );
+          if (thumbOutcome == null || thumbOutcome.cancelled) {
+            _markUploadFailed(createdAt);
+            return;
+          }
+          presignedUrlModel = thumbOutcome.presigned;
         }
         thumbnailUrlPath = _controller.isBroadcast
             ? presignedUrlModel?.mediaUrl ?? ''
@@ -1227,6 +1243,7 @@ mixin IsmChatPageSendMessageMediaMixin {
           attachmentType:
               ismChatChatMessageModel.attachments?.first.attachmentType,
           stillUrl: mediaUrlPath,
+          forceUpload: forceUploadOnMessage ? true : null,
         );
         final attachment = <Map<String, dynamic>>[
           uploadedAttachment.toOutgoingMap(),

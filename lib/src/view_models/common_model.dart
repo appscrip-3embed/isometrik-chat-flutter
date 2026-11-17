@@ -52,6 +52,50 @@ class IsmChatCommonViewModel {
     return null;
   }
 
+  /// Presign (+ PUT) with same-name / storage-quota branching.
+  Future<SameNameUploadOutcome?> postMediaUrlWithSameNameHandling({
+    required String conversationId,
+    required String nameWithExtension,
+    required int mediaType,
+    required String mediaId,
+    required bool isLoading,
+    required Uint8List bytes,
+    bool isUpdateThumbnail = false,
+    int conversationType = 0,
+  }) =>
+      IsmChatSameNameAttachmentUpload.resolveAndUpload(
+        fileBytes: bytes.length,
+        isThumbnailPresign: isUpdateThumbnail,
+        presign: ({required bool forceUpload}) async {
+          final result = await _repository.requestMessagePresignedUrls(
+            conversationId: conversationId,
+            nameWithExtension: nameWithExtension,
+            mediaType: mediaType,
+            mediaId: mediaId,
+            isLoading: isLoading,
+            conversationType: conversationType,
+            forceUpload: forceUpload,
+          );
+          if (result.response.hasError) {
+            await IsmChatStorageQuotaGuard.handleResponseIfQuota(
+              result.response,
+            );
+            return null;
+          }
+          final urls = result.urls;
+          if (urls == null || urls.isEmpty) {
+            return null;
+          }
+          return urls.first;
+        },
+        putBytes: (presignedPutUrl, Uint8List data) => updatePresignedUrl(
+          presignedUrl: presignedPutUrl,
+          bytes: data,
+          isLoading: isLoading,
+        ),
+        mediaBytes: bytes,
+      );
+
   Future<PresignedUrlModel?> postMediaUrl({
     required String conversationId,
     required String nameWithExtension,
@@ -60,27 +104,22 @@ class IsmChatCommonViewModel {
     required bool isLoading,
     required Uint8List bytes,
     bool isUpdateThumbnail = false,
+    int conversationType = 0,
   }) async {
-    final responseMedia = await _repository.postMediaUrl(
+    final outcome = await postMediaUrlWithSameNameHandling(
       conversationId: conversationId,
       nameWithExtension: nameWithExtension,
       mediaType: mediaType,
       mediaId: mediaId,
       isLoading: isLoading,
+      bytes: bytes,
+      isUpdateThumbnail: isUpdateThumbnail,
+      conversationType: conversationType,
     );
-    if (responseMedia != null) {
-      final response = await updatePresignedUrl(
-        bytes: bytes,
-        isLoading: isLoading,
-        presignedUrl: isUpdateThumbnail
-            ? responseMedia.thumbnailPresignedUrl
-            : responseMedia.mediaPresignedUrl,
-      );
-      if (response == 200) {
-        return responseMedia;
-      }
+    if (outcome == null || outcome.cancelled) {
+      return null;
     }
-    return null;
+    return outcome.presigned;
   }
 
   Future<bool> sendMessage({

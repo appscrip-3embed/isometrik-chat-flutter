@@ -195,4 +195,7 @@ const Map<String, String> kIsmChatLocaleFr = {
   'focusMenuSelectMessage': 'Sélectionner le message',
   'focusMenuReply': 'Répondre',
   'focusMenuForward': 'Transférer',
+  'sameNameUploadTitle': 'Fichier déjà dans le stockage',
+  'reshareOlderFile': 'Partager l’ancien fichier',
+  'uploadACopy': 'Téléverser une copie',
 };

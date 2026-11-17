@@ -25,6 +25,7 @@ class AttachmentModel {
     this.mediaWidth,
     this.mediaHeight,
     this.restricted = false,
+    this.forceUpload,
   });
 
   factory AttachmentModel.fromMap(Map<String, dynamic> map) => AttachmentModel(
@@ -52,6 +53,7 @@ class AttachmentModel {
         attachmentType: _resolveMediaTypeFromMap(map),
         // Media-storage quota: server hides the file past the allowance.
         restricted: map['restricted'] as bool? ?? false,
+        forceUpload: map['forceUpload'] as bool?,
       );
 
   /// API may send both [mediaType] and [attachmentType]; prefer [mediaType].
@@ -90,6 +92,10 @@ class AttachmentModel {
   /// allowance: [mediaUrl]/[thumbnailUrl] are blanked server-side, so render a
   /// placeholder instead of a broken image. The message text is still shown.
   bool restricted;
+
+  /// When `true`, send on `POST /chat/message` after uploading a new copy of an
+  /// existing file name (storage quota). Omit on reshare and first-time uploads.
+  bool? forceUpload;
 
   /// Parses width/height that may arrive as int, double, or string.
   static int? _parseDimension(dynamic value) {
@@ -182,6 +188,7 @@ class AttachmentModel {
     int? mediaWidth,
     int? mediaHeight,
     bool? restricted,
+    bool? forceUpload,
   }) =>
       AttachmentModel(
         thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
@@ -201,6 +208,7 @@ class AttachmentModel {
         mediaWidth: mediaWidth ?? this.mediaWidth,
         mediaHeight: mediaHeight ?? this.mediaHeight,
         restricted: restricted ?? this.restricted,
+        forceUpload: forceUpload ?? this.forceUpload,
       );
 
   Map<String, dynamic> toMap() => <String, dynamic>{
@@ -224,6 +232,7 @@ class AttachmentModel {
         'attachmentType': attachmentType?.value,
         'mediaType': attachmentType?.value,
         if (name != null && name!.isNotEmpty) 'nameWithExtension': name,
+        if (forceUpload == true) 'forceUpload': true,
       }.removeNullValues();
 
   /// Builds the attachment object expected by the send-message API.

@@ -12,6 +12,10 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 /// server quota rejection into a user-facing prompt. Used by the SDK's own send
 /// path and available to host apps.
 ///
+/// Same-name duplicate handling (reshare vs upload a copy) lives in
+/// [IsmChatSameNameAttachmentUpload] — not here — so quota dialogs stay split
+/// by concern.
+///
 /// The app-level quota error code returned by presign/send when a user is over
 /// quota (HTTP 403 body `{ "errorCode": 6, "error": "Storage quota exceeded." }`).
 class IsmChatStorageQuotaGuard {

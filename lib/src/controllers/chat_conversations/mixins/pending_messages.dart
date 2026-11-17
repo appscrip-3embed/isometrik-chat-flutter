@@ -53,8 +53,8 @@ mixin IsmChatConversationsPendingMessagesMixin on GetxController {
       ].contains(x.customType)) {
         final attachment = x.attachments?.first;
         final bytes = File(attachment?.mediaUrl ?? '').readAsBytesSync();
-        PresignedUrlModel? presignedUrlModel;
-        presignedUrlModel = await _controller.commonController.postMediaUrl(
+        final mediaOutcome = await _controller.commonController
+            .postMediaUrlWithSameNameHandling(
           conversationId: x.conversationId ?? '',
           nameWithExtension: attachment?.name ?? '',
           mediaType: attachment?.attachmentType?.value ?? 0,
@@ -62,41 +62,32 @@ mixin IsmChatConversationsPendingMessagesMixin on GetxController {
           isLoading: false,
           bytes: bytes,
         );
-
-        var mediaUrlPath = '';
-        if (presignedUrlModel != null) {
-          var response = await _controller.commonController.updatePresignedUrl(
-            presignedUrl: presignedUrlModel.mediaPresignedUrl,
-            bytes: bytes,
-            isLoading: false,
-          );
-          if (response == 200) {
-            mediaUrlPath = presignedUrlModel.mediaUrl ?? '';
-          }
+        if (mediaOutcome == null || mediaOutcome.cancelled) {
+          continue;
         }
+        final presignedUrlModel = mediaOutcome.presigned;
+        final forceUploadOnMessage = mediaOutcome.forceUploadOnMessage;
+
+        var mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
         var thumbnailUrlPath = '';
         if (IsmChatCustomMessageType.video == x.customType) {
-          PresignedUrlModel? presignedUrlModel;
           final nameWithExtension = attachment?.thumbnailUrl?.split('/').last;
-          final bytes = File(attachment?.thumbnailUrl ?? '').readAsBytesSync();
-          presignedUrlModel = await _controller.commonController.postMediaUrl(
+          final thumbBytes =
+              File(attachment?.thumbnailUrl ?? '').readAsBytesSync();
+          final thumbOutcome = await _controller.commonController
+              .postMediaUrlWithSameNameHandling(
             conversationId: x.conversationId ?? '',
             nameWithExtension: nameWithExtension ?? '',
             mediaType: 0,
             mediaId: DateTime.now().millisecondsSinceEpoch.toString(),
             isLoading: false,
-            bytes: bytes,
+            bytes: thumbBytes,
+            isUpdateThumbnail: true,
           );
-          if (presignedUrlModel != null) {
-            final response = await _controller.commonController.updatePresignedUrl(
-              presignedUrl: presignedUrlModel.thumbnailPresignedUrl,
-              bytes: bytes,
-              isLoading: false,
-            );
-            if (response == 200) {
-              thumbnailUrlPath = presignedUrlModel.thumbnailUrl ?? '';
-            }
+          if (thumbOutcome == null || thumbOutcome.cancelled) {
+            continue;
           }
+          thumbnailUrlPath = thumbOutcome.presigned?.thumbnailUrl ?? '';
         }
         if (mediaUrlPath.isNotEmpty) {
           attachments = [
@@ -111,6 +102,7 @@ mixin IsmChatConversationsPendingMessagesMixin on GetxController {
               'mediaId': attachment?.mediaId,
               'extension': attachment?.extension,
               'attachmentType': attachment?.attachmentType?.value,
+              if (forceUploadOnMessage) 'forceUpload': true,
             }
           ];
         }
