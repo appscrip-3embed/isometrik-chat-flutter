@@ -169,6 +169,7 @@ void main() {
       expect(dup.isDuplicate, isTrue);
       expect(dup.mediaPresignedUrl, isNull);
       expect(dup.warning, contains('same name'));
+      expect(dup.existingMediaId, 'existing');
     });
   });
 

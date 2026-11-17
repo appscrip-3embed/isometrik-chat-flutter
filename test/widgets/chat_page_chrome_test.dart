@@ -44,4 +44,26 @@ void main() {
     );
     expect(find.text('Messages UI'), findsOneWidget);
   }, setUpApi: (api) => api.registerSendDefaults());
+
+  chatTestWidgets('IsmChatListHeader renders host actions', (tester, ctx) async {
+    seedConversationListForUi(ctx.conversations);
+    await pumpSdkScreen(
+      tester,
+      size: const Size(900, 800),
+      child: Scaffold(
+        appBar: IsmChatListHeader(
+          showSearch: false,
+          onSearchTap: (_, __, ___) {},
+          actions: [
+            IconButton(
+              tooltip: 'Chat settings',
+              onPressed: () {},
+              icon: const Icon(Icons.tune_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
+    expect(find.byTooltip('Chat settings'), findsOneWidget);
+  }, setUpApi: (api) => api.registerSendDefaults());
 }

@@ -77,8 +77,8 @@ class PresignedUrlModel {
   /// Server banner text when [duplicate] is `true`.
   final String? warning;
 
-  /// Older attachment id — display / context only; never use as new message
-  /// [mediaId].
+  /// Older attachment id from `duplicate: true` — send as message attachment
+  /// `mediaId` when the user reshares (omit `forceUpload`).
   final String? existingMediaId;
 
   final String? existingMessageId;

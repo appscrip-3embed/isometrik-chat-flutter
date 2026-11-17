@@ -67,29 +67,37 @@ mixin IsmChatConversationsPendingMessagesMixin on GetxController {
         }
         final presignedUrlModel = mediaOutcome.presigned;
         final forceUploadOnMessage = mediaOutcome.forceUploadOnMessage;
+        final outgoingMediaId = mediaOutcome.resolveOutgoingMediaId(
+          clientMediaId: attachment?.mediaId ?? '',
+        );
 
         var mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
         var thumbnailUrlPath = '';
         if (IsmChatCustomMessageType.video == x.customType) {
-          final nameWithExtension = attachment?.thumbnailUrl?.split('/').last;
-          final thumbBytes =
-              File(attachment?.thumbnailUrl ?? '').readAsBytesSync();
-          final thumbOutcome = await _controller.commonController
-              .postMediaUrlWithSameNameHandling(
-            conversationId: x.conversationId ?? '',
-            nameWithExtension: nameWithExtension ?? '',
-            mediaType: 0,
-            mediaId: DateTime.now().millisecondsSinceEpoch.toString(),
-            isLoading: false,
-            bytes: thumbBytes,
-            isUpdateThumbnail: true,
-          );
-          if (thumbOutcome == null || thumbOutcome.cancelled) {
-            continue;
+          if (mediaOutcome.isReshareExistingFile &&
+              (presignedUrlModel?.thumbnailUrl?.isNotEmpty ?? false)) {
+            thumbnailUrlPath = presignedUrlModel!.thumbnailUrl!;
+          } else {
+            final nameWithExtension = attachment?.thumbnailUrl?.split('/').last;
+            final thumbBytes =
+                File(attachment?.thumbnailUrl ?? '').readAsBytesSync();
+            final thumbOutcome = await _controller.commonController
+                .postMediaUrlWithSameNameHandling(
+              conversationId: x.conversationId ?? '',
+              nameWithExtension: nameWithExtension ?? '',
+              mediaType: 0,
+              mediaId: DateTime.now().millisecondsSinceEpoch.toString(),
+              isLoading: false,
+              bytes: thumbBytes,
+              isUpdateThumbnail: true,
+            );
+            if (thumbOutcome == null || thumbOutcome.cancelled) {
+              continue;
+            }
+            thumbnailUrlPath = thumbOutcome.presigned?.thumbnailUrl ?? '';
           }
-          thumbnailUrlPath = thumbOutcome.presigned?.thumbnailUrl ?? '';
         }
-        if (mediaUrlPath.isNotEmpty) {
+        if (mediaUrlPath.isNotEmpty && (outgoingMediaId?.isNotEmpty ?? false)) {
           attachments = [
             {
               'thumbnailUrl': IsmChatCustomMessageType.video == x.customType
@@ -99,7 +107,7 @@ mixin IsmChatConversationsPendingMessagesMixin on GetxController {
               'name': attachment?.name,
               'mimeType': attachment?.mimeType,
               'mediaUrl': mediaUrlPath,
-              'mediaId': attachment?.mediaId,
+              'mediaId': outgoingMediaId,
               'extension': attachment?.extension,
               'attachmentType': attachment?.attachmentType?.value,
               if (forceUploadOnMessage) 'forceUpload': true,

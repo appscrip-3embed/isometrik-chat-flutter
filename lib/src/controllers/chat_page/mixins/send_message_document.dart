@@ -341,6 +341,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
       final nameWithExtension = file.name;
 
       PresignedUrlModel? presignedUrlModel;
+      SameNameUploadOutcome? mediaOutcome;
       var forceUploadOnMessage = false;
       final presignConversationType = _controller.isBroadcast ? 1 : 0;
       if (_controller.isBroadcast) {
@@ -365,15 +366,19 @@ mixin IsmChatPageSendMessageDocumentMixin {
         if (outcome == null || outcome.cancelled) {
           return null;
         }
+        mediaOutcome = outcome;
         presignedUrlModel = outcome.presigned;
         forceUploadOnMessage = outcome.forceUploadOnMessage;
       }
 
       var mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
-      final resolvedMediaId =
-          _controller.isBroadcast ? mediaId : presignedUrlModel?.mediaId ?? '';
+      final resolvedMediaId = _controller.isBroadcast
+          ? mediaId
+          : mediaOutcome?.resolveOutgoingMediaId(clientMediaId: mediaId) ??
+              presignedUrlModel?.mediaId ??
+              '';
 
-      if (mediaUrlPath.isEmpty) {
+      if (mediaUrlPath.isEmpty || resolvedMediaId.isEmpty) {
         return null;
       }
 
@@ -391,6 +396,12 @@ mixin IsmChatPageSendMessageDocumentMixin {
 
       var thumbnailUrlPath = '';
       if (thumbnailBytes.isNotEmpty) {
+        if (!_controller.isBroadcast &&
+            mediaOutcome != null &&
+            mediaOutcome.isReshareExistingFile &&
+            (presignedUrlModel?.thumbnailUrl?.isNotEmpty ?? false)) {
+          thumbnailUrlPath = presignedUrlModel!.thumbnailUrl!;
+        } else {
         PresignedUrlModel? thumbPresigned;
         if (_controller.isBroadcast) {
           thumbPresigned = await _controller.commonController.getPresignedUrl(
@@ -426,6 +437,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
             bytes: thumbnailBytes,
             isLoading: false,
           );
+        }
         }
       }
 

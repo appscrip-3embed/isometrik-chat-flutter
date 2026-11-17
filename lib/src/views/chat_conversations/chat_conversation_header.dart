@@ -139,6 +139,8 @@ class IsmChatListHeader extends StatelessWidget implements PreferredSizeWidget {
           actions: [
             if (showSearch) _SearchAction(onTap: onSearchTap),
             if (IsmChatResponsive.isWeb(context)) _StartMessage(),
+            // Host-provided actions (e.g. example app Chat settings / threads demo).
+            ...?actions,
             _MoreIcon(onSignOut),
           ],
         ),

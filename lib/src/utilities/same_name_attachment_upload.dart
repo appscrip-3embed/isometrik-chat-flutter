@@ -24,10 +24,33 @@ class SameNameUploadOutcome {
   final PresignedUrlModel? presigned;
   final bool forceUploadOnMessage;
   final bool cancelled;
+
+  /// User chose **Reshare older file** after `duplicate: true` (no new PUT).
+  bool get isReshareExistingFile =>
+      !cancelled &&
+      (presigned?.duplicate ?? false) &&
+      !forceUploadOnMessage;
+
+  /// `mediaId` for `POST /chat/message` — see `docs/SAME_NAME_UPLOAD_FRONTEND_1_1.md`.
+  String? resolveOutgoingMediaId({required String clientMediaId}) {
+    if (cancelled || presigned == null) return null;
+    if (isReshareExistingFile) {
+      final existing = presigned!.existingMediaId?.trim() ?? '';
+      return existing.isNotEmpty ? existing : null;
+    }
+    return (presigned!.mediaId?.trim().isNotEmpty == true)
+        ? presigned!.mediaId!.trim()
+        : clientMediaId;
+  }
 }
 
 /// Same-name upload flow for `POST /chat/messages/presignedurls` — see
-/// `SAME_NAME_UPLOAD_FRONTEND.md` in the project handoff.
+/// `docs/SAME_NAME_UPLOAD_FRONTEND_1_1.md`.
+///
+/// Presign `nameWithExtension` must be stable across re-picks of the same asset
+/// (not an iOS `image_picker_<uuid>` temp name). Set at pick time via
+/// [IsmChatUtility.resolveOutboundPresignFileName] (content-hash for ephemeral
+/// picker names).
 ///
 /// Centralizes: presign → branch on `duplicate` → optional PUT → message flags.
 class IsmChatSameNameAttachmentUpload {

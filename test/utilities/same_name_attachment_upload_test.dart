@@ -113,4 +113,60 @@ void main() {
       expect(outcome?.forceUploadOnMessage, isTrue);
     });
   });
+
+  group('SameNameUploadOutcome', () {
+    test('reshare uses existingMediaId on message', () {
+      final outcome = SameNameUploadOutcome(
+        presigned: PresignedUrlModel(
+          duplicate: true,
+          mediaId: 'client-id',
+          existingMediaId: 'storage-row-id',
+          mediaUrl: 'https://cdn.test/older.jpg',
+        ),
+      );
+      expect(outcome.isReshareExistingFile, isTrue);
+      expect(
+        outcome.resolveOutgoingMediaId(clientMediaId: 'client-id'),
+        'storage-row-id',
+      );
+    });
+
+    test('upload copy uses presigned mediaId', () {
+      final outcome = SameNameUploadOutcome(
+        presigned: PresignedUrlModel(
+          mediaId: 'client-id',
+          mediaUrl: 'https://cdn.test/copy.jpg',
+        ),
+        forceUploadOnMessage: true,
+      );
+      expect(outcome.isReshareExistingFile, isFalse);
+      expect(
+        outcome.resolveOutgoingMediaId(clientMediaId: 'client-id'),
+        'client-id',
+      );
+    });
+
+    test('first upload falls back to client mediaId', () {
+      final outcome = SameNameUploadOutcome(
+        presigned: PresignedUrlModel(
+          mediaUrl: 'https://cdn.test/new.jpg',
+        ),
+      );
+      expect(
+        outcome.resolveOutgoingMediaId(clientMediaId: 'generated'),
+        'generated',
+      );
+    });
+
+    test('reshare without existingMediaId returns null', () {
+      final outcome = SameNameUploadOutcome(
+        presigned: PresignedUrlModel(
+          duplicate: true,
+          mediaId: 'client-id',
+          mediaUrl: 'https://cdn.test/older.jpg',
+        ),
+      );
+      expect(outcome.resolveOutgoingMediaId(clientMediaId: 'client-id'), isNull);
+    });
+  });
 }

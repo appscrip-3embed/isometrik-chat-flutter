@@ -218,16 +218,29 @@ class IsmChatCommonViewModel {
               pendingMessage.attachments = updatedAttachments;
             }
           } else if (response.respone.errorCode == 403) {
-            pendingMessage
-              ..messageId = ''
-              ..isInvalidMessage = true;
-            // Quota (`errorCode` 6) dialog — unchanged. Profanity (`errorCode` 3):
-            // message is already marked failed; only surface the API error text.
             final quotaHandled =
                 await IsmChatStorageQuotaGuard.handleResponseIfQuota(
               response.respone,
             );
-            if (!quotaHandled && response.respone.isProfanityBlocked) {
+            if (quotaHandled) {
+              // Storage quota — keep pending draft for retry (same-name handoff).
+              pendingMessage
+                ..messageId = ''
+                ..isInvalidMessage = false
+                ..isUploading = true;
+              if (chatPendingMessages != null) {
+                await dbBox?.saveConversation(
+                  conversation: chatPendingMessages!,
+                  dbBox: IsmChatDbBox.pending,
+                );
+              }
+              return false;
+            }
+            pendingMessage
+              ..messageId = ''
+              ..isInvalidMessage = true;
+            // Profanity (`errorCode` 3): only surface the API error text.
+            if (response.respone.isProfanityBlocked) {
               unawaited(
                 IsmChatUtility.showErrorDialog(
                   response.respone.apiErrorMessage(
@@ -265,6 +278,24 @@ class IsmChatCommonViewModel {
         // Server rejected message -> mark it failed so UI shows error icon
         // instead of clock forever, and stop retrying automatically.
         if (pendingMessage != null && response.respone.hasError == true) {
+          final quotaHandled =
+              await IsmChatStorageQuotaGuard.handleResponseIfQuota(
+            response.respone,
+          );
+          if (quotaHandled) {
+            pendingMessage
+              ..messageId = ''
+              ..isInvalidMessage = false
+              ..isUploading = true;
+            if (chatPendingMessages != null) {
+              await dbBox?.saveConversation(
+                conversation: chatPendingMessages!,
+                dbBox: IsmChatDbBox.pending,
+              );
+            }
+            return false;
+          }
+
           pendingMessage
             ..messageId = ''
             ..isInvalidMessage = true
