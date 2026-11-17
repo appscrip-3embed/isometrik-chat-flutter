@@ -72,6 +72,12 @@ void main() {
       final outgoing = image.toOutgoingMap();
       expect(outgoing.containsKey('bytes'), isFalse);
       expect(outgoing['attachmentType'], IsmChatMediaType.image.value);
+      expect(outgoing.containsKey('forceUpload'), isFalse);
+
+      final withForce = attachment(IsmChatMediaType.image)
+          .copyWith(forceUpload: true)
+          .toOutgoingMap();
+      expect(withForce['forceUpload'], isTrue);
 
       final gif = AttachmentModel(
         attachmentType: IsmChatMediaType.gif,

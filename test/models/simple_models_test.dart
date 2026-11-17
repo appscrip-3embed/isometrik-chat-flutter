@@ -154,6 +154,22 @@ void main() {
       expect(model.hashCode, isA<int>());
       expect(model.toString(), contains('mediaId: id'));
       expect(PresignedUrlModel.fromMap({}).mediaUrl, isNull);
+      expect(PresignedUrlModel.fromMap({}).duplicate, isFalse);
+    });
+
+    test('parses duplicate:true without PUT urls', () {
+      final dup = PresignedUrlModel.fromMap({
+        'mediaId': 'client-id',
+        'duplicate': true,
+        'warning': 'A file with the same name is already in your storage.',
+        'mediaUrl': 'https://cdn.test/older.pdf',
+        'thumbnailUrl': 'https://cdn.test/older-thumb.pdf',
+        'existingMediaId': 'existing',
+      });
+      expect(dup.isDuplicate, isTrue);
+      expect(dup.mediaPresignedUrl, isNull);
+      expect(dup.warning, contains('same name'));
+      expect(dup.existingMediaId, 'existing');
     });
   });
 

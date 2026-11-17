@@ -341,6 +341,9 @@ mixin IsmChatPageSendMessageDocumentMixin {
       final nameWithExtension = file.name;
 
       PresignedUrlModel? presignedUrlModel;
+      SameNameUploadOutcome? mediaOutcome;
+      var forceUploadOnMessage = false;
+      final presignConversationType = _controller.isBroadcast ? 1 : 0;
       if (_controller.isBroadcast) {
         presignedUrlModel = await _controller.commonController.getPresignedUrl(
           isLoading: false,
@@ -350,38 +353,55 @@ mixin IsmChatPageSendMessageDocumentMixin {
           bytes: bytesForUpload,
         );
       } else {
-        presignedUrlModel = await _controller.commonController.postMediaUrl(
+        final outcome =
+            await _controller.commonController.postMediaUrlWithSameNameHandling(
           conversationId: conversationId,
           nameWithExtension: nameWithExtension,
           mediaType: IsmChatMediaType.file.value,
           mediaId: mediaId,
           bytes: bytesForUpload,
           isLoading: false,
+          conversationType: presignConversationType,
         );
+        if (outcome == null || outcome.cancelled) {
+          return null;
+        }
+        mediaOutcome = outcome;
+        presignedUrlModel = outcome.presigned;
+        forceUploadOnMessage = outcome.forceUploadOnMessage;
       }
 
       var mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
-      final resolvedMediaId =
-          _controller.isBroadcast ? mediaId : presignedUrlModel?.mediaId ?? '';
+      final resolvedMediaId = _controller.isBroadcast
+          ? mediaId
+          : mediaOutcome?.resolveOutgoingMediaId(clientMediaId: mediaId) ??
+              presignedUrlModel?.mediaId ??
+              '';
 
-      if (mediaUrlPath.isEmpty) {
+      if (mediaUrlPath.isEmpty || resolvedMediaId.isEmpty) {
         return null;
       }
 
-      final mediaResponse =
-          await _controller.commonController.updatePresignedUrl(
-        presignedUrl: _controller.isBroadcast
-            ? presignedUrlModel?.presignedUrl
-            : presignedUrlModel?.mediaPresignedUrl,
-        bytes: bytesForUpload,
-        isLoading: false,
-      );
-      if (mediaResponse != 200) {
-        return null;
+      if (_controller.isBroadcast) {
+        final mediaResponse =
+            await _controller.commonController.updatePresignedUrl(
+          presignedUrl: presignedUrlModel?.presignedUrl,
+          bytes: bytesForUpload,
+          isLoading: false,
+        );
+        if (mediaResponse != 200) {
+          return null;
+        }
       }
 
       var thumbnailUrlPath = '';
       if (thumbnailBytes.isNotEmpty) {
+        if (!_controller.isBroadcast &&
+            mediaOutcome != null &&
+            mediaOutcome.isReshareExistingFile &&
+            (presignedUrlModel?.thumbnailUrl?.isNotEmpty ?? false)) {
+          thumbnailUrlPath = presignedUrlModel!.thumbnailUrl!;
+        } else {
         PresignedUrlModel? thumbPresigned;
         if (_controller.isBroadcast) {
           thumbPresigned = await _controller.commonController.getPresignedUrl(
@@ -393,7 +413,8 @@ mixin IsmChatPageSendMessageDocumentMixin {
           );
           thumbnailUrlPath = thumbPresigned?.mediaUrl ?? '';
         } else {
-          thumbPresigned = await _controller.commonController.postMediaUrl(
+          final thumbOutcome = await _controller.commonController
+              .postMediaUrlWithSameNameHandling(
             conversationId: conversationId,
             nameWithExtension: thumbnailNameWithExtension,
             mediaType: IsmChatMediaType.image.value,
@@ -401,18 +422,22 @@ mixin IsmChatPageSendMessageDocumentMixin {
             bytes: thumbnailBytes,
             isLoading: false,
             isUpdateThumbnail: true,
+            conversationType: presignConversationType,
           );
+          if (thumbOutcome == null || thumbOutcome.cancelled) {
+            return null;
+          }
+          thumbPresigned = thumbOutcome.presigned;
           thumbnailUrlPath = thumbPresigned?.thumbnailUrl ?? '';
         }
 
-        if (thumbnailUrlPath.isNotEmpty) {
+        if (thumbnailUrlPath.isNotEmpty && _controller.isBroadcast) {
           await _controller.commonController.updatePresignedUrl(
-            presignedUrl: _controller.isBroadcast
-                ? thumbPresigned?.presignedUrl
-                : thumbPresigned?.thumbnailPresignedUrl,
+            presignedUrl: thumbPresigned?.presignedUrl,
             bytes: thumbnailBytes,
             isLoading: false,
           );
+        }
         }
       }
 
@@ -439,6 +464,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
         'size': bytes.length,
         // 3 = doc. 0 is image and must not be sent for a document.
         'attachmentType': IsmChatMediaType.file.value,
+        if (forceUploadOnMessage) 'forceUpload': true,
       };
     } catch (e, st) {
       IsmChatLog.error(e, st);

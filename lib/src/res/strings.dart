@@ -223,4 +223,7 @@ class IsmChatStrings {
   static String get focusMenuSelectMessage => IsmChatL10n.get('focusMenuSelectMessage');
   static String get focusMenuReply => IsmChatL10n.get('focusMenuReply');
   static String get focusMenuForward => IsmChatL10n.get('focusMenuForward');
+  static String get sameNameUploadTitle => IsmChatL10n.get('sameNameUploadTitle');
+  static String get reshareOlderFile => IsmChatL10n.get('reshareOlderFile');
+  static String get uploadACopy => IsmChatL10n.get('uploadACopy');
 }

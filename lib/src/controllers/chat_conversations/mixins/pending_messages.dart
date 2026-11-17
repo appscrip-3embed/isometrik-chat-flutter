@@ -53,8 +53,8 @@ mixin IsmChatConversationsPendingMessagesMixin on GetxController {
       ].contains(x.customType)) {
         final attachment = x.attachments?.first;
         final bytes = File(attachment?.mediaUrl ?? '').readAsBytesSync();
-        PresignedUrlModel? presignedUrlModel;
-        presignedUrlModel = await _controller.commonController.postMediaUrl(
+        final mediaOutcome = await _controller.commonController
+            .postMediaUrlWithSameNameHandling(
           conversationId: x.conversationId ?? '',
           nameWithExtension: attachment?.name ?? '',
           mediaType: attachment?.attachmentType?.value ?? 0,
@@ -62,43 +62,42 @@ mixin IsmChatConversationsPendingMessagesMixin on GetxController {
           isLoading: false,
           bytes: bytes,
         );
-
-        var mediaUrlPath = '';
-        if (presignedUrlModel != null) {
-          var response = await _controller.commonController.updatePresignedUrl(
-            presignedUrl: presignedUrlModel.mediaPresignedUrl,
-            bytes: bytes,
-            isLoading: false,
-          );
-          if (response == 200) {
-            mediaUrlPath = presignedUrlModel.mediaUrl ?? '';
-          }
+        if (mediaOutcome == null || mediaOutcome.cancelled) {
+          continue;
         }
+        final presignedUrlModel = mediaOutcome.presigned;
+        final forceUploadOnMessage = mediaOutcome.forceUploadOnMessage;
+        final outgoingMediaId = mediaOutcome.resolveOutgoingMediaId(
+          clientMediaId: attachment?.mediaId ?? '',
+        );
+
+        var mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
         var thumbnailUrlPath = '';
         if (IsmChatCustomMessageType.video == x.customType) {
-          PresignedUrlModel? presignedUrlModel;
-          final nameWithExtension = attachment?.thumbnailUrl?.split('/').last;
-          final bytes = File(attachment?.thumbnailUrl ?? '').readAsBytesSync();
-          presignedUrlModel = await _controller.commonController.postMediaUrl(
-            conversationId: x.conversationId ?? '',
-            nameWithExtension: nameWithExtension ?? '',
-            mediaType: 0,
-            mediaId: DateTime.now().millisecondsSinceEpoch.toString(),
-            isLoading: false,
-            bytes: bytes,
-          );
-          if (presignedUrlModel != null) {
-            final response = await _controller.commonController.updatePresignedUrl(
-              presignedUrl: presignedUrlModel.thumbnailPresignedUrl,
-              bytes: bytes,
+          if (mediaOutcome.isReshareExistingFile &&
+              (presignedUrlModel?.thumbnailUrl?.isNotEmpty ?? false)) {
+            thumbnailUrlPath = presignedUrlModel!.thumbnailUrl!;
+          } else {
+            final nameWithExtension = attachment?.thumbnailUrl?.split('/').last;
+            final thumbBytes =
+                File(attachment?.thumbnailUrl ?? '').readAsBytesSync();
+            final thumbOutcome = await _controller.commonController
+                .postMediaUrlWithSameNameHandling(
+              conversationId: x.conversationId ?? '',
+              nameWithExtension: nameWithExtension ?? '',
+              mediaType: 0,
+              mediaId: DateTime.now().millisecondsSinceEpoch.toString(),
               isLoading: false,
+              bytes: thumbBytes,
+              isUpdateThumbnail: true,
             );
-            if (response == 200) {
-              thumbnailUrlPath = presignedUrlModel.thumbnailUrl ?? '';
+            if (thumbOutcome == null || thumbOutcome.cancelled) {
+              continue;
             }
+            thumbnailUrlPath = thumbOutcome.presigned?.thumbnailUrl ?? '';
           }
         }
-        if (mediaUrlPath.isNotEmpty) {
+        if (mediaUrlPath.isNotEmpty && (outgoingMediaId?.isNotEmpty ?? false)) {
           attachments = [
             {
               'thumbnailUrl': IsmChatCustomMessageType.video == x.customType
@@ -108,9 +107,10 @@ mixin IsmChatConversationsPendingMessagesMixin on GetxController {
               'name': attachment?.name,
               'mimeType': attachment?.mimeType,
               'mediaUrl': mediaUrlPath,
-              'mediaId': attachment?.mediaId,
+              'mediaId': outgoingMediaId,
               'extension': attachment?.extension,
               'attachmentType': attachment?.attachmentType?.value,
+              if (forceUploadOnMessage) 'forceUpload': true,
             }
           ];
         }

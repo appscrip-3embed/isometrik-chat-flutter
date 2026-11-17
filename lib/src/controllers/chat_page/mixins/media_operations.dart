@@ -42,10 +42,17 @@ mixin IsmChatPageMediaOperationsMixin on GetxController {
           break;
         }
         final bytes = await x?.readAsBytes();
-        final extension = x?.name.split('.').last;
+        final name = IsmChatUtility.resolveOutboundPresignFileName(
+          pickerName: x?.name,
+          path: x?.path,
+          fileBytes: bytes,
+        );
+        final extension = name.contains('.')
+            ? name.split('.').last
+            : x?.name.split('.').last;
         final dataSize = IsmChatUtility.formatBytes(bytes?.length ?? 0);
         final platformFile = IsmchPlatformFile(
-          name: x?.name ?? '',
+          name: name,
           size: bytes?.length,
           bytes: bytes,
           path: x?.path,
@@ -125,13 +132,14 @@ mixin IsmChatPageMediaOperationsMixin on GetxController {
           return;
         }
         final bytes = await file.readAsBytes();
-      var name = '';
-      if (kIsWeb) {
-        name = file.name;
-      } else {
-        name = file.path.split('/').last;
-      }
-      final extension = name.split('.').last;
+        final name = IsmChatUtility.resolveOutboundPresignFileName(
+          pickerName: file.name,
+          path: file.path,
+          fileBytes: bytes,
+        );
+        final extension = name.contains('.')
+            ? name.split('.').last
+            : file.name.split('.').last;
       final dataSize = IsmChatUtility.formatBytes(bytes.length);
       final platformFile = IsmchPlatformFile(
         name: name,
@@ -198,11 +206,20 @@ mixin IsmChatPageMediaOperationsMixin on GetxController {
     final fileSize = IsmChatUtility.formatBytes(
       int.parse(bytes.length.toString()),
     );
-    var name = '';
+    final String name;
     if (kIsWeb) {
       name = '${DateTime.now().millisecondsSinceEpoch}.png';
     } else {
-      name = file.path.split('/').last;
+      final existing =
+          _controller.webMedia[selectedIndex].platformFile.name?.trim() ?? '';
+      name = IsmChatUtility.shouldPreservePresignNameOnGalleryEdit(existing)
+          ? existing
+          : IsmChatUtility.resolveOutboundPresignFileName(
+              pickerName: file.name,
+              path: file.path,
+              extension: 'png',
+              fileBytes: bytes,
+            );
     }
     final extension = name.split('.').last;
     _controller.webMedia[selectedIndex] = WebMediaModel(
@@ -284,11 +301,21 @@ mixin IsmChatPageMediaOperationsMixin on GetxController {
     final fileSize = IsmChatUtility.formatBytes(
       int.parse(bytes.length.toString()),
     );
-    var name = '';
+    final String name;
     if (kIsWeb) {
       name = '${DateTime.now().millisecondsSinceEpoch}.png';
     } else {
-      name = file.path.split('/').last;
+      final existing = _controller.webMedia.isNotEmpty
+          ? (_controller.webMedia.first.platformFile.name?.trim() ?? '')
+          : '';
+      name = IsmChatUtility.shouldPreservePresignNameOnGalleryEdit(existing)
+          ? existing
+          : IsmChatUtility.resolveOutboundPresignFileName(
+              pickerName: file.name,
+              path: file.path,
+              extension: 'png',
+              fileBytes: bytes,
+            );
     }
     final extension = name.split('.').last;
     _controller.webMedia

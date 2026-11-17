@@ -207,4 +207,7 @@ const Map<String, String> kIsmChatLocaleEn = {
   'focusMenuSelectMessage': 'Select Message',
   'focusMenuReply': 'Reply',
   'focusMenuForward': 'Forward',
+  'sameNameUploadTitle': 'File already in storage',
+  'reshareOlderFile': 'Reshare older file',
+  'uploadACopy': 'Upload a copy',
 };

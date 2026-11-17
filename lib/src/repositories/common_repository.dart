@@ -194,44 +194,81 @@ class IsmChatCommonRepository {
     }
   }
 
-  Future<PresignedUrlModel?> postMediaUrl({
+  /// `POST /chat/messages/presignedurls` — returns the raw response so quota
+  /// and validation errors are not dropped.
+  Future<MessagePresignedUrlsResult> requestMessagePresignedUrls({
     required String conversationId,
     required String nameWithExtension,
     required int mediaType,
     required String mediaId,
     required bool isLoading,
+    int conversationType = 0,
+    bool forceUpload = false,
   }) async {
     try {
-      final payload = {
-        'conversationId': conversationId,
-        'attachments': [
-          {
-            'nameWithExtension': nameWithExtension,
-            'mediaType': mediaType,
-            'mediaId': mediaId
-          }
-        ]
+      final attachment = <String, dynamic>{
+        'nameWithExtension': nameWithExtension,
+        'mediaType': mediaType,
+        'mediaId': mediaId,
       };
-      var response = await _apiWrapper.post(
+      if (forceUpload) {
+        attachment['forceUpload'] = true;
+      }
+      final payload = <String, dynamic>{
+        'conversationId': conversationId,
+        'conversationType': conversationType,
+        'attachments': [attachment],
+      };
+      final response = await _apiWrapper.post(
         IsmChatAPI.presignedUrls,
         payload: payload,
         headers: IsmChatUtility.tokenCommonHeader(),
         showLoader: isLoading,
       );
       if (response.hasError) {
-        return null;
+        return MessagePresignedUrlsResult(response: response);
       }
 
-      var data = jsonDecode(response.data);
-
-      return (data['presignedUrls'] as List)
+      final data = jsonDecode(response.data) as Map<String, dynamic>;
+      final urls = (data['presignedUrls'] as List)
           .map((e) => PresignedUrlModel.fromMap(e as Map<String, dynamic>))
-          .toList()
-          .first;
+          .toList();
+      return MessagePresignedUrlsResult(response: response, urls: urls);
     } catch (e, st) {
-      IsmChatLog.error('Media url $e', st);
+      IsmChatLog.error('requestMessagePresignedUrls $e', st);
+      return MessagePresignedUrlsResult(
+        response: IsmChatResponseModel.message(
+          e.toString(),
+          isSuccess: false,
+        ),
+      );
+    }
+  }
+
+  /// Legacy helper — success-only first URL (use [requestMessagePresignedUrls]
+  /// when quota / duplicate handling is required).
+  Future<PresignedUrlModel?> postMediaUrl({
+    required String conversationId,
+    required String nameWithExtension,
+    required int mediaType,
+    required String mediaId,
+    required bool isLoading,
+    int conversationType = 0,
+    bool forceUpload = false,
+  }) async {
+    final result = await requestMessagePresignedUrls(
+      conversationId: conversationId,
+      nameWithExtension: nameWithExtension,
+      mediaType: mediaType,
+      mediaId: mediaId,
+      isLoading: isLoading,
+      conversationType: conversationType,
+      forceUpload: forceUpload,
+    );
+    if (result.response.hasError) {
       return null;
     }
+    return result.urls?.isNotEmpty == true ? result.urls!.first : null;
   }
 
   Future<IsmChatResponseModel?> createConversation({
