@@ -139,6 +139,8 @@ class IsmChatListHeader extends StatelessWidget implements PreferredSizeWidget {
           actions: [
             if (showSearch) _SearchAction(onTap: onSearchTap),
             if (IsmChatResponsive.isWeb(context)) _StartMessage(),
+            // Host-provided actions (e.g. example app Chat settings / threads demo).
+            ...?actions,
             _MoreIcon(onSignOut),
           ],
         ),
@@ -250,18 +252,15 @@ class _MoreIcon extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  IsmChatProperties
-                          .conversationProperties
-                          .storageQuotaListBannerProperties
-                          .menuIcon ??
+                  IsmChatProperties.conversationProperties
+                          .storageQuotaListBannerProperties.menuIcon ??
                       Icons.sd_storage_outlined,
                   color: IsmChatConfig.chatTheme.primaryColor,
                 ),
                 IsmChatDimens.boxWidth8,
                 Text(
                   IsmChatProperties
-                      .conversationProperties
-                      .storageQuotaListBannerProperties
+                      .conversationProperties.storageQuotaListBannerProperties
                       .resolveMenuLabel(
                     _,
                     Get.isRegistered<IsmChatStorageQuotaController>()

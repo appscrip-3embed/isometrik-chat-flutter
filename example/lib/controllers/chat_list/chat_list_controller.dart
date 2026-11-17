@@ -69,6 +69,7 @@ class ChatListController extends GetxController {
   void initialize() async {
     IsmChatLog.error(AppConfig.userDetail?.toJson());
     await IsmChat.i.initialize(
+      threadsEnabled: true,
       maskSensitiveContent: true,
       messageEncrypted: true,
       kNavigatorKey: kNavigatorKey,
