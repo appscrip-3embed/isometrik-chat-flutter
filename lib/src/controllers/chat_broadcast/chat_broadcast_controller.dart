@@ -80,6 +80,22 @@ class IsmChatBroadcastController extends GetxController {
     _isApiCall.value = value;
   }
 
+  /// Loads the broadcast list when opening [IsmChatBroadCastView].
+  ///
+  /// Clears a stale [isApiCall] from add-members flows, then fetches groupcasts.
+  Future<void> openBroadcastList() async {
+    isApiCall = false;
+    update();
+    await getBroadCast();
+  }
+
+  @override
+  void onClose() {
+    isApiCall = false;
+    refreshController.dispose();
+    super.onClose();
+  }
+
   /// Retrieves broadcasts with pagination support.
   ///
   /// Parameters:
@@ -92,19 +108,24 @@ class IsmChatBroadcastController extends GetxController {
     int skip = 0,
   }) async {
     if (isShowLoader) isApiCall = true;
-
-    final response = await _viewModel.getBroadCast(
-      isloading: isloading,
-      skip: skip,
-    );
-    if (skip == 0 && response != null) {
-      broadcastList = response;
-    } else if (skip != 0 && response != null) {
-      broadcastList.addAll(response);
-    } else if (skip == 0) {
-      broadcastList.clear();
+    try {
+      final response = await _viewModel.getBroadCast(
+        isloading: isloading,
+        skip: skip,
+      );
+      if (skip == 0 && response != null) {
+        broadcastList = response;
+      } else if (skip != 0 && response != null) {
+        broadcastList.addAll(response);
+      } else if (skip == 0) {
+        broadcastList.clear();
+      }
+    } catch (e, st) {
+      IsmChatLog.error('getBroadCast failed: $e', st);
+      if (skip == 0) broadcastList.clear();
+    } finally {
+      if (isShowLoader) isApiCall = false;
     }
-    if (isShowLoader) isApiCall = false;
   }
 
   /// Deletes a broadcast group.
@@ -291,45 +312,50 @@ class IsmChatBroadcastController extends GetxController {
     bool shouldShowLoader = true,
   }) async {
     if (shouldShowLoader) isApiCall = true;
-    final response = await _viewModel.getEligibleMembers(
-      groupcastId: groupcastId,
-      isloading: isloading,
-      skip: skip,
-      limit: limit,
-      searchTag: searchTag,
-    );
-    final users = response ?? [];
+    try {
+      final response = await _viewModel.getEligibleMembers(
+        groupcastId: groupcastId,
+        isloading: isloading,
+        skip: skip,
+        limit: limit,
+        searchTag: searchTag,
+      );
+      final users = response ?? [];
 
-    if (searchTag.isNullOrEmpty) {
-      eligibleMembers.addAll(List.from(users)
-          .map((e) => SelectedMembers(
+      if (searchTag.isNullOrEmpty) {
+        eligibleMembers.addAll(List.from(users)
+            .map((e) => SelectedMembers(
+                  isUserSelected: selectedUserList.isEmpty
+                      ? false
+                      : selectedUserList
+                          .any((d) => d.userId == (e as UserDetails).userId),
+                  userDetails: e as UserDetails,
+                  isBlocked: false,
+                ))
+            .toList());
+        eligibleMembersduplicate = List<SelectedMembers>.from(eligibleMembers);
+      } else {
+        eligibleMembers = List.from(users)
+            .map(
+              (e) => SelectedMembers(
                 isUserSelected: selectedUserList.isEmpty
                     ? false
                     : selectedUserList
                         .any((d) => d.userId == (e as UserDetails).userId),
                 userDetails: e as UserDetails,
                 isBlocked: false,
-              ))
-          .toList());
-      eligibleMembersduplicate = List<SelectedMembers>.from(eligibleMembers);
-    } else {
-      eligibleMembers = List.from(users)
-          .map(
-            (e) => SelectedMembers(
-              isUserSelected: selectedUserList.isEmpty
-                  ? false
-                  : selectedUserList
-                      .any((d) => d.userId == (e as UserDetails).userId),
-              userDetails: e as UserDetails,
-              isBlocked: false,
-            ),
-          )
-          .toList();
+              ),
+            )
+            .toList();
+      }
+      if (response != null) {
+        handleList(eligibleMembers);
+      }
+    } catch (e, st) {
+      IsmChatLog.error('getEligibleMembers failed: $e', st);
+    } finally {
+      if (shouldShowLoader) isApiCall = false;
     }
-    if (response != null) {
-      handleList(eligibleMembers);
-    }
-    if (shouldShowLoader) isApiCall = false;
   }
 
   /// Handles sorting and indexing of member list for UI display.
@@ -362,6 +388,8 @@ class IsmChatBroadcastController extends GetxController {
   void onEligibleMemberTap(int index) {
     eligibleMembers[index].isUserSelected =
         !eligibleMembers[index].isUserSelected;
+    eligibleMembers = List<SelectedMembers>.from(eligibleMembers);
+    update();
   }
 
   /// Updates the selection state of a user in the selected members list.
@@ -369,15 +397,14 @@ class IsmChatBroadcastController extends GetxController {
 
   /// - `userDetails`: User details to update selection status
   void isSelectedMembers(UserDetails userDetails) {
-    if (selectedUserList.isEmpty) {
-      selectedUserList.add(userDetails);
+    final updated = List<UserDetails>.from(selectedUserList);
+    if (updated.any((e) => e.userId == userDetails.userId)) {
+      updated.removeWhere((e) => e.userId == userDetails.userId);
     } else {
-      if (selectedUserList.any((e) => e.userId == userDetails.userId)) {
-        selectedUserList.removeWhere((e) => e.userId == userDetails.userId);
-      } else {
-        selectedUserList.add(userDetails);
-      }
+      updated.add(userDetails);
     }
+    selectedUserList = updated;
+    update();
   }
 
   /// Adds eligible members to a broadcast group.

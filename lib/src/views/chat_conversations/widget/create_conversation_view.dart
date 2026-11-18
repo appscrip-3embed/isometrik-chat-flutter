@@ -416,11 +416,7 @@ class _AlphabetAwareAzListViewState extends State<_AlphabetAwareAzListView> {
               offstage: user.isShowSuspension != true,
               child: IsmChatUtility.buildSusWidget(susTag),
             ),
-            ColoredBox(
-              color: user.isUserSelected
-                  ? IsmChatConfig.chatTheme.primaryColor!.applyIsmOpacity(.2)
-                  : Colors.transparent,
-              child: ListTile(
+            ListTile(
                 onTap: () async {
                   if (widget.isGroupConversation) {
                     widget.controller.onForwardUserTap(index);
@@ -467,6 +463,9 @@ class _AlphabetAwareAzListViewState extends State<_AlphabetAwareAzListView> {
                 },
                 dense: true,
                 mouseCursor: SystemMouseCursors.click,
+                tileColor: user.isUserSelected
+                    ? IsmChatConfig.chatTheme.primaryColor!.applyIsmOpacity(.2)
+                    : null,
                 leading: IsmChatImage.profile(
                   user.userDetails.userProfileImageUrl,
                   name: user.userDetails.userName,
@@ -501,7 +500,6 @@ class _AlphabetAwareAzListViewState extends State<_AlphabetAwareAzListView> {
                         ),
                       ),
               ),
-            ),
           ],
         );
       },

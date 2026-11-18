@@ -14,19 +14,17 @@ class IsmChatCreateBroadCastView extends StatelessWidget {
   Widget build(BuildContext context) => GetX<IsmChatConversationsController>(
         tag: IsmChat.i.chatListPageTag,
         initState: (_) {
-          final converstaionController =
-              Get.find<IsmChatConversationsController>(
-                  tag: IsmChat.i.chatListPageTag);
-          converstaionController
-            ..callApiOrNot = true
-            ..forwardedList.clear()
-            ..selectedUserList.clear()
-            ..showSearchField = false
-            ..isLoadResponse = false
-            ..getNonBlockUserList(
-              isGroupConversation: true,
-              opponentId: converstaionController.userDetails?.userId,
+          IsmChatUtility.doLater(() async {
+            if (!Get.isRegistered<IsmChatConversationsController>(
+                tag: IsmChat.i.chatListPageTag)) {
+              return;
+            }
+            final conversationsController =
+                Get.find<IsmChatConversationsController>(
+              tag: IsmChat.i.chatListPageTag,
             );
+            await conversationsController.initCreateConversation(true);
+          });
         },
         builder: (controller) => Scaffold(
           backgroundColor: IsmChatColors.whiteColor,
@@ -295,13 +293,7 @@ class IsmChatCreateBroadCastView extends StatelessWidget {
                                               user.isShowSuspension != true,
                                           child: _GetSuspensionTag(
                                               susTag: susTag)),
-                                      ColoredBox(
-                                        color: user.isUserSelected
-                                            ? IsmChatConfig
-                                                .chatTheme.primaryColor!
-                                                .applyIsmOpacity(.2)
-                                            : Colors.transparent,
-                                        child: ListTile(
+                                      ListTile(
                                           onTap: () {
                                             controller
                                               ..onForwardUserTap(index)
@@ -310,11 +302,11 @@ class IsmChatCreateBroadCastView extends StatelessWidget {
                                           },
                                           dense: true,
                                           mouseCursor: SystemMouseCursors.click,
-                                          // tileColor: user.isUserSelected
-                                          //     ? IsmChatConfig
-                                          //         .chatTheme.primaryColor!
-                                          //         .applyOpacity(.2)
-                                          //     : null,
+                                          tileColor: user.isUserSelected
+                                              ? IsmChatConfig
+                                                  .chatTheme.primaryColor!
+                                                  .applyIsmOpacity(.2)
+                                              : null,
                                           leading: IsmChatImage.profile(
                                             user.userDetails
                                                 .userProfileImageUrl,
@@ -336,7 +328,6 @@ class IsmChatCreateBroadCastView extends StatelessWidget {
                                             style: IsmChatStyles.w400Black12,
                                           ),
                                         ),
-                                      ),
                                     ],
                                   );
                                 },

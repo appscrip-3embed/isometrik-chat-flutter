@@ -11,26 +11,30 @@ mixin IsmChatConversationsForwardOperationsMixin on GetxController {
   IsmChatConversationsController get _controller =>
       this as IsmChatConversationsController;
 
-  /// This function will be used in [Forward Screen and New conversation screen] to Select or Unselect users
+  /// Select / unselect a user on forward, group, and broadcast pickers.
   ///
-  ///  `index` : The index of the user in the forwarded list.
+  /// Also refreshes GetX: [SelectedMembers.isUserSelected] is an internal [RxBool],
+  /// so toggling it alone does not rebuild [GetX] builders.
   void onForwardUserTap(int index) {
-    _controller.forwardedList[index].isUserSelected = !_controller.forwardedList[index].isUserSelected;
+    _controller.forwardedList[index].isUserSelected =
+        !_controller.forwardedList[index].isUserSelected;
+    _controller.forwardedList =
+        List<SelectedMembers>.from(_controller.forwardedList);
+    _controller.update();
   }
 
   /// This function will be used in [Forward Screen and New conversation screen] Adds or removes a user from the selected user list based on their selection state.
   ///
   ///  `userDetails`: The user to be selected or deselected.
   void isSelectedUser(UserDetails userDetails) {
-    if (_controller.selectedUserList.isEmpty) {
-      _controller.selectedUserList.add(userDetails);
+    final updated = List<UserDetails>.from(_controller.selectedUserList);
+    if (updated.any((e) => e.userId == userDetails.userId)) {
+      updated.removeWhere((e) => e.userId == userDetails.userId);
     } else {
-      if (_controller.selectedUserList.any((e) => e.userId == userDetails.userId)) {
-        _controller.selectedUserList.removeWhere((e) => e.userId == userDetails.userId);
-      } else {
-        _controller.selectedUserList.add(userDetails);
-      }
+      updated.add(userDetails);
     }
+    _controller.selectedUserList = updated;
+    _controller.update();
   }
 
   /// Sends a forwarded message to specified users.
@@ -76,7 +80,7 @@ mixin IsmChatConversationsForwardOperationsMixin on GetxController {
   /// Initializes the state for creating a new conversation.
   ///
   /// `isGroupConversation`: Indicates if the conversation is a group chat.
-  void initCreateConversation([bool isGroupConversation = false]) async {
+  Future<void> initCreateConversation([bool isGroupConversation = false]) async {
     _controller.callApiOrNot = true;
     _controller.profileImage = '';
     _controller.forwardedList.clear();

@@ -248,13 +248,7 @@ class IsmChatForwardView extends StatelessWidget {
                                         offstage: user.isShowSuspension != true,
                                         child: _buildSusWidget(susTag),
                                       ),
-                                      ColoredBox(
-                                        color: user.isUserSelected
-                                            ? IsmChatConfig
-                                                .chatTheme.primaryColor!
-                                                .applyIsmOpacity(.2)
-                                            : Colors.transparent,
-                                        child: ListTile(
+                                      ListTile(
                                           onTap: !user.isUserSelected &&
                                                   controller
                                                           .forwardedList
@@ -292,6 +286,11 @@ class IsmChatForwardView extends StatelessWidget {
                                                 },
                                           dense: true,
                                           mouseCursor: SystemMouseCursors.click,
+                                          tileColor: user.isUserSelected
+                                              ? IsmChatConfig
+                                                  .chatTheme.primaryColor!
+                                                  .applyIsmOpacity(.2)
+                                              : null,
                                           leading: IsmChatImage.profile(
                                             user.userDetails
                                                 .userProfileImageUrl,
@@ -309,7 +308,6 @@ class IsmChatForwardView extends StatelessWidget {
                                           ),
                                           autofocus: true,
                                         ),
-                                      ),
                                     ],
                                   );
                                 },

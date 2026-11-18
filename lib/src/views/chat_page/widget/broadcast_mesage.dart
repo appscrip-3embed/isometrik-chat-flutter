@@ -24,6 +24,15 @@ class _IsmChatBoradcastMessagePageState
     if (!IsmChatUtility.chatPageControllerRegistered) {
       IsmChatPageBinding().dependencies();
     }
+    // Mobile broadcast route does not use [IsmChatPageView]; without this,
+    // [isMessagesLoading] never clears and the composer never appears.
+    unawaited(_bootstrapBroadcastChatPage());
+  }
+
+  Future<void> _bootstrapBroadcastChatPage() async {
+    if (!IsmChatUtility.chatPageControllerRegistered) return;
+    final chatPage = IsmChatUtility.chatPageController..isBroadcast = true;
+    await chatPage.startInit(isBroadcasts: true);
   }
 
   @override
@@ -98,7 +107,7 @@ class _BroadCastMessageState extends State<_BroadCastMessage> {
   @override
   void initState() {
     super.initState();
-    _fetchBroadcastTitle();
+    // Title fetch runs from [_IsmChatBoradcastMessagePageState] after startInit.
   }
 
   Future<void> _fetchBroadcastTitle() async {
