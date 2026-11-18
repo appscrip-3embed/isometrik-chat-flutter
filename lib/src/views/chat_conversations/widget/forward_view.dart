@@ -16,35 +16,6 @@ class IsmChatForwardView extends StatelessWidget {
 
   final converstaionController = IsmChatUtility.conversationController;
 
-  Widget _buildSusWidget(String susTag) => Container(
-        padding: IsmChatDimens.edgeInsets10_0,
-        height: IsmChatDimens.forty,
-        width: double.infinity,
-        alignment: Alignment.centerLeft,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              susTag,
-              textScaler: const TextScaler.linear(1.5),
-              style: IsmChatStyles.w600Black14,
-            ),
-            SizedBox(
-                width: IsmChatDimens.percentWidth(
-                  IsmChatResponsive.isWeb(
-                          IsmChatConfig.kNavigatorKey.currentContext ??
-                              IsmChatConfig.context)
-                      ? .23
-                      : .7,
-                ),
-                child: Divider(
-                  height: .0,
-                  indent: IsmChatDimens.ten,
-                ))
-          ],
-        ),
-      );
-
   @override
   Widget build(BuildContext context) => GetX<IsmChatConversationsController>(
         tag: IsmChat.i.chatListPageTag,
@@ -53,7 +24,7 @@ class IsmChatForwardView extends StatelessWidget {
           converstaionController.forwardedList.clear();
           converstaionController.selectedUserList.clear();
 
-          converstaionController.showSearchField = false;
+          converstaionController.userSearchNameController.clear();
           converstaionController.isLoadResponse = false;
           converstaionController.getNonBlockUserList(
             opponentId: conversation.opponentDetails?.userId,
@@ -62,95 +33,39 @@ class IsmChatForwardView extends StatelessWidget {
         builder: (controller) => Scaffold(
           backgroundColor: IsmChatColors.whiteColor,
           appBar: IsmChatAppBar(
-            title: controller.showSearchField
-                ? IsmChatInputField(
-                    fillColor: IsmChatConfig.chatTheme.primaryColor,
-                    style: IsmChatStyles.w400White16,
-                    hint: IsmChatStrings.searchUser,
-                    hintStyle: IsmChatStyles.w400White16,
-                    onChanged: (value) {
-                      if (value.trim().isEmpty) {
-                        controller.forwardedList =
-                            controller.forwardedListDuplicat
-                                .map((e) => SelectedMembers(
-                                      isUserSelected:
-                                          controller.selectedUserList.any((d) =>
-                                              d.userId == e.userDetails.userId),
-                                      userDetails: e.userDetails,
-                                      isBlocked: e.isBlocked,
-                                      tagIndex: e.tagIndex,
-                                    ))
-                                .toList();
-                        controller.commonController.handleSorSelectedMembers(
-                          controller.forwardedList,
-                        );
-                        return;
-                      }
-                      controller.debounce.run(() {
-                        controller
-                          ..isLoadResponse = false
-                          ..getNonBlockUserList(
-                            searchTag: value,
-                            opponentId: IsmChatConfig
-                                .communicationConfig.userConfig.userId,
-                          );
-                      });
-                    },
-                  )
-                : Text(
-                    'Forward to...  ${controller.selectedUserList.isEmpty ? '' : controller.selectedUserList.length}',
-                    style: IsmChatConfig
-                            .chatTheme.chatPageHeaderTheme?.titleStyle ??
-                        IsmChatStyles.w600White18,
-                  ),
-            action: [
-              IconButton(
-                onPressed: () {
-                  controller.showSearchField = !controller.showSearchField;
-
-                  if (!controller.showSearchField &&
-                      controller.forwardedListDuplicat.isNotEmpty) {
-                    controller.forwardedList = controller.forwardedListDuplicat
-                        .map(
-                          (e) => SelectedMembers(
-                              isUserSelected: controller.selectedUserList
-                                  .any((d) => d.userId == e.userDetails.userId),
-                              userDetails: e.userDetails,
-                              isBlocked: e.isBlocked,
-                              tagIndex: e.tagIndex),
-                        )
-                        .toList();
-                    controller.commonController.handleSorSelectedMembers(
-                      controller.forwardedList,
-                    );
-                  }
-                  if (controller.isLoadResponse) {
-                    controller.isLoadResponse = false;
-                  }
-                },
-                icon: Icon(
-                  controller.showSearchField
-                      ? Icons.clear_rounded
-                      : Icons.search_rounded,
-                  color: IsmChatColors.whiteColor,
-                ),
-              )
-            ],
+            title: Text(
+              'Forward to...  ${controller.selectedUserList.isEmpty ? '' : controller.selectedUserList.length}',
+              style: IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
+                  IsmChatStyles.w600White18,
+            ),
           ),
-          body: controller.forwardedList.isEmpty
-              ? controller.isLoadResponse
-                  ? Center(
-                      child: Text(
-                        IsmChatStrings.noUserFound,
-                        style: IsmChatStyles.w600Black16,
-                      ),
-                    )
-                  : const IsmChatLoadingDialog()
-              : Column(
-                  children: [
-                    Expanded(
-                      child: NotificationListener<ScrollNotification>(
+          body: Column(
+            children: [
+              IsmChatUserListSearchBar(
+                controller: controller.userSearchNameController,
+                height: IsmChatDimens.fortyEight,
+                padding: EdgeInsets.fromLTRB(
+                  IsmChatDimens.ten,
+                  IsmChatDimens.ten,
+                  IsmChatDimens.ten,
+                  IsmChatDimens.ten,
+                ),
+                onChanged: (value) => _onForwardSearchChanged(controller, value),
+                onClear: () => _onForwardSearchClear(controller),
+              ),
+              Expanded(
+                child: controller.forwardedList.isEmpty
+                    ? controller.isLoadResponse
+                        ? Center(
+                            child: Text(
+                              IsmChatStrings.noUserFound,
+                              style: IsmChatStyles.w600Black16,
+                            ),
+                          )
+                        : const IsmChatLoadingDialog()
+                    : NotificationListener<ScrollNotification>(
                         onNotification: (scrollNotification) {
+                          dismissKeyboardOnPickerScroll(scrollNotification);
                           if (scrollNotification is ScrollEndNotification) {
                             if (scrollNotification.metrics.pixels >
                                 scrollNotification.metrics.maxScrollExtent *
@@ -245,16 +160,15 @@ class IsmChatForwardView extends StatelessWidget {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Offstage(
-                                        offstage: user.isShowSuspension != true,
-                                        child: _buildSusWidget(susTag),
+                                        offstage: user.isShowSuspension !=
+                                                true ||
+                                            index == 0,
+                                        child: IsmChatUtility.buildSusWidget(
+                                          susTag,
+                                          showTrailingDivider: index != 0,
+                                        ),
                                       ),
-                                      ColoredBox(
-                                        color: user.isUserSelected
-                                            ? IsmChatConfig
-                                                .chatTheme.primaryColor!
-                                                .applyIsmOpacity(.2)
-                                            : Colors.transparent,
-                                        child: ListTile(
+                                      ListTile(
                                           onTap: !user.isUserSelected &&
                                                   controller
                                                           .forwardedList
@@ -292,6 +206,11 @@ class IsmChatForwardView extends StatelessWidget {
                                                 },
                                           dense: true,
                                           mouseCursor: SystemMouseCursors.click,
+                                          tileColor: user.isUserSelected
+                                              ? IsmChatConfig
+                                                  .chatTheme.primaryColor!
+                                                  .applyIsmOpacity(.2)
+                                              : null,
                                           leading: IsmChatImage.profile(
                                             user.userDetails
                                                 .userProfileImageUrl,
@@ -309,22 +228,16 @@ class IsmChatForwardView extends StatelessWidget {
                                           ),
                                           autofocus: true,
                                         ),
-                                      ),
                                     ],
                                   );
                                 },
                               ),
                       ),
-                    ),
-                    if (controller.selectedUserList.isNotEmpty)
+              ),
+              if (controller.selectedUserList.isNotEmpty)
                       Container(
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: Colors.white,
-                          border: Border(
-                            top: BorderSide(
-                              color: Colors.grey.applyIsmOpacity(0.5),
-                            ),
-                          ),
                         ),
                         height: IsmChatDimens.sixty,
                         padding: IsmChatDimens.edgeInsets10_0,
@@ -345,10 +258,7 @@ class IsmChatForwardView extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const VerticalDivider(
-                              thickness: 1,
-                              color: IsmChatColors.greyColorLight,
-                            ),
+                            IsmChatDimens.boxWidth8,
                             FloatingActionButton(
                               onPressed: () async {
                                 if (IsmChatProperties
@@ -406,8 +316,59 @@ class IsmChatForwardView extends StatelessWidget {
                           ],
                         ),
                       ),
-                  ],
-                ),
+            ],
+          ),
         ),
       );
+
+  static void _onForwardSearchChanged(
+    IsmChatConversationsController controller,
+    String value,
+  ) {
+    if (value.trim().isEmpty) {
+      controller.forwardedList = controller.forwardedListDuplicat
+          .map((e) => SelectedMembers(
+                isUserSelected: controller.selectedUserList
+                    .any((d) => d.userId == e.userDetails.userId),
+                userDetails: e.userDetails,
+                isBlocked: e.isBlocked,
+                tagIndex: e.tagIndex,
+              ))
+          .toList();
+      controller.commonController.handleSorSelectedMembers(
+        controller.forwardedList,
+      );
+      return;
+    }
+    controller.debounce.run(() {
+      controller
+        ..isLoadResponse = false
+        ..getNonBlockUserList(
+          searchTag: value,
+          opponentId: IsmChatConfig.communicationConfig.userConfig.userId,
+        );
+    });
+  }
+
+  static void _onForwardSearchClear(IsmChatConversationsController controller) {
+    if (controller.forwardedListDuplicat.isNotEmpty) {
+      controller.forwardedList = controller.forwardedListDuplicat
+          .map(
+            (e) => SelectedMembers(
+              isUserSelected: controller.selectedUserList
+                  .any((d) => d.userId == e.userDetails.userId),
+              userDetails: e.userDetails,
+              isBlocked: e.isBlocked,
+              tagIndex: e.tagIndex,
+            ),
+          )
+          .toList();
+      controller.commonController.handleSorSelectedMembers(
+        controller.forwardedList,
+      );
+    }
+    if (controller.isLoadResponse) {
+      controller.isLoadResponse = false;
+    }
+  }
 }

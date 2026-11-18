@@ -96,18 +96,17 @@ class _AzListWidgtetState<T> extends State<AzListWidgtet<T>> {
                   offstage: suspension.isShowSuspension != true,
                   child: IsmChatUtility.buildSusWidget(susTag),
                 ),
-                ColoredBox(
-                  color: widget.isSelected.call(member)
-                      ? IsmChatConfig.chatTheme.primaryColor!
-                          .applyIsmOpacity(.2)
-                      : IsmChatColors.transparent,
-                  child: ListTile(
+                ListTile(
                     onTap: () {
                       widget.onTap.call(index, member);
                       setState(() {});
                     },
                     dense: true,
                     mouseCursor: SystemMouseCursors.click,
+                    tileColor: widget.isSelected.call(member)
+                        ? IsmChatConfig.chatTheme.primaryColor!
+                            .applyIsmOpacity(.2)
+                        : null,
                     leading: IsmChatImage.profile(
                       widget.imageUrl.call(member),
                       name: widget.title.call(member),
@@ -140,7 +139,6 @@ class _AzListWidgtetState<T> extends State<AzListWidgtet<T>> {
                       ),
                     ),
                   ),
-                ),
               ],
             );
           },

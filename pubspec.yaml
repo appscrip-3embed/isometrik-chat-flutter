@@ -21,7 +21,8 @@ dependencies:
   dio: ^5.8.0+1
   emoji_picker_flutter: ^4.4.0
   encrypt: ^5.0.3
-  file_picker: ^10.3.8
+  # ^13.x matches Hola's dependency_overrides (win32 6 / share_plus).
+  file_picker: ^13.4.0
   flutter:
     sdk: flutter
   flutter_contacts: ^2.0.0
@@ -62,7 +63,7 @@ dependencies:
   pull_to_refresh: ^2.0.0
   record: ^6.0.0
   scroll_to_index: ^3.0.1
-  share_plus: ^12.0.0
+  share_plus: ^13.3.1
   universal_html: ^2.2.4
   url_launcher: ^6.3.1
   video_compress: ^3.1.4

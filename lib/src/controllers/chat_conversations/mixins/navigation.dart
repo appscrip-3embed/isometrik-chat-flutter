@@ -71,8 +71,10 @@ mixin IsmChatConversationsNavigationMixin on GetxController {
       if (!IsmChatUtility.chatPageControllerRegistered) {
         IsmChatPageBinding().dependencies();
       }
-      IsmChatUtility.chatPageController.isBroadcast = true;
-      IsmChatRoute.goToRoute(const IsmChatBoradcastMessagePage());
+      IsmChatUtility.chatPageController
+        ..isBroadcast = true
+        ..isMessagesLoading = true;
+      await IsmChatRoute.goToRoute(const IsmChatBoradcastMessagePage());
     }
   }
 }

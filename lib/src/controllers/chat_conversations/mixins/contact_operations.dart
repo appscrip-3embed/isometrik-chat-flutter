@@ -33,7 +33,8 @@ mixin IsmChatConversationsContactOperationsMixin on GetxController {
   }) async {
     if (!_controller.callApiOrNot) return null;
     _controller.callApiOrNot = false;
-    final response = await _controller.viewModel.getNonBlockUserList(
+    try {
+      final response = await _controller.viewModel.getNonBlockUserList(
       sort: sort,
       skip: searchTag.isNotEmpty
           ? 0
@@ -42,61 +43,64 @@ mixin IsmChatConversationsContactOperationsMixin on GetxController {
               : _controller.forwardedList.length.pagination(),
       limit: limit,
       searchTag: searchTag,
-      isLoading: isLoading,
-    );
+        isLoading: isLoading,
+      );
 
-    final users = response?.users ?? [];
-    if (users.isEmpty) {
-      _controller.isLoadResponse = true;
-    }
-    users.sort((a, b) => a.userName.compareTo(b.userName));
+      final users = response?.users ?? [];
+      if (users.isEmpty || response == null) {
+        _controller.isLoadResponse = true;
+      }
+      users.sort((a, b) => a.userName.compareTo(b.userName));
 
-    if (opponentId != null) {
-      users.removeWhere((e) => e.userId == opponentId);
-    }
+      if (opponentId != null) {
+        users.removeWhere((e) => e.userId == opponentId);
+      }
 
-    if (searchTag.isEmpty) {
-      _controller.forwardedList.addAll(List.from(users)
-          .map((e) => SelectedMembers(
+      if (searchTag.isEmpty) {
+        _controller.forwardedList.addAll(List.from(users)
+            .map((e) => SelectedMembers(
+                  isUserSelected: _controller.selectedUserList.isEmpty
+                      ? false
+                      : _controller.selectedUserList
+                          .any((d) => d.userId == (e as UserDetails).userId),
+                  userDetails: e as UserDetails,
+                  isBlocked: false,
+                ))
+            .toList());
+        _controller.forwardedListDuplicat =
+            List<SelectedMembers>.from(_controller.forwardedList);
+      } else {
+        _controller.forwardedList = List.from(users)
+            .map(
+              (e) => SelectedMembers(
                 isUserSelected: _controller.selectedUserList.isEmpty
                     ? false
                     : _controller.selectedUserList
                         .any((d) => d.userId == (e as UserDetails).userId),
                 userDetails: e as UserDetails,
                 isBlocked: false,
-              ))
-          .toList());
-      _controller.forwardedListDuplicat =
-          List<SelectedMembers>.from(_controller.forwardedList);
-    } else {
-      _controller.forwardedList = List.from(users)
-          .map(
-            (e) => SelectedMembers(
-              isUserSelected: _controller.selectedUserList.isEmpty
-                  ? false
-                  : _controller.selectedUserList
-                      .any((d) => d.userId == (e as UserDetails).userId),
-              userDetails: e as UserDetails,
-              isBlocked: false,
-            ),
-          )
-          .toList();
-    }
+              ),
+            )
+            .toList();
+      }
 
-    if (response != null) {
-      _controller.commonController.handleSorSelectedMembers(
-        _controller.forwardedList,
-      );
-    }
+      if (response != null) {
+        _controller.commonController.handleSorSelectedMembers(
+          _controller.forwardedList,
+        );
+      }
 
-    if (response == null && searchTag.isEmpty && isGroupConversation == false) {
-      unawaited(
-          _controller.getContacts(isLoading: isLoading, searchTag: searchTag));
-      _controller.callApiOrNot = true;
+      if (response == null &&
+          searchTag.isEmpty &&
+          isGroupConversation == false) {
+        unawaited(_controller.getContacts(
+            isLoading: isLoading, searchTag: searchTag));
+        return _controller.forwardedList;
+      }
       return _controller.forwardedList;
+    } finally {
+      _controller.callApiOrNot = true;
     }
-    _controller.callApiOrNot = true;
-    return _controller.forwardedList;
   }
 
   /// Loads all contacts in the background for A-Z navigation.

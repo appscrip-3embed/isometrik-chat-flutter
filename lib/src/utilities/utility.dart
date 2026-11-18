@@ -1098,7 +1098,11 @@ class IsmChatUtility {
     return null;
   }
 
-  static Widget buildSusWidget(String susTag) => Container(
+  static Widget buildSusWidget(
+    String susTag, {
+    bool showTrailingDivider = true,
+  }) =>
+      Container(
         padding: IsmChatDimens.edgeInsets10_0,
         height: IsmChatDimens.forty,
         width: double.infinity,
@@ -1112,9 +1116,10 @@ class IsmChatUtility {
                     textScaler: const TextScaler.linear(1.5),
                     style: IsmChatStyles.w600Black14,
                   ),
-                  if (!IsmChatResponsive.isWeb(
-                      IsmChatConfig.kNavigatorKey.currentContext ??
-                          IsmChatConfig.context))
+                  if (showTrailingDivider &&
+                      !IsmChatResponsive.isWeb(
+                          IsmChatConfig.kNavigatorKey.currentContext ??
+                              IsmChatConfig.context))
                     SizedBox(
                         width: IsmChatDimens.percentWidth(.8),
                         child: Divider(
