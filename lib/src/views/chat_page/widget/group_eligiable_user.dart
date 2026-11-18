@@ -6,34 +6,6 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 class IsmChatGroupEligibleUser extends StatelessWidget {
   const IsmChatGroupEligibleUser({super.key});
 
-  Widget _buildSusWidget(String susTag) => Container(
-        padding: IsmChatDimens.edgeInsets10_0,
-        height: IsmChatDimens.forty,
-        width: double.infinity,
-        alignment: Alignment.centerLeft,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              susTag,
-              textScaler: const TextScaler.linear(1.5),
-              style: IsmChatStyles.w600Black14,
-            ),
-            SizedBox(
-                width: IsmChatDimens.percentWidth(IsmChatResponsive.isWeb(
-                        IsmChatConfig.kNavigatorKey.currentContext ??
-                            IsmChatConfig.context)
-                    ? .24
-                    : .7),
-                child: Divider(
-                  height: .0,
-                  indent: IsmChatDimens.ten,
-                ))
-          ],
-        ),
-      );
-
   @override
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
@@ -42,13 +14,14 @@ class IsmChatGroupEligibleUser extends StatelessWidget {
           chatPageController
             ..groupEligibleUser.clear()
             ..canCallCurrentApi = false
-            ..isMemberSearch = false
+            ..participnatsEditingController.clear()
             ..getEligibleMembers(
                 conversationId:
                     chatPageController.conversation?.conversationId ?? '',
                 limit: 20);
         },
         builder: (controller) => Scaffold(
+          backgroundColor: IsmChatColors.whiteColor,
           resizeToAvoidBottomInset: false,
           appBar: IsmChatAppBar(
             onBack: !IsmChatResponsive.isWeb(context)
@@ -56,56 +29,42 @@ class IsmChatGroupEligibleUser extends StatelessWidget {
                 : () => IsmChatUtility
                         .conversationController.isRenderChatPageaScreen =
                     IsRenderChatPageScreen.coversationInfoView,
-            title: controller.isMemberSearch
-                ? IsmChatInputField(
-                    fillColor: IsmChatConfig.chatTheme.primaryColor,
-                    autofocus: true,
-                    hint: 'Search user..',
-                    hintStyle: IsmChatStyles.w600White16,
-                    cursorColor: IsmChatColors.whiteColor,
-                    style: IsmChatStyles.w600White16,
-                    controller: controller.participnatsEditingController,
-                    onChanged: (value) {
-                      controller.addParticipantSearch(value);
-                    },
-                  )
-                : Text(
-                    'Add participants...  ${controller.groupEligibleUser.selectedUsers.isEmpty ? '' : controller.groupEligibleUser.selectedUsers.length}',
-                    style: IsmChatConfig
-                            .chatTheme.chatPageHeaderTheme?.titleStyle ??
-                        IsmChatStyles.w600White18,
-                  ),
-            action: [
-              IconButton(
-                onPressed: () {
-                  controller.isMemberSearch = !controller.isMemberSearch;
-                  controller.participnatsEditingController.clear();
-                  controller.addParticipantSearch('');
-                },
-                icon: Icon(
-                  controller.isMemberSearch
-                      ? Icons.clear_rounded
-                      : Icons.search_rounded,
-                  color: IsmChatColors.whiteColor,
-                ),
-              )
-            ],
+            title: Text(
+              'Add participants...  ${controller.groupEligibleUser.selectedUsers.isEmpty ? '' : controller.groupEligibleUser.selectedUsers.length}',
+              style: IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
+                  IsmChatStyles.w600White18,
+            ),
           ),
-          body: controller.groupEligibleUser.isEmpty
-              ? controller.isMemberSearch
-                  ? Center(
-                      child: Text(
-                        'No user found',
-                        style: IsmChatStyles.w600Black16,
-                      ),
-                    )
-                  : const IsmChatLoadingDialog()
-              : SizedBox(
-                  child: Column(
-                    children: [
-                      Expanded(
-                          child: NotificationListener<ScrollNotification>(
+          body: Column(
+            children: [
+              IsmChatUserListSearchBar(
+                controller: controller.participnatsEditingController,
+                hintText: 'Search user..',
+                height: IsmChatDimens.fortyEight,
+                padding: EdgeInsets.fromLTRB(
+                  IsmChatDimens.ten,
+                  IsmChatDimens.ten,
+                  IsmChatDimens.ten,
+                  IsmChatDimens.ten,
+                ),
+                onChanged: controller.addParticipantSearch,
+                onClear: () => controller.addParticipantSearch(''),
+              ),
+              Expanded(
+                child: controller.groupEligibleUser.isEmpty
+                    ? controller.participnatsEditingController.text
+                            .trim()
+                            .isNotEmpty
+                        ? Center(
+                            child: Text(
+                              'No user found',
+                              style: IsmChatStyles.w600Black16,
+                            ),
+                          )
+                        : const IsmChatLoadingDialog()
+                    : NotificationListener<ScrollNotification>(
                         onNotification: (scrollNotification) {
+                          dismissKeyboardOnPickerScroll(scrollNotification);
                           if (scrollNotification is ScrollEndNotification) {
                             if (scrollNotification.metrics.pixels >
                                 scrollNotification.metrics.maxScrollExtent *
@@ -198,8 +157,13 @@ class IsmChatGroupEligibleUser extends StatelessWidget {
                               child: Column(
                                 children: [
                                   Offstage(
-                                    offstage: user.isShowSuspension != true,
-                                    child: _buildSusWidget(susTag),
+                                    offstage: user.isShowSuspension !=
+                                            true ||
+                                        index == 0,
+                                    child: IsmChatUtility.buildSusWidget(
+                                      susTag,
+                                      showTrailingDivider: index != 0,
+                                    ),
                                   ),
                                   Container(
                                     color: controller.groupEligibleUser[index]
@@ -238,12 +202,12 @@ class IsmChatGroupEligibleUser extends StatelessWidget {
                             );
                           },
                         ),
-                      )),
-                      if (controller.groupEligibleUser.selectedUsers.isNotEmpty)
-                        const _SelectedUsers(),
-                    ],
-                  ),
-                ),
+                      ),
+              ),
+              if (controller.groupEligibleUser.selectedUsers.isNotEmpty)
+                const _SelectedUsers(),
+            ],
+          ),
         ),
       );
 }

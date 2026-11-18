@@ -30,197 +30,48 @@ class IsmChatCreateBroadCastView extends StatelessWidget {
           backgroundColor: IsmChatColors.whiteColor,
           appBar: IsmChatAppBar(
             height: IsmChatDimens.fiftyFive,
-            title: controller.showSearchField
-                ? IsmChatInputField(
-                    fillColor: IsmChatConfig.chatTheme.primaryColor,
-                    style: IsmChatStyles.w400White16,
-                    hint: IsmChatStrings.searchUser,
-                    hintStyle: IsmChatStyles.w400White16,
-                    onChanged: (value) {
-                      controller.debounce.run(() {
-                        controller
-                          ..isLoadResponse = false
-                          ..getNonBlockUserList(
-                            searchTag: value,
-                            opponentId: IsmChatConfig
-                                .communicationConfig.userConfig.userId,
-                          );
-                      });
-                      if (value.trim().isEmpty) {
-                        controller.forwardedList =
-                            controller.forwardedListDuplicat
-                                .map((e) => SelectedMembers(
-                                      isUserSelected:
-                                          controller.selectedUserList.any((d) =>
-                                              d.userId == e.userDetails.userId),
-                                      userDetails: e.userDetails,
-                                      isBlocked: e.isBlocked,
-                                      tagIndex: e.tagIndex,
-                                    ))
-                                .toList();
-                        controller.commonController.handleSorSelectedMembers(
-                          controller.forwardedList,
-                        );
-                      }
-                    },
-                  )
-                : Text(
-                    'Broadcast message to...  ${controller.selectedUserList.isEmpty ? '' : controller.selectedUserList.length}',
-                    style: IsmChatConfig
-                            .chatTheme.chatPageHeaderTheme?.titleStyle ??
-                        IsmChatStyles.w600White18,
-                  ),
-            action: [
-              IconButton(
-                onPressed: () {
-                  controller.showSearchField = !controller.showSearchField;
-                  if (!controller.showSearchField &&
-                      controller.forwardedListDuplicat.isNotEmpty) {
-                    controller.forwardedList = controller.forwardedListDuplicat
-                        .map(
-                          (e) => SelectedMembers(
-                              isUserSelected: controller.selectedUserList
-                                  .any((d) => d.userId == e.userDetails.userId),
-                              userDetails: e.userDetails,
-                              isBlocked: e.isBlocked,
-                              tagIndex: e.tagIndex),
-                        )
-                        .toList();
-
-                    controller.commonController.handleSorSelectedMembers(
-                      controller.forwardedList,
-                    );
-                  }
-                  if (controller.isLoadResponse) {
-                    controller.isLoadResponse = false;
-                  }
-                },
-                icon: Icon(
-                  controller.showSearchField
-                      ? Icons.clear_rounded
-                      : Icons.search_rounded,
-                  color:
-                      IsmChatConfig.chatTheme.chatPageHeaderTheme?.iconColor ??
-                          IsmChatColors.whiteColor,
-                ),
-              )
-            ],
+            title: Text(
+              'Broadcast message to...  ${controller.selectedUserList.isEmpty ? '' : controller.selectedUserList.length}',
+              style: IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
+                  IsmChatStyles.w600White18,
+            ),
           ),
           body: Column(
             mainAxisSize: MainAxisSize.max,
             children: [
-              if (controller.selectedUserList.isEmpty) ...[
-                Container(
-                  alignment: Alignment.center,
-                  height: IsmChatDimens.ninty,
-                  child: Text(
-                    IsmChatStrings.contactAppear,
-                    style: IsmChatStyles.w400Black14,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                )
-              ] else ...[
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.grey.applyIsmOpacity(0.5),
-                      ),
-                    ),
-                  ),
-                  height: IsmChatDimens.ninty,
-                  child: ListView.separated(
-                    padding: IsmChatDimens.edgeInsets10,
-                    scrollDirection: Axis.horizontal,
-                    itemCount: controller.selectedUserList.length,
-                    separatorBuilder: (_, __) => IsmChatDimens.boxWidth8,
-                    itemBuilder: (context, index) {
-                      var user = controller.selectedUserList[index];
-                      return InkWell(
-                        onTap: () {
-                          controller
-                            ..isSelectedUser(user)
-                            ..onForwardUserTap(
-                              controller.forwardedList.indexOf(
-                                controller.forwardedList.selectedUsers[index],
-                              ),
-                            );
-                        },
-                        child: SizedBox(
-                          width: IsmChatDimens.fifty,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  SizedBox(
-                                    width: IsmChatDimens.forty,
-                                    height: IsmChatDimens.forty,
-                                    child: IsmChatImage.profile(
-                                      user.userProfileImageUrl,
-                                      name: user.userName,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: IsmChatDimens.twentySeven,
-                                    left: IsmChatDimens.twentySeven,
-                                    child: CircleAvatar(
-                                      backgroundColor: IsmChatConfig
-                                          .chatTheme.backgroundColor,
-                                      radius: IsmChatDimens.eight,
-                                      child: Icon(
-                                        Icons.close_rounded,
-                                        color: IsmChatConfig
-                                            .chatTheme.primaryColor,
-                                        size: IsmChatDimens.twelve,
-                                      ),
-                                    ),
-                                  )
-                                ],
-                              ),
-                              SizedBox(
-                                height: IsmChatDimens.twentyEight,
-                                child: Text(
-                                  user.userName,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                  style: IsmChatStyles.w600Black10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+              IsmChatUserListSearchBar(
+                controller: controller.userSearchNameController,
+                height: IsmChatDimens.fortyEight,
+                padding: EdgeInsets.fromLTRB(
+                  IsmChatDimens.ten,
+                  IsmChatDimens.ten,
+                  IsmChatDimens.ten,
+                  IsmChatDimens.ten,
                 ),
-              ],
-              controller.forwardedList.isEmpty
-                  ? Expanded(
-                      child: Center(
-                        child: controller.isLoadResponse
-                            ? Text(
-                                IsmChatStrings.noUserFound,
-                                style: IsmChatStyles.w600Black16,
-                              )
-                            : const IsmChatLoadingDialog(),
-                      ),
-                    )
-                  : Expanded(
-                      child: NotificationListener<ScrollNotification>(
+                onChanged: (value) =>
+                    _onBroadcastSearchChanged(controller, value),
+                onClear: () => _onBroadcastSearchClear(controller),
+              ),
+              Expanded(
+                child: controller.forwardedList.isEmpty
+                    ? controller.isLoadResponse
+                        ? Center(
+                            child: Text(
+                              IsmChatStrings.noUserFound,
+                              style: IsmChatStyles.w600Black16,
+                            ),
+                          )
+                        : const IsmChatLoadingDialog()
+                    : NotificationListener<ScrollNotification>(
                         onNotification: (scrollNotification) {
-                          if (!controller.showSearchField &&
+                          dismissKeyboardOnPickerScroll(scrollNotification);
+                          if (controller.userSearchNameController.text
+                                  .isEmpty &&
                               !controller.isLoadResponse) {
                             if (scrollNotification is ScrollEndNotification) {
                               if (scrollNotification.metrics.pixels >
                                   scrollNotification.metrics.maxScrollExtent *
                                       0.7) {
-                                /// call the api only on down scroll for pagination
                                 unawaited(controller.getNonBlockUserList(
                                   isGroupConversation: true,
                                   opponentId: IsmChatConfig
@@ -231,16 +82,7 @@ class IsmChatCreateBroadCastView extends StatelessWidget {
                           }
                           return true;
                         },
-                        child: controller.isLoadResponse &&
-                                controller.forwardedList.isEmpty
-                            ? Center(
-                                child: Text(
-                                  IsmChatStrings.noUserFound,
-                                  style: IsmChatStyles.w600Black16,
-                                ),
-                              )
-                            : AzListView(
-                                padding: IsmChatDimens.edgeInsets0_10,
+                        child: AzListView(
                                 data: controller.forwardedList,
                                 itemCount: controller.forwardedList.length,
                                 indexHintBuilder: (context, hint) => Container(
@@ -289,10 +131,14 @@ class IsmChatCreateBroadCastView extends StatelessWidget {
                                   return Column(
                                     children: [
                                       Offstage(
-                                          offstage:
-                                              user.isShowSuspension != true,
-                                          child: _GetSuspensionTag(
-                                              susTag: susTag)),
+                                        offstage: user.isShowSuspension !=
+                                                true ||
+                                            index == 0,
+                                        child: IsmChatUtility.buildSusWidget(
+                                          susTag,
+                                          showTrailingDivider: index != 0,
+                                        ),
+                                      ),
                                       ListTile(
                                           onTap: () {
                                             controller
@@ -333,68 +179,177 @@ class IsmChatCreateBroadCastView extends StatelessWidget {
                                 },
                               ),
                       ),
-                    ),
+              ),
+              if (controller.selectedUserList.isNotEmpty)
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                  ),
+                  height: IsmChatDimens.eighty,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: controller.selectedUserList.length,
+                          separatorBuilder: (_, __) => IsmChatDimens.boxWidth8,
+                          itemBuilder: (context, index) {
+                            var user = controller.selectedUserList[index];
+                            return InkWell(
+                              onTap: () {
+                                controller
+                                  ..isSelectedUser(user)
+                                  ..onForwardUserTap(
+                                    controller.forwardedList.indexOf(
+                                      controller
+                                          .forwardedList.selectedUsers[index],
+                                    ),
+                                  );
+                              },
+                              child: SizedBox(
+                                width: IsmChatDimens.fifty,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        SizedBox(
+                                          width: IsmChatDimens.forty,
+                                          height: IsmChatDimens.forty,
+                                          child: IsmChatImage.profile(
+                                            user.userProfileImageUrl,
+                                            name: user.userName,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: IsmChatDimens.twentySeven,
+                                          left: IsmChatDimens.twentySeven,
+                                          child: CircleAvatar(
+                                            backgroundColor: IsmChatConfig
+                                                .chatTheme.backgroundColor,
+                                            radius: IsmChatDimens.eight,
+                                            child: Icon(
+                                              Icons.close_rounded,
+                                              color: IsmChatConfig
+                                                  .chatTheme.primaryColor,
+                                              size: IsmChatDimens.twelve,
+                                            ),
+                                          ),
+                                        )
+                                      ],
+                                    ),
+                                    SizedBox(
+                                      height: IsmChatDimens.twentyEight,
+                                      child: Text(
+                                        user.userName,
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 2,
+                                        textAlign: TextAlign.center,
+                                        style: IsmChatStyles.w600Black10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      IsmChatDimens.boxWidth8,
+                      FloatingActionButton(
+                        elevation: 0,
+                        shape: const CircleBorder(),
+                        backgroundColor: IsmChatConfig.chatTheme.primaryColor,
+                        onPressed: () async {
+                          if (controller.selectedUserList.length >= 2) {
+                            // Pop picker so back from chat returns to conversation list
+                            // (same as group create in create_conversation_view.dart).
+                            IsmChatRoute.goBack<void>();
+                            await controller.goToBroadcastMessage(
+                              controller.selectedUserList,
+                              '',
+                            );
+                          } else {
+                            await IsmChatContextWidget.showDialogContext(
+                              content: IsmChatAlertDialogBox(
+                                title: IsmChatStrings.broadcastAlert,
+                                cancelLabel: 'Okay',
+                              ),
+                            );
+                          }
+                        },
+                        child: const Icon(
+                          Icons.done_rounded,
+                          color: IsmChatColors.whiteColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
-          floatingActionButton: IsmChatStartChatFAB(
-            onTap: () async {
-              if (controller.selectedUserList.isNotEmpty &&
-                  controller.selectedUserList.length >= 2) {
-                controller.goToBroadcastMessage(
-                    controller.selectedUserList, '');
-              } else {
-                await IsmChatContextWidget.showDialogContext(
-                  content: IsmChatAlertDialogBox(
-                    title: IsmChatStrings.broadcastAlert,
-                    cancelLabel: 'Okay',
-                  ),
-                );
-              }
-            },
-            icon: Icon(
-              Icons.done_rounded,
-              size: IsmChatDimens.thirty,
-              color: IsmChatColors.whiteColor,
-            ),
-          ),
         ),
       );
-}
 
-class _GetSuspensionTag extends StatelessWidget {
-  const _GetSuspensionTag({
-    required this.susTag,
-  });
-
-  final String susTag;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: IsmChatDimens.edgeInsets10_0,
-        height: IsmChatDimens.forty,
-        width: double.infinity,
-        alignment: Alignment.centerLeft,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              susTag,
-              textScaler: const TextScaler.linear(1.5),
-              style: IsmChatStyles.w600Black14,
-            ),
-            SizedBox(
-                width: IsmChatDimens.percentWidth(
-                  IsmChatResponsive.isWeb(
-                          IsmChatConfig.kNavigatorKey.currentContext ??
-                              IsmChatConfig.context)
-                      ? .23
-                      : .7,
-                ),
-                child: Divider(
-                  height: .0,
-                  indent: IsmChatDimens.ten,
-                ))
-          ],
-        ),
+  static void _onBroadcastSearchChanged(
+    IsmChatConversationsController controller,
+    String value,
+  ) {
+    if (value.trim().isEmpty) {
+      controller.forwardedList = controller.forwardedListDuplicat
+          .map((e) => SelectedMembers(
+                isUserSelected: controller.selectedUserList
+                    .any((d) => d.userId == e.userDetails.userId),
+                userDetails: e.userDetails,
+                isBlocked: e.isBlocked,
+                tagIndex: e.tagIndex,
+              ))
+          .toList();
+      controller.commonController.handleSorSelectedMembers(
+        controller.forwardedList,
       );
+      if (controller.isLoadResponse) {
+        controller.isLoadResponse = false;
+      }
+      return;
+    }
+    controller.debounce.run(() {
+      controller
+        ..isLoadResponse = false
+        ..getNonBlockUserList(
+          searchTag: value,
+          opponentId:
+              IsmChatConfig.communicationConfig.userConfig.userId,
+        );
+    });
+  }
+
+  static void _onBroadcastSearchClear(
+    IsmChatConversationsController controller,
+  ) {
+    if (controller.forwardedListDuplicat.isNotEmpty) {
+      controller.forwardedList = controller.forwardedListDuplicat
+          .map(
+            (e) => SelectedMembers(
+              isUserSelected: controller.selectedUserList
+                  .any((d) => d.userId == e.userDetails.userId),
+              userDetails: e.userDetails,
+              isBlocked: e.isBlocked,
+              tagIndex: e.tagIndex,
+            ),
+          )
+          .toList();
+      controller.commonController.handleSorSelectedMembers(
+        controller.forwardedList,
+      );
+    }
+    if (controller.isLoadResponse) {
+      controller.isLoadResponse = false;
+    }
+  }
 }

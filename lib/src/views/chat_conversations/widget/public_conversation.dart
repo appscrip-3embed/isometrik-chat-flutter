@@ -45,60 +45,56 @@ class _IsmChatPublicConversationViewState
                 ? null
                 : IsmChatAppBar(
                     height: IsmChatDimens.fiftyFive,
-                    title: controller.showSearchField
-                        ? IsmChatInputField(
-                            fillColor: IsmChatConfig.chatTheme.primaryColor,
-                            style: IsmChatStyles.w400White16,
-                            hint: IsmChatStrings.searchUser,
-                            hintStyle: IsmChatStyles.w400White16,
-                            onChanged: (value) {
-                              controller.debounce.run(
-                                () {
-                                  controller
-                                    ..isLoadResponse = false
-                                    ..getPublicAndOpenConversation(
-                                      searchTag:
-                                          value.trim().isNotEmpty ? value : '',
-                                      conversationType:
-                                          IsmChatConversationType.public.value,
-                                    );
-                                },
-                              );
-                            },
-                          )
-                        : Text(
-                            IsmChatStrings.publicConversation,
-                            style: IsmChatStyles.w600White18,
-                          ),
-                    action: [
-                      IconButton(
-                        onPressed: () {
-                          controller.showSearchField =
-                              !controller.showSearchField;
-                        },
-                        icon: Icon(
-                          controller.showSearchField
-                              ? Icons.close_rounded
-                              : Icons.search_rounded,
-                          color: IsmChatColors.whiteColor,
-                        ),
-                      ),
-                    ],
+                    title: Text(
+                      IsmChatStrings.publicConversation,
+                      style: IsmChatStyles.w600White18,
+                    ),
                   ),
-            body: controller.publicAndOpenConversation.isEmpty
-                ? controller.isLoadResponse
-                    ? Center(
-                        child: Text(
-                          IsmChatStrings.noConversationFound,
-                          style: IsmChatStyles.w600Black16,
-                        ),
-                      )
-                    : const IsmChatLoadingDialog()
-                : SizedBox(
-                    height: IsmChatDimens.percentHeight(1),
-                    child: ListView.builder(
-                      itemCount: controller.publicAndOpenConversation.length,
-                      itemBuilder: (_, index) {
+            body: Column(
+              children: [
+                IsmChatUserListSearchBar(
+                  controller: controller.userSearchNameController,
+                  onChanged: (value) {
+                    controller.debounce.run(() {
+                      controller
+                        ..publicAndOpenConversation.clear()
+                        ..callApiOrNot = true
+                        ..isLoadResponse = false
+                        ..getPublicAndOpenConversation(
+                          searchTag:
+                              value.trim().isNotEmpty ? value : '',
+                          conversationType:
+                              IsmChatConversationType.public.value,
+                        );
+                    });
+                  },
+                  onClear: () {
+                    controller
+                      ..publicAndOpenConversation.clear()
+                      ..callApiOrNot = true
+                      ..isLoadResponse = false
+                      ..getPublicAndOpenConversation(
+                        conversationType: IsmChatConversationType.public.value,
+                      );
+                  },
+                ),
+                Expanded(
+                  child: controller.publicAndOpenConversation.isEmpty
+                      ? controller.isLoadResponse
+                          ? Center(
+                              child: Text(
+                                IsmChatStrings.noConversationFound,
+                                style: IsmChatStyles.w600Black16,
+                              ),
+                            )
+                          : const IsmChatLoadingDialog()
+                      : NotificationListener<ScrollNotification>(
+                          onNotification: dismissKeyboardOnPickerScroll,
+                          child: ListView.builder(
+                            controller: scrollController,
+                            itemCount:
+                                controller.publicAndOpenConversation.length,
+                            itemBuilder: (_, index) {
                         var data = controller.publicAndOpenConversation[index];
                         return Column(
                           children: [
@@ -162,8 +158,11 @@ class _IsmChatPublicConversationViewState
                             const Divider(),
                           ],
                         );
-                      },
-                    ),
-                  ),
+                            },
+                          ),
+                        ),
+                ),
+              ],
+            ),
           ));
 }

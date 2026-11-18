@@ -88,7 +88,6 @@ mixin IsmChatConversationsForwardOperationsMixin on GetxController {
     _controller.addGrouNameController.clear();
     _controller.forwardedList.selectedUsers.clear();
     _controller.userSearchNameController.clear();
-    _controller.showSearchField = false;
     _controller.isLoadResponse = false;
     await _controller.getNonBlockUserList(
       opponentId: IsmChatConfig.communicationConfig.userConfig.userId,
