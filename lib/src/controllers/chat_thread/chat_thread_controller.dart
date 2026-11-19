@@ -120,6 +120,122 @@ class IsmChatThreadController extends GetxController {
   /// Whether a reply send is in flight (composer shows a spinner).
   bool get isSending => _isSending.value;
 
+  // ----------------------------------------- composer (voice / send affordance)
+
+  /// Mic vs send, isolated from the channel composer while a thread is open.
+  final _showComposerSendButton = false.obs;
+  bool get showComposerSendButton => _showComposerSendButton.value;
+  set showComposerSendButton(bool value) =>
+      _showComposerSendButton.value = value;
+
+  final _isEnableRecordingAudio = false.obs;
+  bool get isEnableRecordingAudio => _isEnableRecordingAudio.value;
+  set isEnableRecordingAudio(bool value) =>
+      _isEnableRecordingAudio.value = value;
+
+  final _recordingSeconds = 0.obs;
+  int get recordingSeconds => _recordingSeconds.value;
+  set recordingSeconds(int value) => _recordingSeconds.value = value;
+
+  final _isRecordPlay = true.obs;
+  bool get isRecordPlay => _isRecordPlay.value;
+  set isRecordPlay(bool value) => _isRecordPlay.value = value;
+
+  Timer? _recordTimer;
+
+  /// Keeps send vs mic in sync with the thread text field.
+  void handleComposerTextChanged(String text) {
+    if (isEnableRecordingAudio) return;
+    final audioOn = IsmChatProperties.threadProperties.isAudioMessageEnabled;
+    showComposerSendButton = audioOn ? text.trim().isNotEmpty : true;
+  }
+
+  /// Starts the recording affordance (timer only — capture lives on the page).
+  void beginRecordingUi() {
+    isEnableRecordingAudio = true;
+    showComposerSendButton = true;
+    recordingSeconds = 0;
+    isRecordPlay = true;
+    _recordTimer?.cancel();
+    _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      recordingSeconds++;
+    });
+  }
+
+  void cancelRecordingUi() => _clearComposerRecording();
+
+  /// Deletes an in-progress voice note (channel + thread UI).
+  Future<void> recordDelete() async {
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      await IsmChatUtility.chatPageController.recordVoice.stop();
+    }
+    _clearComposerRecording();
+  }
+
+  Future<void> recordPlayPauseVoice() async {
+    if (!IsmChatUtility.chatPageControllerRegistered) return;
+    final voice = IsmChatUtility.chatPageController.recordVoice;
+    if (await voice.isPaused()) {
+      await voice.resume();
+      isRecordPlay = true;
+      _recordTimer?.cancel();
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        recordingSeconds++;
+      });
+    } else {
+      await voice.pause();
+      isRecordPlay = false;
+      _recordTimer?.cancel();
+    }
+  }
+
+  void _clearComposerRecording() {
+    _recordTimer?.cancel();
+    _recordTimer = null;
+    isEnableRecordingAudio = false;
+    recordingSeconds = 0;
+    isRecordPlay = true;
+    _refreshComposerSendButton();
+  }
+
+  void _refreshComposerSendButton() {
+    if (isEnableRecordingAudio) {
+      showComposerSendButton = true;
+      return;
+    }
+    final audioOn = IsmChatProperties.threadProperties.isAudioMessageEnabled;
+    showComposerSendButton = audioOn
+        ? replyController.text.trim().isNotEmpty
+        : true;
+  }
+
+  // ----------------------------------------------------------- emoji board
+
+  final _showEmojiBoard = false.obs;
+  bool get showEmojiBoard => _showEmojiBoard.value;
+
+  final _emojiBoardTab = IsmChatEmojiBoardTab.emoji.obs;
+  IsmChatEmojiBoardTab get emojiBoardTab => _emojiBoardTab.value;
+  set emojiBoardTab(IsmChatEmojiBoardTab value) => _emojiBoardTab.value = value;
+
+  /// Opens or closes the thread emoji / GIF / sticker panel.
+  void toggleEmojiBoard([
+    bool? showEmoji,
+    bool focusKeyboard = true,
+  ]) {
+    // Same focus/keyboard dance as [IsmChatPageUiStateManagementMixin.toggleEmojiBoard].
+    if (showEmoji ?? showEmojiBoard) {
+      if (focusKeyboard) {
+        replyFocusNode.requestFocus();
+      }
+    } else {
+      IsmChatUtility.hideKeyboard();
+    }
+    _showEmojiBoard.value = showEmoji ?? !showEmojiBoard;
+  }
+
+  void closeEmojiBoard() => toggleEmojiBoard(false, false);
+
   // -------------------------------------------------------------- lifecycle
 
   final _isLoading = false.obs;
@@ -153,6 +269,7 @@ class IsmChatThreadController extends GetxController {
 
   @override
   void onClose() {
+    _recordTimer?.cancel();
     replyController.dispose();
     replyFocusNode.dispose();
     super.onClose();
@@ -168,8 +285,15 @@ class IsmChatThreadController extends GetxController {
     required IsmChatMessageModel root,
     IsmChatConversationModel? conversation,
   }) async {
-    if (!IsmChatThreadCoordinator.canOpenThread(root)) return;
-    this.root = root;
+    final timeline = IsmChatUtility.chatPageControllerRegistered
+        ? IsmChatUtility.chatPageController.messages
+        : const <IsmChatMessageModel>[];
+    final panelRoot = IsmChatThreadCoordinator.resolveThreadPanelRoot(
+      root,
+      timeline,
+    );
+    if (!IsmChatThreadCoordinator.canOpenThread(panelRoot)) return;
+    this.root = panelRoot;
     this.conversation = conversation ??
         (IsmChatUtility.chatPageControllerRegistered
             ? IsmChatUtility.chatPageController.conversation
@@ -182,6 +306,9 @@ class IsmChatThreadController extends GetxController {
     _alsoSendToChannel.value = false;
     _replyTo.value = null;
     replyController.clear();
+    _clearComposerRecording();
+    _showEmojiBoard.value = false;
+    _emojiBoardTab.value = IsmChatEmojiBoardTab.emoji;
     // From here on, attachments picked in the panel are thread replies.
     syncSendTarget();
     await loadReplies();
@@ -189,6 +316,10 @@ class IsmChatThreadController extends GetxController {
 
   /// Clears the panel state (called when the thread view is popped).
   void closeThread() {
+    final rootMessage = root;
+    if (rootMessage != null) {
+      _publishRootToTimeline(rootMessage);
+    }
     _root.value = null;
     _conversation.value = null;
     _replies.clear();
@@ -199,6 +330,9 @@ class IsmChatThreadController extends GetxController {
     _alsoSendToChannel.value = false;
     _replyTo.value = null;
     replyController.clear();
+    _clearComposerRecording();
+    _showEmojiBoard.value = false;
+    _emojiBoardTab.value = IsmChatEmojiBoardTab.emoji;
     clearSendTarget();
   }
 
@@ -322,6 +456,9 @@ class IsmChatThreadController extends GetxController {
     replyController.clear();
     _replyTo.value = null;
     _replies.add(pending);
+    if (sendToChannel) {
+      _mirrorAlsoSendOnChannel(pending);
+    }
     // Queue it like a channel message so a dropped connection retries it from
     // [IsmChatConversationsController.sendPendingMessgae] instead of losing it.
     await _queuePendingReply(pending);
@@ -355,6 +492,9 @@ class IsmChatThreadController extends GetxController {
         await _dequeuePendingReply(pending);
         _replies.removeWhere((e) => e.sentAt == pending.sentAt &&
             (e.messageId ?? '').isEmpty);
+        if (sendToChannel) {
+          _removeAlsoSendFromChannel(pending.sentAt);
+        }
         _sendError.value = result.response.apiErrorMessage(
           fallback: IsmChatStrings.threadSendFailed,
         );
@@ -372,7 +512,11 @@ class IsmChatThreadController extends GetxController {
       // the panel owns both the in-memory badge and the cached one — unless the
       // echo already counted this reply.
       if (!alreadyShown) {
-        _bumpRoot(confirmed, persist: true);
+        await _bumpRoot(confirmed, persist: true);
+      }
+      if (sendToChannel) {
+        _mirrorAlsoSendOnChannel(confirmed);
+        await _persistAlsoSendReplyToDb(confirmed);
       }
       return true;
     } finally {
@@ -545,7 +689,7 @@ class IsmChatThreadController extends GetxController {
     );
     _replies[index] = confirmed;
     if (!alreadyShown) {
-      _bumpRoot(confirmed, persist: true);
+      unawaited(_bumpRoot(confirmed, persist: true));
     }
   }
 
@@ -653,7 +797,7 @@ class IsmChatThreadController extends GetxController {
   /// the "N replies" footer survives a chat reload. Pass `false` for realtime
   /// replies, whose cached root is written by the MQTT handler — otherwise the
   /// badge would be counted twice.
-  void _bumpRoot(IsmChatMessageModel reply, {required bool persist}) {
+  Future<void> _bumpRoot(IsmChatMessageModel reply, {required bool persist}) async {
     final rootMessage = root;
     if (rootMessage == null) return;
     final updated = IsmChatThreadCoordinator.applyReplyToRoot(
@@ -663,7 +807,7 @@ class IsmChatThreadController extends GetxController {
     root = updated;
     _publishRootToTimeline(updated);
     if (persist) {
-      unawaited(_persistRootToDb(updated));
+      await _persistRootToDb(updated);
     }
   }
 
@@ -695,21 +839,110 @@ class IsmChatThreadController extends GetxController {
     );
   }
 
+  /// Whether [reply] should appear on the live channel timeline (Slack
+  /// "also send to channel").
+  bool _shouldMirrorOnChannel(IsmChatMessageModel reply) =>
+      IsmChatThreadCoordinator.isThreadReply(reply) &&
+      reply.showInConversation == true;
+
+  /// Merges [reply] into the open chat page list (own sends never get MQTT).
+  void _mirrorAlsoSendOnChannel(IsmChatMessageModel reply) {
+    if (!_shouldMirrorOnChannel(reply)) return;
+    if (!IsmChatUtility.chatPageControllerRegistered) return;
+    final page = IsmChatUtility.chatPageController;
+    if (page.conversation?.conversationId != conversationId) return;
+
+    final id = (reply.messageId ?? '').trim();
+    var next = List<IsmChatMessageModel>.from(page.messages);
+    var replaced = false;
+    if (id.isNotEmpty) {
+      final byId = next.indexWhere((e) => (e.messageId ?? '').trim() == id);
+      if (byId != -1) {
+        next[byId] = reply;
+        replaced = true;
+      }
+    }
+    if (!replaced) {
+      final bySentAt = next.indexWhere((e) => e.sentAt == reply.sentAt);
+      if (bySentAt != -1) {
+        next[bySentAt] = reply;
+        replaced = true;
+      }
+    }
+    if (!replaced) {
+      next.add(reply);
+    }
+    page.messages = page.commonController.sortMessages(
+      page.filterMessages(next),
+    );
+    page.update();
+    page.updateLastMessagOnCurrentTime(reply);
+  }
+
+  /// Drops an optimistic also-send row from the channel after a hard failure.
+  void _removeAlsoSendFromChannel(int sentAt) {
+    if (!IsmChatUtility.chatPageControllerRegistered) return;
+    final page = IsmChatUtility.chatPageController;
+    if (page.conversation?.conversationId != conversationId) return;
+    final next = List<IsmChatMessageModel>.from(page.messages)
+      ..removeWhere(
+        (e) => e.sentAt == sentAt && (e.messageId ?? '').isEmpty,
+      );
+    page.messages = next;
+    page.update();
+  }
+
+  /// Stores a confirmed also-send reply in the main conversation cache.
+  Future<void> _persistAlsoSendReplyToDb(IsmChatMessageModel reply) async {
+    final convId = conversationId;
+    if (convId.isEmpty) return;
+    await IsmChatConfig.dbWrapper?.updateConversation(
+      conversationId: convId,
+      update: (latest) {
+        if (latest == null || latest.conversationId != convId) return null;
+        final messages = Map<String, IsmChatMessageModel>.from(
+          latest.messages ?? {},
+        )..['${reply.sentAt}'] = reply;
+        var next = latest.copyWith(messages: messages);
+        if (!IsmChatThreadCoordinator.isThreadOnlyReply(reply)) {
+          next = next.copyWith(
+            lastMessageDetails: next.lastMessageDetails?.copyWith(
+              reactionType: '',
+              messageId: reply.messageId,
+              action: '',
+            ),
+          );
+        }
+        return next;
+      },
+    );
+  }
+
   /// Writes the updated root back into the channel timeline so the
   /// "N replies" footer updates live. Best-effort: the chat page may be gone.
   void _publishRootToTimeline(IsmChatMessageModel updatedRoot) {
     if (!IsmChatUtility.chatPageControllerRegistered) return;
     final pageController = IsmChatUtility.chatPageController;
     if (pageController.conversation?.conversationId != conversationId) return;
+    _syncRootOnChannelTimeline(pageController, updatedRoot);
+  }
+
+  /// Mirrors [IsmChatThreadCoordinator.applyReplyToRootInList] but applies an
+  /// already-updated root document (own send / refresh), so GetX sees a new list.
+  static void _syncRootOnChannelTimeline(
+    IsmChatPageController pageController,
+    IsmChatMessageModel updatedRoot,
+  ) {
     final rootId = (updatedRoot.messageId ?? '').trim();
     if (rootId.isEmpty) return;
-    final index = pageController.messages
-        .indexWhere((e) => (e.messageId ?? '').trim() == rootId);
+    final next = List<IsmChatMessageModel>.from(pageController.messages);
+    final index = next.indexWhere((e) => (e.messageId ?? '').trim() == rootId);
     if (index == -1) return;
-    pageController.messages[index] = pageController.messages[index].copyWith(
+    next[index] = next[index].copyWith(
       replyCount: updatedRoot.replyCount,
       lastThreadReplyAt: updatedRoot.lastThreadReplyAt,
     );
+    pageController.messages = next;
     pageController.update();
   }
 }

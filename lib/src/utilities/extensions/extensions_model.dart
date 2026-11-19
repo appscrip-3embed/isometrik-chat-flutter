@@ -1003,6 +1003,23 @@ extension MentionMessage on IsmChatMessageModel {
   bool get isThreadOnlyReply =>
       IsmChatThreadCoordinator.isThreadOnlyReply(this);
 
+  /// Thread reply also posted on the channel timeline ("also send to channel").
+  bool get isAlsoSentThreadReply =>
+      IsmChatThreadCoordinator.isAlsoSentThreadReply(this);
+
+  /// Whether **replied to a thread: …** should show above the channel bubble.
+  bool get showChannelThreadContext =>
+      IsmChatThreadCoordinator.shouldShowChannelThreadContext(this);
+
+  /// Localized focus-menu label; **View thread** on also-sent thread replies.
+  String focusMenuLabel(IsmChatFocusMenuType type) {
+    if (type == IsmChatFocusMenuType.replyInThread &&
+        IsmChatThreadCoordinator.shouldUseViewThreadMenuLabel(this)) {
+      return IsmChatStrings.viewThread;
+    }
+    return type.label;
+  }
+
   /// Thread this message belongs to: its `threadRootId`, or its own id when it
   /// is the root. Empty when neither is known.
   String get threadId => IsmChatThreadCoordinator.threadIdOf(this);
@@ -1043,6 +1060,35 @@ extension MentionMessage on IsmChatMessageModel {
           : IsmChatColors.blackColor,
     );
   }
+
+  /// **replied to a thread: …** above the bubble (not on the bubble fill).
+  ///
+  /// Uses timeline metadata colors so self messages do not inherit in-bubble
+  /// white text, which is unreadable on the chat background.
+  TextStyle get channelThreadContextStyle {
+    final fontSize = style.fontSize ?? 14;
+    if (sentByMe) {
+      return TextStyle(
+        fontSize: fontSize,
+        fontWeight: FontWeight.w400,
+        color: IsmChatConfig.isChatDarkMode
+            ? IsmChatColors.greyColorLight
+            : IsmChatColors.greyColor,
+      );
+    }
+    return senderNameTextStyle.copyWith(
+      fontSize: fontSize,
+      fontWeight: FontWeight.w400,
+    );
+  }
+
+  /// Parent file name / snippet — bold, primary accent (still readable on bg).
+  TextStyle get channelThreadContextSubjectStyle =>
+      channelThreadContextStyle.copyWith(
+        fontWeight: FontWeight.w600,
+        color: IsmChatConfig.chatTheme.primaryColor ??
+            channelThreadContextStyle.color,
+      );
 
   /// "Forwarded" label style derived from the message text color at 70% opacity.
   TextStyle get forwardedTextStyle => style.copyWith(
@@ -1628,4 +1674,93 @@ extension IsmChatMessageMediaExtension on IsmChatMessageModel {
       (customType == IsmChatCustomMessageType.image &&
           !isGifOrStickerMessage) ||
       customType == IsmChatCustomMessageType.video;
+
+  /// Bubble [customType] for [IsmChatThreadMessageTile].
+  ///
+  /// Thread attachment sends use `messageType: reply` and wire
+  /// `AttachmentMessage:Reply`; the panel should still render photos and
+  /// videos via [IsmChatMessageWrapper] like the channel timeline does.
+  IsmChatCustomMessageType? get threadPanelBubbleType {
+    const directBubbleTypes = [
+      IsmChatCustomMessageType.image,
+      IsmChatCustomMessageType.video,
+      IsmChatCustomMessageType.audio,
+      IsmChatCustomMessageType.file,
+      IsmChatCustomMessageType.multipleAttachments,
+      IsmChatCustomMessageType.location,
+      IsmChatCustomMessageType.contact,
+      IsmChatCustomMessageType.link,
+    ];
+    final type = customType;
+    if (type != null && directBubbleTypes.contains(type)) return type;
+    if (isMultipleAttachmentsMessage) {
+      return IsmChatCustomMessageType.multipleAttachments;
+    }
+    if (type == IsmChatCustomMessageType.reply ||
+        type == IsmChatCustomMessageType.forward) {
+      final fromMeta = metaData?.replyMessage?.forMessageType;
+      if (fromMeta != null &&
+          fromMeta != IsmChatCustomMessageType.text &&
+          fromMeta != IsmChatCustomMessageType.reply &&
+          fromMeta != IsmChatCustomMessageType.forward) {
+        return fromMeta;
+      }
+      final fromAttachment = _threadPanelTypeFromAttachment(primaryAttachmentType);
+      if (fromAttachment != null) return fromAttachment;
+      if (isGifOrStickerMessage && (attachments?.isNotEmpty ?? false)) {
+        return IsmChatCustomMessageType.image;
+      }
+    }
+    return null;
+  }
+
+  /// Image vs video for full-screen media preview pagers.
+  ///
+  /// Thread attachment replies keep `messageType: reply` while the payload is
+  /// on [customType] or [threadPanelBubbleType]. Preview must not treat
+  /// [IsmChatReplyMessageModel.parentMessageMessageType] as the attachment
+  /// type for those rows (it describes the quoted parent, often text).
+  IsmChatCustomMessageType? get mediaPreviewContentType {
+    if (messageType == IsmChatMessageType.forward) {
+      return customType;
+    }
+    final type = customType;
+    if (type == IsmChatCustomMessageType.image ||
+        type == IsmChatCustomMessageType.video) {
+      return type;
+    }
+    final bubble = threadPanelBubbleType;
+    if (bubble == IsmChatCustomMessageType.image ||
+        bubble == IsmChatCustomMessageType.video) {
+      return bubble;
+    }
+    if (messageType == IsmChatMessageType.reply ||
+        type == IsmChatCustomMessageType.reply) {
+      return metaData?.replyMessage?.parentMessageMessageType;
+    }
+    return customType;
+  }
+
+  /// Maps the first attachment to a channel bubble type for the thread panel.
+  IsmChatCustomMessageType? _threadPanelTypeFromAttachment(
+    IsmChatMediaType? attachmentType,
+  ) {
+    if (attachmentType == null) return null;
+    switch (attachmentType) {
+      case IsmChatMediaType.image:
+      case IsmChatMediaType.gif:
+      case IsmChatMediaType.sticker:
+        return IsmChatCustomMessageType.image;
+      case IsmChatMediaType.video:
+        return IsmChatCustomMessageType.video;
+      case IsmChatMediaType.audio:
+        return IsmChatCustomMessageType.audio;
+      case IsmChatMediaType.file:
+        return IsmChatCustomMessageType.file;
+      case IsmChatMediaType.location:
+        return IsmChatCustomMessageType.location;
+      case IsmChatMediaType.adminMessage:
+        return null;
+    }
+  }
 }

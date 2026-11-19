@@ -36,7 +36,21 @@ class IsmChatFileMessage extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          DecoratedBox(
+          IsmChatTapHandler(
+            onTap: () {
+              if (IsmChatUtility.chatPageControllerRegistered) {
+                IsmChatUtility.chatPageController.tapForMediaPreview(message);
+              }
+            },
+            onLongPress: () {
+              if (IsmChatUtility.chatPageControllerRegistered) {
+                IsmChatUtility.chatPageController.onMessageLongPress(
+                  context,
+                  message,
+                );
+              }
+            },
+            child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(IsmChatDimens.ten),
             ),
@@ -160,6 +174,7 @@ class IsmChatFileMessage extends StatelessWidget {
                       ),
                     ],
                   ),
+            ),
           ),
           if (message.isUploading == true)
             IsmChatUtility.circularProgressBar(

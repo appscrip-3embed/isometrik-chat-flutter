@@ -21,8 +21,11 @@ class IsmChatThreadProperties {
     this.composerHintText,
     this.showAlsoSendToChannel = true,
     this.showAttachments = true,
+    this.showAudioMessage,
+    this.showEmoji,
     this.alsoSendToChannelLabel,
     this.replyFooterBuilder,
+    this.channelThreadContextBuilder,
     this.rootMessageBuilder,
     this.replyTileBuilder,
     this.emptyPlaceholder,
@@ -49,6 +52,27 @@ class IsmChatThreadProperties {
   /// `false` makes the thread text-only.
   final bool showAttachments;
 
+  /// Whether the thread composer shows the voice-note mic (like the channel).
+  ///
+  /// `null` follows [IsmChatFeature.audioMessage] on [IsmChatPageProperties].
+  final bool? showAudioMessage;
+
+  /// Mic enabled for this panel — respects [showAudioMessage] when set.
+  bool get isAudioMessageEnabled =>
+      showAudioMessage ??
+      IsmChatProperties.chatPageProperties.features
+          .contains(IsmChatFeature.audioMessage);
+
+  /// Whether the thread composer shows the emoji affordance (like the channel).
+  ///
+  /// `null` follows [IsmChatFeature.emojiIcon] on [IsmChatPageProperties].
+  final bool? showEmoji;
+
+  bool get isEmojiEnabled =>
+      showEmoji ??
+      IsmChatProperties.chatPageProperties.features
+          .contains(IsmChatFeature.emojiIcon);
+
   /// Label for that checkbox. Defaults to
   /// [IsmChatStrings.threadAlsoSendToChannel].
   final String? alsoSendToChannelLabel;
@@ -63,6 +87,14 @@ class IsmChatThreadProperties {
     IsmChatMessageModel message,
     int replyCount,
   )? replyFooterBuilder;
+
+  /// Replaces **replied to a thread: …** above an also-sent thread reply in the
+  /// channel. Return `null` to keep the SDK row
+  /// ([IsmChatThreadChannelContext]).
+  final Widget? Function(
+    BuildContext context,
+    IsmChatMessageModel message,
+  )? channelThreadContextBuilder;
 
   /// Replaces the root-message card at the top of the thread panel.
   final Widget? Function(

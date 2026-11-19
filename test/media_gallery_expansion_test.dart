@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
+import 'helpers/fixtures.dart';
+
 void main() {
   group('expandDocsGalleryItems', () {
     test('flattens multipleAttachments document list', () {
@@ -286,6 +288,63 @@ void main() {
       expect(
         IsmChatCustomMessageType.file.value,
         'AttachmentMessage:Doc',
+      );
+    });
+  });
+
+  group('mediaPreviewContentType', () {
+    test('thread image reply uses payload image not parent text type', () {
+      final reply = message(
+        body: IsmChatStrings.image,
+        customType: IsmChatCustomMessageType.reply,
+        messageType: IsmChatMessageType.reply,
+        attachments: [attachment(IsmChatMediaType.image)],
+        metaData: IsmChatMetaData(
+          replyMessage: IsmChatReplyMessageModel(
+            parentMessageMessageType: IsmChatCustomMessageType.text,
+            forMessageType: IsmChatCustomMessageType.image,
+          ),
+        ),
+      );
+      final bubbleRow = reply.copyWith(
+        customType: reply.threadPanelBubbleType,
+      );
+      expect(bubbleRow.mediaPreviewContentType, IsmChatCustomMessageType.image);
+    });
+
+    test('GIF thread reply resolves panel bubble and preview as image', () {
+      final gifReply = message(
+        body: IsmChatStrings.gif,
+        customType: IsmChatCustomMessageType.reply,
+        messageType: IsmChatMessageType.reply,
+        attachments: [
+          attachment(IsmChatMediaType.gif).copyWith(
+            mediaUrl: 'https://cdn.example/gif.gif',
+          ),
+        ],
+        metaData: IsmChatMetaData(
+          replyMessage: IsmChatReplyMessageModel(
+            parentMessageMessageType: IsmChatCustomMessageType.text,
+          ),
+        ),
+      );
+      expect(gifReply.threadPanelBubbleType, IsmChatCustomMessageType.image);
+      expect(gifReply.mediaPreviewContentType, IsmChatCustomMessageType.image);
+    });
+
+    test('quote-style reply without attachment uses parent type', () {
+      final textQuote = message(
+        customType: IsmChatCustomMessageType.reply,
+        messageType: IsmChatMessageType.reply,
+        metaData: IsmChatMetaData(
+          replyMessage: IsmChatReplyMessageModel(
+            parentMessageMessageType: IsmChatCustomMessageType.image,
+          ),
+        ),
+      );
+      expect(
+        textQuote.mediaPreviewContentType,
+        IsmChatCustomMessageType.image,
       );
     });
   });

@@ -56,7 +56,7 @@ header, as a bottom sheet.
 | Thread-only replies | render inline in the timeline | hidden from the timeline, shown in the thread panel |
 | Root message | plain bubble | bubble + tappable **"N replies"** footer |
 | Focus menu (long-press) | Reply, Forward, … | the same, plus **Reply in thread** |
-| Thread composer | n/a | text **plus** the channel's attachment sheet: photos, videos, camera, voice notes, documents, location, contacts |
+| Thread composer | n/a | same chrome as the channel field (`textFiledTheme` insets/decoration, emoji prefix, in-field attach, mic/send, full [IsmChatComposerEmojiBoard] with GIF/sticker when configured); hold-to-record when [IsmChatFeature.audioMessage] is on |
 | Incoming reply (MQTT) | appended to the channel | routed to the open thread; only the root's badge moves in the channel |
 | Offline send | queued in the pending box, retried on reconnect | identical — a queued thread reply is retried **as a thread reply** |
 | Conversation preview | last message, whatever it is | last **channel** message (thread replies do not replace the snippet) |
@@ -103,6 +103,12 @@ Slack's checkbox is `showInConversation` on the reply:
 The thread composer shows the checkbox; hide it with
 `IsmChatThreadProperties(showAlsoSendToChannel: false)` to make every reply
 thread-only.
+
+On the channel, those rows show **replied to a thread: …** directly above the
+bubble (same alignment, minimal gap so it is obvious which message it refers
+to; subject truncated to 10 characters). The long-press
+menu says **View thread** instead of **Reply in thread**; it still opens the
+same thread panel.
 
 ---
 
@@ -263,8 +269,11 @@ own reply replaces the optimistic row instead of duplicating it.
 
 ## Attachments in a thread
 
-The thread composer's paperclip opens the **same** attachment sheet as the
-channel composer, and the reply travels through the **same** pipelines — so
+The thread composer matches [IsmChatMessageField] visually and opens the **same**
+attachment sheet as the channel. Hold-to-record uses the channel's
+`recordVoice` / `sendAudio` paths with thread-local UI state so web split-view
+does not toggle the channel composer. Replies still travel through the **same**
+pipelines — so
 uploads, presigned URLs, compression, progress, the storage-quota gate and the
 offline queue all behave exactly as they do in the channel.
 

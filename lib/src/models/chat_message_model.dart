@@ -648,16 +648,25 @@ class IsmChatMessageModel {
       );
 
   List<IsmChatContactMetaDatModel> get contacts {
-    if (customType == IsmChatCustomMessageType.contact) {
-      if (body == IsmChatStrings.contact) {
-        return metaData?.contacts ?? [];
-      }
-      final number = body == IsmChatCustomMessageType.contact.value
-          ? body
-          : jsonDecode(body);
-      if (number == List<dynamic>) {
-        number.map((e) => Contact.fromJson(e as Map<String, dynamic>)).toList();
-        return number
+    if (customType != IsmChatCustomMessageType.contact) {
+      return [];
+    }
+
+    // Metadata is canonical for SDK-sent and API contact messages. Older
+    // local echoes used an empty body; decoding that throws during bubble build.
+    if (body.isEmpty ||
+        body == IsmChatStrings.contact ||
+        body == IsmChatCustomMessageType.contact.value) {
+      return metaData?.contacts ?? [];
+    }
+
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is List) {
+        decoded
+            .map((e) => Contact.fromJson(e as Map<String, dynamic>))
+            .toList();
+        return decoded
             .map(
               (e) => IsmChatContactMetaDatModel(
                 contactId: e.id,
@@ -669,12 +678,11 @@ class IsmChatMessageModel {
               ),
             )
             .toList();
-      } else {
-        return metaData?.contacts ?? [];
       }
+    } catch (_) {
+      // Malformed legacy body; fall through to metadata.
     }
-
-    return [];
+    return metaData?.contacts ?? [];
   }
 
   Map<String, dynamic> toMap() => {

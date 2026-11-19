@@ -54,11 +54,24 @@ mixin IsmChatDelegateThreadsMixin {
     IsmChatMessageModel message, {
     IsmChatConversationModel? conversation,
   }) async {
-    if (!IsmChatThreadCoordinator.canOpenThread(message)) return;
+    final timeline = IsmChatUtility.chatPageControllerRegistered
+        ? IsmChatUtility.chatPageController.messages
+        : const <IsmChatMessageModel>[];
+    final panelRoot =
+        IsmChatThreadCoordinator.resolveThreadPanelRoot(message, timeline);
+    if (!IsmChatThreadCoordinator.canOpenThread(panelRoot)) return;
     IsmChatThreadBinding().dependencies();
+    final resolvedConversation = conversation ??
+        (IsmChatUtility.chatPageControllerRegistered
+            ? IsmChatUtility.chatPageController.conversation
+            : null);
+    await _threadController.openThread(
+      root: panelRoot,
+      conversation: resolvedConversation,
+    );
     final view = IsmChatThreadView(
-      rootMessage: message,
-      conversation: conversation,
+      rootMessage: panelRoot,
+      conversation: resolvedConversation,
     );
     final context =
         IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context;
@@ -134,7 +147,14 @@ mixin IsmChatDelegateThreadsMixin {
     if (controller.threadRootId != rootId) {
       final root = controller.root;
       if (root == null || IsmChatThreadCoordinator.threadIdOf(root) != rootId) {
-        await controller.openThread(root: parent);
+        final timeline = IsmChatUtility.chatPageControllerRegistered
+            ? IsmChatUtility.chatPageController.messages
+            : const <IsmChatMessageModel>[];
+        final panelRoot = IsmChatThreadCoordinator.resolveThreadPanelRoot(
+          parent,
+          timeline,
+        );
+        await controller.openThread(root: panelRoot);
       }
     }
     controller.alsoSendToChannel = alsoSendToChannel;

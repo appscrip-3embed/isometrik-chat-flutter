@@ -24,6 +24,8 @@ class IsmChatThreadTheme {
     required this.composerHintStyle,
     required this.composerTextStyle,
     required this.alsoSendToChannelLabelStyle,
+    required this.channelContextPrefixStyle,
+    required this.channelContextSubjectStyle,
     required this.sendButtonColor,
     required this.sendButtonIconColor,
     required this.errorTextStyle,
@@ -70,6 +72,16 @@ class IsmChatThreadTheme {
         ),
         composerTextStyle: const TextStyle(fontSize: 14.5),
         alsoSendToChannelLabelStyle: const TextStyle(fontSize: 12.5),
+        channelContextPrefixStyle: const TextStyle(
+          fontSize: 12.5,
+          color: IsmChatColors.greyColor,
+        ),
+        channelContextSubjectStyle: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w500,
+          color: IsmChatConfig.chatTheme.primaryColor ??
+              IsmChatColors.primaryColorLight,
+        ),
         sendButtonColor: IsmChatConfig.chatTheme.primaryColor ??
             IsmChatColors.primaryColorLight,
         sendButtonIconColor: IsmChatColors.whiteColor,
@@ -134,6 +146,16 @@ class IsmChatThreadTheme {
           fontSize: 12.5,
           color: IsmChatColors.whiteColor,
         ),
+        channelContextPrefixStyle: const TextStyle(
+          fontSize: 12.5,
+          color: IsmChatColors.greyColorLight,
+        ),
+        channelContextSubjectStyle: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w500,
+          color: IsmChatConfig.chatTheme.primaryColor ??
+              IsmChatColors.primaryColorDark,
+        ),
         sendButtonColor: IsmChatConfig.chatTheme.primaryColor ??
             IsmChatColors.primaryColorDark,
         sendButtonIconColor: IsmChatColors.whiteColor,
@@ -174,6 +196,13 @@ class IsmChatThreadTheme {
   final TextStyle composerHintStyle;
   final TextStyle composerTextStyle;
   final TextStyle alsoSendToChannelLabelStyle;
+
+  /// **replied to a thread:** prefix on also-sent channel rows.
+  final TextStyle channelContextPrefixStyle;
+
+  /// Clickable parent summary (file name, snippet, media type).
+  final TextStyle channelContextSubjectStyle;
+
   final Color sendButtonColor;
   final Color sendButtonIconColor;
 

@@ -154,7 +154,7 @@ class IsmChatFocusMenu extends StatelessWidget {
                                         children: [
                                           Expanded(
                                             child: Text(
-                                              item.label,
+                                              message.focusMenuLabel(item),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               softWrap: false,
@@ -346,7 +346,8 @@ class IsmChatFocusMenu extends StatelessWidget {
                                                       children: [
                                                         Expanded(
                                                           child: Text(
-                                                            item.label,
+                                                            message.focusMenuLabel(
+                                                                item),
                                                             maxLines: 1,
                                                             overflow:
                                                                 TextOverflow

@@ -94,11 +94,74 @@ void main() {
       expect(controller.replies.map((e) => e.messageId), ['other-1']);
     });
 
+    test('opening from an also-sent row loads that thread, not the last panel',
+        () async {
+      final pageApi = FakeChatApi();
+      final ctrls = registerChatControllers(pageApi);
+      final page = ctrls.page;
+      final rootA = threadRoot(messageId: 'root-a', replyCount: 1);
+      final rootB = threadRoot(messageId: 'root-b', replyCount: 0);
+      final alsoSent = threadReply(
+        messageId: 'also-1',
+        threadRootId: 'root-a',
+        alsoSentToChannel: true,
+        body: 'broadcast',
+      );
+      page.messages = [rootA, alsoSent, rootB];
+
+      pageApi.on(
+        'GET',
+        '/chat/messages',
+        FakeResponse.json({
+          'messages': [
+            threadReplyJson(messageId: 'b-1', threadRootId: 'root-b'),
+          ],
+        }),
+      );
+      final threadCtrl = IsmChatThreadController(
+        IsmChatThreadViewModel(
+          IsmChatThreadRepository(apiWrapper: pageApi.wrapper()),
+        ),
+      );
+      Get.put(threadCtrl);
+      final conversation = directConversation();
+
+      await threadCtrl.openThread(root: rootB, conversation: conversation);
+      expect(threadCtrl.threadRootId, 'root-b');
+      expect(threadCtrl.replies.single.messageId, 'b-1');
+
+      pageApi.on(
+        'GET',
+        '/chat/messages',
+        FakeResponse.json({
+          'messages': [
+            threadReplyJson(messageId: 'a-1', threadRootId: 'root-a'),
+          ],
+        }),
+      );
+      await threadCtrl.openThread(root: alsoSent, conversation: conversation);
+      expect(threadCtrl.threadRootId, 'root-a');
+      expect(threadCtrl.root?.messageId, 'root-a');
+      expect(threadCtrl.replies.single.messageId, 'a-1');
+    });
+
     test('a failed load surfaces a retry message and keeps the panel', () async {
       api.on('GET', '/chat/messages', const FakeResponse('{}', status: 500));
       await controller.openThread(root: threadRoot());
       expect(controller.replies, isEmpty);
       expect(controller.loadErrorMessage, IsmChatStrings.threadLoadFailed);
+    });
+
+    test('HTTP 404 on first load is an empty thread, not a failure', () async {
+      api.on(
+        'GET',
+        '/chat/messages',
+        const FakeResponse('{"error":"Not found"}', status: 404),
+      );
+      await controller.openThread(root: threadRoot(replyCount: 0));
+      expect(controller.replies, isEmpty);
+      expect(controller.loadErrorMessage, isEmpty);
+      expect(controller.isLoading, isFalse);
     });
 
     test('system rows from the API are filtered out of the thread', () async {
@@ -112,6 +175,15 @@ void main() {
       ]);
       await controller.openThread(root: threadRoot());
       expect(controller.replies.map((e) => e.messageId), ['r1']);
+    });
+
+    test('toggleEmojiBoard is isolated from the channel composer', () async {
+      await controller.openThread(root: threadRoot());
+      expect(controller.showEmojiBoard, isFalse);
+      controller.toggleEmojiBoard(true);
+      expect(controller.showEmojiBoard, isTrue);
+      controller.closeEmojiBoard();
+      expect(controller.showEmojiBoard, isFalse);
     });
 
     test('closeThread clears every bit of panel state', () async {
@@ -260,6 +332,48 @@ void main() {
           as Map<String, dynamic>;
       expect(body['showInConversation'], isTrue);
       expect(controller.replies.single.showInConversation, isTrue);
+    });
+
+    test('also-send text is mirrored onto the live chat page', () async {
+      final pageApi = FakeChatApi();
+      final ctrls = registerChatControllers(pageApi);
+      final page = ctrls.page;
+      final root = threadRoot(messageId: 'root-1', replyCount: 0);
+      final conversation = directConversation();
+      page
+        ..conversation = conversation
+        ..messages = [root];
+      pageApi.on(
+        'GET',
+        '/chat/messages',
+        FakeResponse.json({'messages': []}),
+      );
+      pageApi.on(
+        'POST',
+        '/chat/message',
+        FakeResponse.json({'messageId': 'also-sent-id'}),
+      );
+      final threadCtrl = IsmChatThreadController(
+        IsmChatThreadViewModel(
+          IsmChatThreadRepository(apiWrapper: pageApi.wrapper()),
+        ),
+      );
+      Get.put(threadCtrl);
+
+      await threadCtrl.openThread(root: root, conversation: conversation);
+      threadCtrl
+        ..alsoSendToChannel = true
+        ..replyController.text = 'seen in channel';
+
+      expect(await threadCtrl.sendReply(), isTrue);
+      expect(
+        page.messages.map((e) => e.body),
+        contains('seen in channel'),
+      );
+      final channelRow = page.messages
+          .firstWhere((e) => (e.messageId ?? '') == 'also-sent-id');
+      expect(channelRow.threadRootId, 'root-1');
+      expect(channelRow.showInConversation, isTrue);
     });
 
     test('a nested reply targets the reply, not the root', () async {

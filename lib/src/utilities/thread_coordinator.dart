@@ -68,6 +68,21 @@ class IsmChatThreadCoordinator {
   static bool isThreadOnlyReply(IsmChatMessageModel? message) =>
       isThreadReply(message) && message?.showInConversation == false;
 
+  /// Slack "also send to channel" — a thread reply visible on the channel
+  /// timeline as well as in the panel.
+  static bool isAlsoSentThreadReply(IsmChatMessageModel? message) =>
+      isEnabled &&
+      isThreadReply(message) &&
+      message?.showInConversation == true;
+
+  /// Focus menu reads **View thread** instead of **Reply in thread**.
+  static bool shouldUseViewThreadMenuLabel(IsmChatMessageModel? message) =>
+      isUiEnabled && isAlsoSentThreadReply(message);
+
+  /// Channel row shows **replied to a thread: …** above the bubble.
+  static bool shouldShowChannelThreadContext(IsmChatMessageModel? message) =>
+      isUiEnabled && isAlsoSentThreadReply(message);
+
   /// Whether [message] must be kept out of the channel timeline.
   ///
   /// Always `false` while threads are off, which is why disabling the feature
@@ -114,6 +129,147 @@ class IsmChatThreadCoordinator {
   /// The server value always wins once the message is re-fetched.
   static String resolveThreadRootId(IsmChatMessageModel parent) =>
       threadIdOf(parent);
+
+  /// Canonical thread **root** to load when the user opens a thread from
+  /// [message] (e.g. "Reply in thread" on an also-sent channel row).
+  ///
+  /// Channel rows that open a thread panel (root or any `messageType: 2` reply).
+  static bool isThreadPanelEntry(IsmChatMessageModel? message) {
+    if (message == null || !isEnabled) return false;
+    if ((message.messageId ?? '').trim().isEmpty) return false;
+    if (message.messageType == IsmChatMessageType.reply) return true;
+    return isThreadReply(message);
+  }
+
+  /// Thread replies carry `threadRootId`; without it, [threadIdOf] would use
+  /// the reply's own `messageId` and fetch the wrong panel. Walks
+  /// [channelTimeline] for the root row when possible.
+
+  static IsmChatMessageModel resolveThreadPanelRoot(
+    IsmChatMessageModel message,
+    List<IsmChatMessageModel> channelTimeline,
+  ) {
+    if (!isThreadPanelEntry(message)) {
+      return message;
+    }
+    var rootId = (message.threadRootId ?? '').trim();
+    if (rootId.isEmpty) {
+      final parentId = (message.parentMessageId ?? '').trim();
+      if (parentId.isNotEmpty) {
+        for (final row in channelTimeline) {
+          final id = (row.messageId ?? '').trim();
+          if (id != parentId) continue;
+          if (!isThreadReply(row)) return row;
+          rootId = threadIdOf(row);
+          if (rootId.isNotEmpty) break;
+        }
+      }
+    }
+    if (rootId.isEmpty) return message;
+
+    for (final row in channelTimeline) {
+      if ((row.messageId ?? '').trim() == rootId) return row;
+    }
+    // Root not on the timeline yet — still open the thread by server root id.
+    return message.copyWith(
+      messageId: rootId,
+      threadRootId: null,
+      parentMessageId: null,
+      messageType: IsmChatMessageType.normal,
+    );
+  }
+
+  /// Parent row for channel thread-context copy ([parentMessageId] on
+  /// [message]). Falls back to the thread root when the immediate parent is
+  /// thread-only and absent from the channel list.
+  static IsmChatMessageModel? resolveParentInTimeline(
+    IsmChatMessageModel message,
+    List<IsmChatMessageModel> channelTimeline,
+  ) {
+    final parentId = (message.parentMessageId ?? '').trim();
+    if (parentId.isNotEmpty) {
+      for (final row in channelTimeline) {
+        if ((row.messageId ?? '').trim() == parentId) return row;
+      }
+    }
+    final rootId = (message.threadRootId ?? '').trim();
+    if (rootId.isEmpty || rootId == parentId) return null;
+    for (final row in channelTimeline) {
+      if ((row.messageId ?? '').trim() == rootId) return row;
+    }
+    return null;
+  }
+
+  /// Max visible characters for the subject in **replied to a thread: …**
+  /// (file names, text, type labels) before `...` is appended.
+  static const int channelThreadContextSubjectMaxLength = 10;
+
+  static String _truncateChannelThreadSubject(String text) =>
+      IsmChatUtility.truncateNotificationBody(
+        text,
+        maxLength: channelThreadContextSubjectMaxLength,
+      );
+
+  /// Human label for the parent in **replied to a thread: …**
+  ///
+  /// Media rows use localized type names ([IsmChatStrings.image],
+  /// [IsmChatStrings.document], …), not attachment file names. Plain text
+  /// parents show a short body snippet.
+  static String threadReplyContextSubject(IsmChatMessageModel? parent) {
+    late final String subject;
+    if (parent == null) {
+      subject = IsmChatStrings.threadContextSubjectFallback;
+    } else {
+      final typeLabel = threadContentTypeLabel(parent);
+      if (typeLabel != null && typeLabel.isNotEmpty) {
+        subject = typeLabel;
+      } else if (parent.customType ==
+          IsmChatCustomMessageType.multipleAttachments) {
+        subject = parent.multipleAttachmentsPreviewLabel;
+      } else {
+        final body =
+            IsmChatUtility.lastMessageBodyForConversationSync(parent).trim();
+        if (body.isNotEmpty &&
+            !IsmChatUtility.isOutboundAttachmentPlaceholderBody(body)) {
+          subject = body;
+        } else {
+          subject = IsmChatStrings.threadContextSubjectFallback;
+        }
+      }
+    }
+    return _truncateChannelThreadSubject(subject);
+  }
+
+  /// Non-text bubble label (photo, document, …) for thread panel and channel
+  /// context. Returns `null` for plain text rows ([body] is shown instead).
+  static String? threadContentTypeLabel(
+    IsmChatMessageModel message, [
+    IsmChatCustomMessageType? contentType,
+  ]) {
+    final bubble =
+        contentType ?? message.threadPanelBubbleType ?? message.customType;
+    switch (bubble) {
+      case IsmChatCustomMessageType.image:
+        return IsmChatStrings.image;
+      case IsmChatCustomMessageType.video:
+        return IsmChatStrings.video;
+      case IsmChatCustomMessageType.audio:
+        return IsmChatStrings.audio;
+      case IsmChatCustomMessageType.file:
+        return IsmChatStrings.document;
+      case IsmChatCustomMessageType.multipleAttachments:
+        return IsmChatStrings.document;
+      case IsmChatCustomMessageType.location:
+        return IsmChatStrings.location;
+      case IsmChatCustomMessageType.contact:
+        return IsmChatL10n.get('contact');
+      case IsmChatCustomMessageType.deletedForEveryone:
+      case IsmChatCustomMessageType.deletedForMe:
+        return IsmChatStrings.wasDeletedMessage;
+      default:
+        return null;
+    }
+  }
 
   /// Whether a thread can be opened for [message] at all: threading on, a real
   /// server message id, and not a deleted / system row.
@@ -187,6 +343,36 @@ class IsmChatThreadCoordinator {
     return next;
   }
 
+  /// When [getMessagesFromDB] reloads, keep thread root badges that were bumped
+  /// in memory but not yet written to Hive (e.g. user popped the thread fast).
+  static List<IsmChatMessageModel> mergeThreadRootBadgesInList(
+    List<IsmChatMessageModel> fromDb,
+    List<IsmChatMessageModel> previous,
+  ) {
+    if (!isEnabled || previous.isEmpty) {
+      return List<IsmChatMessageModel>.from(fromDb);
+    }
+    final byId = <String, IsmChatMessageModel>{};
+    for (final m in previous) {
+      final id = (m.messageId ?? '').trim();
+      if (id.isNotEmpty) byId[id] = m;
+    }
+    return fromDb.map((db) {
+      final id = (db.messageId ?? '').trim();
+      final mem = byId[id];
+      if (mem == null) return db;
+      final memCount = replyCountOf(mem);
+      final dbCount = replyCountOf(db);
+      final memLast = mem.lastThreadReplyAt ?? 0;
+      final dbLast = db.lastThreadReplyAt ?? 0;
+      if (memCount <= dbCount && memLast <= dbLast) return db;
+      return db.copyWith(
+        replyCount: memCount > dbCount ? memCount : dbCount,
+        lastThreadReplyAt: memLast > dbLast ? memLast : dbLast,
+      );
+    }).toList();
+  }
+
   /// [applyReplyToRootInMap] for the in-memory timeline list.
   static List<IsmChatMessageModel> applyReplyToRootInList(
     List<IsmChatMessageModel> messages,
@@ -242,6 +428,105 @@ class IsmChatThreadCoordinator {
   /// thread and the channel timeline.
   static bool showInConversationForReply({required bool alsoSendToChannel}) =>
       alsoSendToChannel;
+
+  // -------------------------------------------------------- media preview
+
+  /// Stable key for deduping swipe-preview rows across channel + thread lists.
+  static String mediaGalleryItemKey(IsmChatMessageModel item) {
+    final id = (item.messageId ?? '').trim();
+    if (id.isNotEmpty) return id;
+    final url = item.attachments?.firstOrNull?.mediaUrl ?? '';
+    return '${item.sentAt}_$url';
+  }
+
+  /// Expands in-panel thread replies into image/video gallery rows.
+  ///
+  /// API replies may use wire `customType` `AttachmentMessage:Reply`; resolve
+  /// the bubble type via [IsmChatMessageModel.threadPanelBubbleType]. See
+  /// `docs/THREADS.md`.
+  static List<IsmChatMessageModel> mediaGalleryItemsFromThreadReplies(
+    List<IsmChatMessageModel> replies,
+  ) {
+    final items = <IsmChatMessageModel>[];
+    for (final reply in replies) {
+      final bubble = reply.threadPanelBubbleType;
+      if (bubble == null) continue;
+      final row = reply.copyWith(customType: bubble);
+      items.addAll(row.toMediaGalleryItems(includeAudio: false));
+    }
+    return items;
+  }
+
+  /// Merges two preview lists without duplicate messages.
+  static List<IsmChatMessageModel> mergeMediaGalleryItems(
+    List<IsmChatMessageModel> primary,
+    List<IsmChatMessageModel> extra,
+  ) {
+    final seen = <String>{};
+    final merged = <IsmChatMessageModel>[];
+    for (final item in [...primary, ...extra]) {
+      final key = mediaGalleryItemKey(item);
+      if (key.isNotEmpty && seen.contains(key)) continue;
+      if (key.isNotEmpty) seen.add(key);
+      merged.add(item);
+    }
+    return merged;
+  }
+
+  /// Channel + thread entry for tapping an image, GIF, sticker, or video.
+  ///
+  /// Uses [IsmChatPageController.tapForMediaPreview] when registered so swipe
+  /// preview merges channel and in-panel thread media; otherwise opens a
+  /// single-item gallery via [openMediaPreviewList].
+  static Future<void> openMediaPreviewFromThread(
+    IsmChatMessageModel message,
+  ) async {
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      IsmChatUtility.chatPageController.tapForMediaPreview(message);
+      return;
+    }
+    final bubble = message.threadPanelBubbleType;
+    final normalized =
+        bubble != null ? message.copyWith(customType: bubble) : message;
+    final gallery = normalized.toMediaGalleryItems(includeAudio: false);
+    if (gallery.isEmpty) return;
+    await openMediaPreviewList(
+      mediaList: gallery,
+      selectedIndex: 0,
+      message: gallery.first,
+    );
+  }
+
+  /// Pushes the shared image/video preview route (channel or thread panel).
+  ///
+  /// Reused by [IsmChatPageController] and [IsmChatThreadMessageTile] when the
+  /// chat page is not mounted so thread-only previews still work.
+  static Future<void> openMediaPreviewList({
+    required List<IsmChatMessageModel> mediaList,
+    required int selectedIndex,
+    required IsmChatMessageModel message,
+  }) async {
+    if (IsmChatResponsive.isWeb(
+        IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context)) {
+      await IsmChatRoute.goToRoute(IsmWebMessageMediaPreview(
+        previewData: {
+          'mediaIndex': selectedIndex,
+          'messageData': mediaList,
+          'mediaUserName': message.chatName,
+          'initiated': message.sentByMe,
+          'mediaTime': message.sentAt,
+        },
+      ));
+    } else {
+      await IsmChatRoute.goToRoute(IsmMediaPreview(
+        mediaIndex: selectedIndex,
+        messageData: mediaList,
+        mediaUserName: message.chatName,
+        initiated: message.sentByMe,
+        mediaTime: message.sentAt,
+      ));
+    }
+  }
 
   // ------------------------------------------------------------ delete rules
 

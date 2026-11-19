@@ -100,6 +100,21 @@ void main() {
       );
     });
 
+    test('HTTP 404 on thread fetch means zero replies', () async {
+      api.on(
+        'GET',
+        '/chat/messages',
+        const FakeResponse('{"error":"Not found"}', status: 404),
+      );
+      expect(
+        await repo.getThreadMessages(
+          conversationId: kDirectConversationId,
+          threadRootId: 'root-1',
+        ),
+        isEmpty,
+      );
+    });
+
     test('returns null when the transport throws', () async {
       api.throwOn('GET', '/chat/messages', Exception('offline'));
       expect(

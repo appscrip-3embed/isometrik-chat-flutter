@@ -26,48 +26,53 @@ class IsmChatThreadMessageTile extends StatelessWidget {
   /// Renders the root variant: card background and border.
   final bool isRoot;
 
-  /// Message kinds whose body is rendered by the SDK's own message widgets
-  /// (the same ones the channel uses) instead of as plain text.
-  static bool rendersAsBubble(IsmChatMessageModel message) => const [
-        IsmChatCustomMessageType.image,
-        IsmChatCustomMessageType.video,
-        IsmChatCustomMessageType.audio,
-        IsmChatCustomMessageType.file,
-        IsmChatCustomMessageType.multipleAttachments,
-        IsmChatCustomMessageType.location,
-        IsmChatCustomMessageType.contact,
-        IsmChatCustomMessageType.link,
-      ].contains(message.customType);
+  /// Whether taps on this row should open media / files (not nested-reply).
+  static bool usesMediaTapBehavior(IsmChatMessageModel message) =>
+      message.threadPanelBubbleType != null;
+
+  /// Bubble kinds that open routes from the channel message card tap target on
+  /// channel timeline but do not attach their own [IsmChatTapHandler] (unlike
+  /// image / video / file). The thread panel reuses [IsmChatMessageWrapper]
+  /// without that outer tap — wire the same behavior here.
+  static bool threadPanelBubbleNeedsMessageCardTap(
+    IsmChatCustomMessageType type,
+  ) =>
+      type == IsmChatCustomMessageType.contact;
+
+  /// Opens shared-contact details for a thread row (root or reply).
+  ///
+  /// Reuses [IsmChatPageController.tapForMediaPreview] when the chat page is
+  /// mounted; otherwise navigates directly so a thread opened in isolation
+  /// still works (e.g. deep link before chat loads).
+  static void openContactDetailsFromThread(IsmChatMessageModel message) {
+    if (message.contacts.isEmpty) return;
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      IsmChatUtility.chatPageController.tapForMediaPreview(message);
+      return;
+    }
+    IsmChatRoute.goToRoute(
+      IsmChatContactsInfoView(contacts: message.contacts),
+    );
+  }
+
+  /// Opens image / video preview from a thread row (delegates to coordinator).
+  static Future<void> openMediaPreviewFromThread(
+    IsmChatMessageModel message,
+  ) =>
+      IsmChatThreadCoordinator.openMediaPreviewFromThread(message);
 
   /// Short human label for a message with no text body, used when the real
   /// bubble cannot be rendered (no chat page controller — e.g. a thread opened
   /// from a notification before chat mounted).
   ///
   /// Returns `null` for text-ish messages, whose [IsmChatMessageModel.body] is
-  /// shown as-is.
-  static String? threadPreviewLabel(IsmChatMessageModel message) {
-    switch (message.customType) {
-      case IsmChatCustomMessageType.image:
-        return 'Photo';
-      case IsmChatCustomMessageType.video:
-        return 'Video';
-      case IsmChatCustomMessageType.audio:
-        return 'Audio';
-      case IsmChatCustomMessageType.file:
-        return 'Document';
-      case IsmChatCustomMessageType.multipleAttachments:
-        return 'Attachments';
-      case IsmChatCustomMessageType.location:
-        return 'Location';
-      case IsmChatCustomMessageType.contact:
-        return 'Contact';
-      case IsmChatCustomMessageType.deletedForEveryone:
-      case IsmChatCustomMessageType.deletedForMe:
-        return 'This message was deleted';
-      default:
-        return null;
-    }
-  }
+  /// shown as-is. Pass [contentType] from [IsmChatMessageModel.threadPanelBubbleType]
+  /// when wire `customType` is `reply`.
+  static String? threadPreviewLabel(
+    IsmChatMessageModel message, [
+    IsmChatCustomMessageType? contentType,
+  ]) =>
+      IsmChatThreadCoordinator.threadContentTypeLabel(message, contentType);
 
   String get _senderName {
     if (message.sentByMe) return IsmChatStrings.you;
@@ -88,13 +93,18 @@ class IsmChatThreadMessageTile extends StatelessWidget {
     }
 
     final theme = IsmChatThemeResolver.threadFromConfig(context);
-    final label = threadPreviewLabel(message);
+    final bubbleType = message.threadPanelBubbleType;
+    final label = threadPreviewLabel(message, bubbleType);
     final body = message.body.trim();
     // Media / location / contact replies reuse the channel's own widgets, so a
     // photo in a thread looks like a photo in the chat (and an in-flight
     // upload shows the same progress state).
-    final asBubble = rendersAsBubble(message) &&
+    final asBubble = bubbleType != null &&
         IsmChatUtility.chatPageControllerRegistered;
+    final showBodyText = body.isNotEmpty &&
+        !(asBubble && IsmChatUtility.isOutboundAttachmentPlaceholderBody(body));
+    final bubbleMessage =
+        asBubble ? message.copyWith(customType: bubbleType) : message;
 
     final content = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,7 +138,16 @@ class IsmChatThreadMessageTile extends StatelessWidget {
               ),
               IsmChatDimens.boxHeight2,
               if (asBubble)
-                IsmChatMessageWrapper(message)
+                _threadPanelBubbleTapTarget(
+                  bubbleType: bubbleType,
+                  message: bubbleMessage,
+                  child: _threadAttachmentPreview(
+                    context,
+                    bubbleType: bubbleType,
+                    theme: theme,
+                    child: IsmChatMessageWrapper(bubbleMessage),
+                  ),
+                )
               else if (label != null && body.isEmpty)
                 Text(label, style: theme.attachmentLabelStyle)
               else ...[
@@ -136,7 +155,7 @@ class IsmChatThreadMessageTile extends StatelessWidget {
                   Text(label, style: theme.attachmentLabelStyle),
                   IsmChatDimens.boxHeight2,
                 ],
-                Text(body, style: theme.bodyStyle),
+                if (showBodyText) Text(body, style: theme.bodyStyle),
               ],
               // "Also sent to channel" replies carry showInConversation: true.
               if (!isRoot && message.showInConversation == true) ...[
@@ -172,4 +191,45 @@ class IsmChatThreadMessageTile extends StatelessWidget {
       child: content,
     );
   }
+}
+
+/// Adds channel-style tap handling when the bubble does not handle taps itself.
+Widget _threadPanelBubbleTapTarget({
+  required IsmChatCustomMessageType? bubbleType,
+  required IsmChatMessageModel message,
+  required Widget child,
+}) {
+  if (bubbleType == null ||
+      !IsmChatThreadMessageTile.threadPanelBubbleNeedsMessageCardTap(
+        bubbleType,
+      )) {
+    return child;
+  }
+  return IsmChatTapHandler(
+    onTap: () =>
+        IsmChatThreadMessageTile.openContactDetailsFromThread(message),
+    child: child,
+  );
+}
+
+/// Outlines document previews in the thread panel.
+///
+/// Thread rows reuse [IsmChatFileMessage] without [MessageBubble] chrome, so
+/// the PDF / text / Office preview would otherwise blend into the panel
+/// background. Only file attachments get the frame (other media keep full-bleed).
+Widget _threadAttachmentPreview(
+  BuildContext context, {
+  required IsmChatCustomMessageType? bubbleType,
+  required IsmChatThreadTheme theme,
+  required Widget child,
+}) {
+  if (bubbleType != IsmChatCustomMessageType.file) return child;
+  final radius = BorderRadius.circular(IsmChatDimens.ten);
+  return DecoratedBox(
+    decoration: BoxDecoration(
+      borderRadius: radius,
+      border: Border.all(color: theme.rootCardBorderColor),
+    ),
+    child: ClipRRect(borderRadius: radius, child: child),
+  );
 }

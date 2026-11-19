@@ -110,8 +110,12 @@ mixin IsmChatPageGetMessageMixin on GetxController {
       _controller.isMessagesLoading = false;
       return;
     }
+    final merged = IsmChatThreadCoordinator.mergeThreadRootBadgesInList(
+      localMessages,
+      _controller.messages,
+    );
     _controller.messages = _controller.commonController
-        .sortMessages(filterMessages(localMessages));
+        .sortMessages(filterMessages(merged));
     _controller.isMessagesLoading = false;
     _controller._generateIndexedMessageList();
     update();

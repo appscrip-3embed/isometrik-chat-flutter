@@ -435,6 +435,43 @@ void main() {
       expect(body['showInConversation'], isTrue);
     }, setUpApi: (api) => api.registerSendDefaults());
 
+    IsmChatMessageModel audioEcho({int sentAt = 7200}) => message(
+          body: 'Audio',
+          customType: IsmChatCustomMessageType.audio,
+          messageId: '',
+          sentAt: sentAt,
+          attachments: [attachment(IsmChatMediaType.audio)],
+        );
+
+    chatTestWidgets('audio composed in a thread stays in the panel',
+        (tester, ctx) async {
+      IsmChatConfig.threadsEnabled = true;
+      addTearDown(() => IsmChatConfig.threadsEnabled = false);
+      final root = threadRoot(messageId: 'root-1', replyCount: 0);
+      await tester.runAsync(
+        () => seedConversation(ctx, messages: {'1000': root}),
+      );
+      ctx.page.messages = [root];
+      ctx.api.on('GET', '/chat/messages', FakeResponse.json({'messages': []}));
+      final thread = putThreadController(ctx);
+      await drive(
+        tester,
+        () => thread.openThread(root: root, conversation: ctx.page.conversation),
+      );
+
+      final echo = IsmChatThreadCoordinator.stampThreadTarget(
+        audioEcho(),
+        ctx.page.threadSendTarget,
+      );
+      ctx.page.addLocalOutgoingRow(echo);
+
+      expect(thread.replies.single.sentAt, 7200);
+      expect(
+        ctx.page.messages.map((e) => e.sentAt),
+        isNot(contains(7200)),
+      );
+    }, setUpApi: (api) => api.registerSendDefaults());
+
     chatTestWidgets('threads off → an attachment send is unchanged',
         (tester, ctx) async {
       IsmChatConfig.threadsEnabled = false;
@@ -541,6 +578,79 @@ void main() {
       expect(find.byType(IsmChatMessageWrapper), findsOneWidget);
       expect(find.text('Document'), findsNothing);
     }, setUpApi: (api) => api.registerSendDefaults());
+
+  });
+
+  test('usesMediaTapBehavior is true for attachment replies only', () {
+    configureChatSdk();
+    addTearDown(() => resetChatSdk());
+    expect(
+      IsmChatThreadMessageTile.usesMediaTapBehavior(
+        threadReply(body: 'hello'),
+      ),
+      isFalse,
+    );
+    expect(
+      IsmChatThreadMessageTile.usesMediaTapBehavior(
+        message(
+          body: IsmChatStrings.image,
+          customType: IsmChatCustomMessageType.reply,
+          messageType: IsmChatMessageType.reply,
+          attachments: [attachment(IsmChatMediaType.image)],
+        ),
+      ),
+      isTrue,
+    );
+  });
+
+  test('threadPanelBubbleType resolves AttachmentMessage:Reply + image attachment',
+      () {
+    configureChatSdk();
+    addTearDown(() => resetChatSdk());
+    final replyFromApi = message(
+      body: IsmChatStrings.image,
+      customType: IsmChatCustomMessageType.reply,
+      messageType: IsmChatMessageType.reply,
+      threadRootId: 'root-1',
+      attachments: [attachment(IsmChatMediaType.image)],
+    );
+    expect(replyFromApi.threadPanelBubbleType, IsmChatCustomMessageType.image);
+  });
+
+  group('channel badge after thread', () {
+    chatTestWidgets(
+        'text reply bumps footer count; close + DB reload keeps badge',
+        (tester, ctx) async {
+      IsmChatConfig.threadsEnabled = true;
+      addTearDown(() => IsmChatConfig.threadsEnabled = false);
+      final root = threadRoot(messageId: 'root-1', replyCount: 0);
+      await tester.runAsync(
+        () => seedConversation(ctx, messages: {'1000': root}),
+      );
+      ctx.page.messages = [root];
+      ctx.api.on('GET', '/chat/messages', FakeResponse.json({'messages': []}));
+      final thread = putThreadController(ctx);
+      await drive(
+        tester,
+        () => thread.openThread(root: root, conversation: ctx.page.conversation),
+      );
+      thread.replyController.text = 'hello';
+      await drive(tester, () => thread.sendReply());
+      expect(
+        ctx.page.messages
+            .firstWhere((e) => e.messageId == 'root-1')
+            .replyCount,
+        1,
+      );
+      thread.closeThread();
+      await drive(tester, () => ctx.page.getMessagesFromDB(kDirectConversationId));
+      expect(
+        ctx.page.messages
+            .firstWhere((e) => e.messageId == 'root-1')
+            .replyCount,
+        1,
+      );
+    }, setUpApi: (api) => api.registerSendDefaults());
   });
 
   group('focus menu', () {
@@ -569,6 +679,16 @@ void main() {
       expect(
         message(messageId: '').focusMenuList,
         isNot(contains(IsmChatFocusMenuType.replyInThread)),
+      );
+
+      final alsoSent = threadReply(alsoSentToChannel: true);
+      expect(
+        alsoSent.focusMenuLabel(IsmChatFocusMenuType.replyInThread),
+        IsmChatStrings.viewThread,
+      );
+      expect(
+        root.focusMenuLabel(IsmChatFocusMenuType.replyInThread),
+        IsmChatStrings.replyInThread,
       );
     }, setUpApi: (api) => api.registerSendDefaults());
   });

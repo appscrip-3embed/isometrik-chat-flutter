@@ -281,12 +281,15 @@ extension SizeOfMedia on String {
 
   /// Converts a JSON string representation of a list to Uint8List.
   Uint8List get strigToUnit8List {
-    if (isNotEmpty) {
-      var list = Uint8List.fromList(
+    if (isEmpty) {
+      return Uint8List(0);
+    }
+    try {
+      return Uint8List.fromList(
         List.from(jsonDecode(this) as List),
       );
-      return list;
+    } catch (_) {
+      return Uint8List(0);
     }
-    return Uint8List(0);
   }
 }

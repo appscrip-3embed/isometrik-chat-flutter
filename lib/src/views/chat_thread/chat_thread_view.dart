@@ -41,19 +41,42 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
 
   IsmChatThreadProperties get _props => IsmChatProperties.threadProperties;
 
+  /// Expected thread id for [widget.rootMessage] (resolves also-sent rows).
+  String get _targetThreadId =>
+      IsmChatThreadCoordinator.threadIdOf(widget.rootMessage);
+
+  /// Panel state matches [widget.rootMessage] (avoids stale reply lists).
+  bool get _isPanelSynced => _controller.threadRootId == _targetThreadId;
+
   @override
   void initState() {
     super.initState();
     IsmChatThreadBinding().dependencies();
     _controller = Get.find<IsmChatThreadController>();
     _scrollController.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncPanelIfNeeded());
+  }
+
+  @override
+  void didUpdateWidget(covariant IsmChatThreadView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.rootMessage.messageId != widget.rootMessage.messageId ||
+        IsmChatThreadCoordinator.threadIdOf(oldWidget.rootMessage) !=
+            _targetThreadId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncPanelIfNeeded());
+    }
+  }
+
+  /// Opens or re-targets the panel when the delegate has not already done so.
+  Future<void> _syncPanelIfNeeded() async {
+    if (!IsmChatThreadCoordinator.canOpenThread(widget.rootMessage)) return;
+    if (!_isPanelSynced) {
       await _controller.openThread(
         root: widget.rootMessage,
         conversation: widget.conversation,
       );
-      _props.onThreadOpened?.call(widget.rootMessage);
-    });
+    }
+    _props.onThreadOpened?.call(widget.rootMessage);
   }
 
   @override
@@ -72,10 +95,28 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
     }
   }
 
+  /// Dismisses the composer keyboard when scrolling replies or tapping the
+  /// thread content (same pattern as [IsmChatSearchMessgae]).
+  Widget _wrapKeyboardDismissBehavior(Widget child) =>
+      NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification is ScrollStartNotification) {
+            IsmChatUtility.hideKeyboard();
+          }
+          return false;
+        },
+        child: GestureDetector(
+          onTap: IsmChatUtility.hideKeyboard,
+          behavior: HitTestBehavior.translucent,
+          child: child,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final theme = IsmChatThemeResolver.threadFromConfig(context);
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: IsmChatAppBar(
         title: Text(
@@ -88,18 +129,52 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
       body: Obx(
         () => Column(
           children: [
-            IsmChatThreadMessageTile(
-              message: _controller.root ?? widget.rootMessage,
-              isRoot: true,
+            Expanded(
+              child: _wrapKeyboardDismissBehavior(
+                Column(
+                  children: [
+                    IsmChatThreadMessageTile(
+                      message: _controller.root ?? widget.rootMessage,
+                      isRoot: true,
+                    ),
+                    _replyCountRow(theme),
+                    Expanded(child: _replies(theme)),
+                  ],
+                ),
+              ),
             ),
-            _replyCountRow(theme),
-            Expanded(child: _replies(theme)),
-            IsmChatThreadComposer(controller: _controller),
+            // Same stack order as [_IsmChatPageView]: shell then emoji board.
+            _threadComposerShell(context),
+            Offstage(
+              offstage: !_controller.showEmojiBoard,
+              child: IsmChatComposerEmojiBoard(
+                key: const Key('ism-thread-emoji-board'),
+                textController: _controller.replyController,
+                emojiBoardTab: _controller.emojiBoardTab,
+                onTabChanged: (tab) => _controller.emojiBoardTab = tab,
+                onBeforeGiphySend: () async {
+                  _controller.syncSendTarget();
+                },
+                onAfterGiphySend: _controller.closeEmojiBoard,
+              ),
+            ),
           ],
         ),
       ),
-    );
+    ).withUnfocusGestureDetctor(context);
   }
+
+  /// Outer composer chrome matches [_IsmChatPageView._defaultComposer].
+  Widget _threadComposerShell(BuildContext context) => Container(
+        padding: IsmChatConfig
+            .chatTheme.chatPageTheme?.textFiledTheme?.textfieldInsets,
+        decoration:
+            IsmChatConfig.chatTheme.chatPageTheme?.textFiledTheme?.decoration,
+        child: SafeArea(
+          bottom: !_controller.showEmojiBoard,
+          child: IsmChatThreadComposer(controller: _controller),
+        ),
+      );
 
   Widget _replyCountRow(IsmChatThreadTheme theme) {
     final count = _controller.replyCount;
@@ -124,6 +199,9 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
   }
 
   Widget _replies(IsmChatThreadTheme theme) {
+    if (!_isPanelSynced && _controller.replies.isNotEmpty) {
+      return const Center(child: IsmChatLoadingDialog());
+    }
     if (_controller.isLoading && _controller.replies.isEmpty) {
       return const Center(child: IsmChatLoadingDialog());
     }
@@ -148,7 +226,8 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
       key: const Key('ism-thread-replies'),
       controller: _scrollController,
       padding: EdgeInsets.only(bottom: IsmChatDimens.eight),
-      itemCount: _controller.replies.length + (_controller.isPaginating ? 1 : 0),
+      itemCount:
+          _controller.replies.length + (_controller.isPaginating ? 1 : 0),
       separatorBuilder: (_, __) => Divider(
         height: IsmChatDimens.one,
         color: theme.dividerColor,
@@ -167,10 +246,18 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
           );
         }
         final reply = _controller.replies[index];
-        // Tap a reply to answer it (nested reply inside the same thread).
+        final tile = IsmChatThreadMessageTile(message: reply);
+        // Media rows handle their own taps (preview / open file). Text keeps
+        // the Slack-style "tap to reply to this message" gesture.
+        if (IsmChatThreadMessageTile.usesMediaTapBehavior(reply)) {
+          return tile;
+        }
         return IsmChatTapHandler(
-          onTap: () => _controller.replyTo = reply,
-          child: IsmChatThreadMessageTile(message: reply),
+          onTap: () {
+            IsmChatUtility.hideKeyboard();
+            _controller.replyTo = reply;
+          },
+          child: tile,
         );
       },
     );

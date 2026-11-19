@@ -35,7 +35,14 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
         // Slack-style: open the thread panel instead of quoting inline. Only
         // offered while IsmChatConfig.threadsEnabled is true (see
         // IsmChatMessageModel.focusMenuList).
-        await IsmChat.i.openThread(message, conversation: _controller.conversation);
+        final panelRoot = IsmChatThreadCoordinator.resolveThreadPanelRoot(
+          message,
+          _controller.messages,
+        );
+        await IsmChat.i.openThread(
+          panelRoot,
+          conversation: _controller.conversation,
+        );
         break;
       case IsmChatFocusMenuType.forward:
         _controller.conversationController.forwardedList.clear();
@@ -471,29 +478,78 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
               .shouldBlured ??
           false;
 
-  /// All image/video items in the current chat for swipe preview (no audio).
-  List<IsmChatMessageModel> _conversationImageVideoGallery() =>
-      expandMediaGalleryItems(
-        _controller.messages,
-        includeAudio: false,
-      ).where((item) => !_isMessageBlurredForMediaPreview(item)).toList();
+  /// Channel timeline + open thread replies for swipe preview (no audio).
+  ///
+  /// Thread-only media lives on the open thread panel's reply list, not on the
+  /// channel timeline — see `docs/THREADS.md` and `IsmChatThreadCoordinator`.
+  List<IsmChatMessageModel> _mediaGalleryForPreview() {
+    final channel = expandMediaGalleryItems(
+      _controller.messages,
+      includeAudio: false,
+    );
+    var merged = channel;
+    if (IsmChatThreadCoordinator.isEnabled) {
+      final thread = IsmChatThreadController.instance;
+      final convId = (_controller.conversation?.conversationId ?? '').trim();
+      if (thread != null && thread.conversationId == convId) {
+        merged = IsmChatThreadCoordinator.mergeMediaGalleryItems(
+          channel,
+          IsmChatThreadCoordinator.mediaGalleryItemsFromThreadReplies(
+            thread.replies,
+          ),
+        );
+      }
+    }
+    return merged
+        .where((item) => !_isMessageBlurredForMediaPreview(item))
+        .toList();
+  }
+
+  /// Preview list for a single message when it is not in the merged gallery.
+  List<IsmChatMessageModel> _singleMessageMediaGallery(
+    IsmChatMessageModel message,
+  ) {
+    final bubble = message.threadPanelBubbleType;
+    final row =
+        bubble != null ? message.copyWith(customType: bubble) : message;
+    return row
+        .toMediaGalleryItems(includeAudio: false)
+        .where((item) => !_isMessageBlurredForMediaPreview(item))
+        .toList();
+  }
 
   Future<void> _openGalleryForMessage(
     IsmChatMessageModel message, {
     int? attachmentIndex,
   }) async {
-    final mediaList = _conversationImageVideoGallery();
-    if (mediaList.isEmpty) {
-      return;
-    }
-    final selectedIndex = indexInMediaGallery(
-      mediaList,
-      message,
-      attachmentIndex: attachmentIndex,
-    );
+    var mediaList = _mediaGalleryForPreview();
+    var selectedIndex = mediaList.isEmpty
+        ? -1
+        : indexInMediaGallery(
+            mediaList,
+            message,
+            attachmentIndex: attachmentIndex,
+          );
+
     if (selectedIndex < 0) {
-      return;
+      final fallback = _singleMessageMediaGallery(message);
+      if (fallback.isEmpty) {
+        return;
+      }
+      mediaList = fallback;
+      if (attachmentIndex != null &&
+          attachmentIndex >= 0 &&
+          attachmentIndex < fallback.length) {
+        selectedIndex = attachmentIndex;
+      } else {
+        selectedIndex = indexInMediaGallery(fallback, message,
+            attachmentIndex: attachmentIndex);
+        if (selectedIndex < 0) {
+          selectedIndex = 0;
+        }
+      }
     }
+
     final previewMeta = mediaList[selectedIndex];
     await _openMediaPreviewList(
       mediaList: mediaList,
@@ -520,42 +576,26 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
     required List<IsmChatMessageModel> mediaList,
     required int selectedIndex,
     required IsmChatMessageModel message,
-  }) async {
-    if (IsmChatResponsive.isWeb(
-        IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context)) {
-      await IsmChatRoute.goToRoute(IsmWebMessageMediaPreview(
-        previewData: {
-          'mediaIndex': selectedIndex,
-          'messageData': mediaList,
-          'mediaUserName': message.chatName,
-          'initiated': message.sentByMe,
-          'mediaTime': message.sentAt,
-        },
-      ));
-    } else {
-      await IsmChatRoute.goToRoute(IsmMediaPreview(
-        mediaIndex: selectedIndex,
-        messageData: mediaList,
-        mediaUserName: message.chatName,
-        initiated: message.sentByMe,
-        mediaTime: message.sentAt,
-      ));
-    }
-  }
+  }) async =>
+      IsmChatThreadCoordinator.openMediaPreviewList(
+        mediaList: mediaList,
+        selectedIndex: selectedIndex,
+        message: message,
+      );
 
   /// Taps for media preview from a message.
   void tapForMediaPreview(IsmChatMessageModel message) async {
+    final bubble = message.threadPanelBubbleType ?? message.customType;
     if ([IsmChatCustomMessageType.image, IsmChatCustomMessageType.video]
-        .contains(message.customType)) {
+        .contains(bubble)) {
       await _openGalleryForMessage(message);
-    } else if (message.customType == IsmChatCustomMessageType.file) {
+    } else if (bubble == IsmChatCustomMessageType.file) {
       final attachment = message.attachments?.firstOrNull;
       if (attachment == null) {
         return;
       }
       await openFileAttachment(attachment);
-    } else if (message.customType ==
-        IsmChatCustomMessageType.multipleAttachments) {
+    } else if (bubble == IsmChatCustomMessageType.multipleAttachments) {
       final layout = message.multipleAttachmentLayout;
       if (layout == MultipleAttachmentLayout.mediaGrid) {
         await _openGalleryForMessage(message, attachmentIndex: 0);
@@ -563,13 +603,13 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
         // Each document row handles its own tap; avoid opening the first file only.
         return;
       }
-    } else if (message.customType == IsmChatCustomMessageType.audio) {
+    } else if (bubble == IsmChatCustomMessageType.audio) {
       await IsmChatContextWidget.showDialogContext(
         content: AudioPreview(
           message: message,
         ),
       );
-    } else if (message.customType == IsmChatCustomMessageType.contact) {
+    } else if (bubble == IsmChatCustomMessageType.contact) {
       await IsmChatRoute.goToRoute(
         IsmChatContactsInfoView(
           contacts: message.contacts,

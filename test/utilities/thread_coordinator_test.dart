@@ -76,12 +76,131 @@ void main() {
       expect(IsmChatThreadCoordinator.shouldHideFromTimeline(shared), isFalse);
     });
 
+    test('also-sent replies gate channel echo UI', () {
+      IsmChatConfig.threadsEnabled = true;
+      addTearDown(() => IsmChatConfig.threadsEnabled = false);
+      final shared = threadReply(alsoSentToChannel: true);
+      final threadOnly = threadReply();
+      expect(IsmChatThreadCoordinator.isAlsoSentThreadReply(shared), isTrue);
+      expect(IsmChatThreadCoordinator.isAlsoSentThreadReply(threadOnly), isFalse);
+      expect(
+        IsmChatThreadCoordinator.shouldUseViewThreadMenuLabel(shared),
+        isTrue,
+      );
+      expect(
+        IsmChatThreadCoordinator.shouldShowChannelThreadContext(shared),
+        isTrue,
+      );
+    });
+
     test('thread-only replies are hidden from the timeline only when on', () {
       final reply = threadReply();
       expect(IsmChatThreadCoordinator.shouldHideFromTimeline(reply), isFalse);
 
       IsmChatConfig.threadsEnabled = true;
       expect(IsmChatThreadCoordinator.shouldHideFromTimeline(reply), isTrue);
+    });
+  });
+
+  group('resolveThreadPanelRoot', () {
+    setUp(() => IsmChatConfig.threadsEnabled = true);
+
+    test('returns the channel root for an also-sent reply', () {
+      final root = threadRoot(messageId: 'root-1');
+      final shared = threadReply(
+        messageId: 'r-shared',
+        threadRootId: 'root-1',
+        alsoSentToChannel: true,
+      );
+      final resolved = IsmChatThreadCoordinator.resolveThreadPanelRoot(
+        shared,
+        [root, shared],
+      );
+      expect(resolved.messageId, 'root-1');
+      expect(IsmChatThreadCoordinator.isThreadReply(resolved), isFalse);
+    });
+
+    test('uses parentMessageId when threadRootId is missing', () {
+      final root = threadRoot(messageId: 'root-1');
+      final reply = message(
+        messageId: 'r1',
+        messageType: IsmChatMessageType.reply,
+        parentMessageId: 'root-1',
+        showInConversation: true,
+      );
+      final resolved = IsmChatThreadCoordinator.resolveThreadPanelRoot(
+        reply,
+        [root],
+      );
+      expect(resolved.messageId, 'root-1');
+    });
+
+    test('plain channel messages are unchanged', () {
+      final plain = message(messageId: 'plain-1');
+      expect(
+        IsmChatThreadCoordinator.resolveThreadPanelRoot(plain, [plain]),
+        plain,
+      );
+    });
+  });
+
+  group('channel thread context', () {
+    setUp(() => IsmChatConfig.threadsEnabled = true);
+    tearDown(() => IsmChatConfig.threadsEnabled = false);
+
+    test('resolveParentInTimeline prefers parentMessageId then root', () {
+      final root = threadRoot(messageId: 'root-1');
+      final img = message(
+        messageId: 'img-1',
+        body: '',
+        customType: IsmChatCustomMessageType.image,
+        attachments: [
+          attachment(IsmChatMediaType.image).copyWith(name: 'image (1).png'),
+        ],
+      );
+      final shared = threadReply(
+        messageId: 'r1',
+        alsoSentToChannel: true,
+        parentMessageId: 'img-1',
+      );
+      final timeline = [root, img, shared];
+      expect(
+        IsmChatThreadCoordinator.resolveParentInTimeline(shared, timeline),
+        img,
+      );
+      final nested = threadReply(
+        messageId: 'r2',
+        alsoSentToChannel: true,
+        parentMessageId: 'missing',
+        threadRootId: 'root-1',
+      );
+      expect(
+        IsmChatThreadCoordinator.resolveParentInTimeline(nested, timeline),
+        root,
+      );
+    });
+
+    test('threadReplyContextSubject uses media type labels and text', () {
+      final named = message(
+        customType: IsmChatCustomMessageType.image,
+        attachments: [
+          attachment(IsmChatMediaType.image).copyWith(name: 'image (1).png'),
+        ],
+      );
+      expect(
+        IsmChatThreadCoordinator.threadReplyContextSubject(named),
+        IsmChatStrings.image,
+      );
+      expect(
+        IsmChatThreadCoordinator.threadReplyContextSubject(
+          message(body: 'hello thread'),
+        ),
+        'hello thre...',
+      );
+      expect(
+        IsmChatThreadCoordinator.threadReplyContextSubject(null),
+        IsmChatStrings.threadContextSubjectFallback,
+      );
     });
   });
 
@@ -277,6 +396,63 @@ void main() {
       expect(next[1].replyCount, 1);
       expect(next[1].lastThreadReplyAt, 7000);
       expect(list[1].replyCount, 0);
+    });
+
+    test('mediaGalleryItemsFromThreadReplies resolves reply wire type', () {
+      IsmChatConfig.threadsEnabled = true;
+      addTearDown(() => IsmChatConfig.threadsEnabled = false);
+      final replies = [
+        message(
+          body: IsmChatStrings.image,
+          customType: IsmChatCustomMessageType.reply,
+          messageType: IsmChatMessageType.reply,
+          threadRootId: 'root-1',
+          messageId: 'img-reply',
+          attachments: [attachment(IsmChatMediaType.image)],
+        ),
+        threadReply(body: 'text only'),
+      ];
+      final gallery =
+          IsmChatThreadCoordinator.mediaGalleryItemsFromThreadReplies(replies);
+      expect(gallery, hasLength(1));
+      expect(gallery.single.messageId, 'img-reply');
+      expect(gallery.single.customType, IsmChatCustomMessageType.image);
+    });
+
+    test('mergeMediaGalleryItems dedupes channel + thread rows', () {
+      final channel = message(
+        messageId: 'shared',
+        customType: IsmChatCustomMessageType.image,
+        attachments: [attachment(IsmChatMediaType.image)],
+      );
+      final threadRow = channel.copyWith(
+        customType: IsmChatCustomMessageType.reply,
+        messageType: IsmChatMessageType.reply,
+      );
+      final merged = IsmChatThreadCoordinator.mergeMediaGalleryItems(
+        [channel],
+        [threadRow.copyWith(customType: IsmChatCustomMessageType.image)],
+      );
+      expect(merged, hasLength(1));
+    });
+
+    test('mergeThreadRootBadgesInList keeps higher in-memory reply counts', () {
+      IsmChatConfig.threadsEnabled = true;
+      addTearDown(() => IsmChatConfig.threadsEnabled = false);
+      final fromDb = [
+        threadRoot(messageId: 'root-1', replyCount: 0),
+        message(messageId: 'other'),
+      ];
+      final previous = [
+        threadRoot(messageId: 'root-1', replyCount: 2, lastThreadReplyAt: 9000),
+      ];
+      final merged = IsmChatThreadCoordinator.mergeThreadRootBadgesInList(
+        fromDb,
+        previous,
+      );
+      expect(merged[0].replyCount, 2);
+      expect(merged[0].lastThreadReplyAt, 9000);
+      expect(merged[1].messageId, 'other');
     });
   });
 

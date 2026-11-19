@@ -241,7 +241,8 @@ class IsmChatUtility {
         (content == name || _looksLikeDocumentFileName(content));
     if (!isFileName) {
       if (content.isNotEmpty) return content;
-      if (notification.isNotEmpty && !_looksLikeDocumentFileName(notification)) {
+      if (notification.isNotEmpty &&
+          !_looksLikeDocumentFileName(notification)) {
         return notification;
       }
     }
@@ -482,8 +483,7 @@ class IsmChatUtility {
       'ZB',
       'YB',
     ];
-    final multiple =
-        (log(size) / log(1000)).floor().clamp(0, units.length - 1);
+    final multiple = (log(size) / log(1000)).floor().clamp(0, units.length - 1);
     final value = size / pow(1000, multiple);
     final text = (value - value.round()).abs() < 0.001
         ? value.round().toString()
@@ -798,9 +798,8 @@ class IsmChatUtility {
     required Function(int) downloadProgrees,
   }) async {
     try {
-      final fallbackExtension = extension.isNotEmpty
-          ? extension
-          : (isVideo ? 'mp4' : 'jpg');
+      final fallbackExtension =
+          extension.isNotEmpty ? extension : (isVideo ? 'mp4' : 'jpg');
       final resolvedName = ensureFileExtension(
         resolveSaveFileName(
           fileName: fileName,
@@ -1108,8 +1107,20 @@ class IsmChatUtility {
     return _outboundAttachmentPlaceholderBody(mediaType);
   }
 
+  /// Whether [body] is only the placeholder sent with attachment-only messages
+  /// (no caption). Used by thread panel rendering so "Image" is not shown as text.
+  static bool isOutboundAttachmentPlaceholderBody(String body) {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) return false;
+    return trimmed == IsmChatStrings.image ||
+        trimmed == IsmChatStrings.video ||
+        trimmed == IsmChatStrings.gif ||
+        trimmed == IsmChatStrings.sticker;
+  }
+
   /// Wire `body` when an attachment has no caption (see [outboundAttachmentBody]).
-  static String _outboundAttachmentPlaceholderBody(IsmChatMediaType? mediaType) {
+  static String _outboundAttachmentPlaceholderBody(
+      IsmChatMediaType? mediaType) {
     switch (mediaType) {
       case IsmChatMediaType.image:
         return IsmChatStrings.image;
@@ -1194,8 +1205,8 @@ class IsmChatUtility {
     if (trimmed.isNotEmpty && trimmed != placeholder) {
       return trimmed;
     }
-    final metaLabel =
-        metaData?.customMetaData?[IsmChatConstants.multipleMediaPreviewLabelKey];
+    final metaLabel = metaData
+        ?.customMetaData?[IsmChatConstants.multipleMediaPreviewLabelKey];
     if (metaLabel is String && metaLabel.trim().isNotEmpty) {
       return metaLabel.trim();
     }
@@ -1205,7 +1216,8 @@ class IsmChatUtility {
     return IsmChatStrings.image;
   }
 
-  static String lastMessageBodyForConversationSync(IsmChatMessageModel message) {
+  static String lastMessageBodyForConversationSync(
+      IsmChatMessageModel message) {
     if (message.customType != IsmChatCustomMessageType.multipleAttachments) {
       return message.body;
     }

@@ -28,6 +28,47 @@ void main() {
     await resetChatSdk();
   });
 
+  group('IsmChatThreadChannelContext', () {
+    testWidgets('shows replied-to line with parent media type',
+        (tester) async {
+      IsmChatConfig.threadsEnabled = true;
+      final api = FakeChatApi();
+      final page = Get.put(
+        IsmChatPageController(
+          IsmChatPageViewModel(
+            IsmChatPageRepository(apiWrapper: api.wrapper()),
+          ),
+        ),
+        tag: IsmChat.i.chatPageTag,
+      );
+      final img = message(
+        messageId: 'img-1',
+        body: '',
+        customType: IsmChatCustomMessageType.image,
+        attachments: [
+          attachment(IsmChatMediaType.image).copyWith(name: 'image (1).png'),
+        ],
+      );
+      final shared = threadReply(
+        alsoSentToChannel: true,
+        parentMessageId: 'img-1',
+        body: 'amaing',
+      );
+      page.messages = [img, shared];
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadChannelContext(message: shared),
+      );
+      expect(
+        find.byKey(const Key('ism-thread-channel-context')),
+        findsOneWidget,
+      );
+      expect(find.textContaining(IsmChatStrings.image), findsOneWidget);
+      expect(find.textContaining('replied to a thread'), findsOneWidget);
+      await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
+    });
+  });
+
   group('IsmChatThreadFooter', () {
     testWidgets('renders "3 replies" for a root with replies', (tester) async {
       IsmChatConfig.threadsEnabled = true;
@@ -133,8 +174,49 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Photo'), findsOneWidget);
+      expect(find.text(IsmChatStrings.image), findsOneWidget);
     });
+
+    test('contact bubbles need the channel-style tap wrapper', () {
+      expect(
+        IsmChatThreadMessageTile.threadPanelBubbleNeedsMessageCardTap(
+          IsmChatCustomMessageType.contact,
+        ),
+        isTrue,
+      );
+      expect(
+        IsmChatThreadMessageTile.threadPanelBubbleNeedsMessageCardTap(
+          IsmChatCustomMessageType.image,
+        ),
+        isFalse,
+      );
+    });
+
+    chatTestWidgets('tapping a thread contact row opens contact info',
+        (tester, ctx) async {
+      final contactMsg = message(
+        body: IsmChatStrings.contact,
+        customType: IsmChatCustomMessageType.contact,
+        messageType: IsmChatMessageType.reply,
+        metaData: IsmChatMetaData(
+          contacts: [
+            IsmChatContactMetaDatModel(
+              contactName: 'Alice',
+              contactIdentifier: '+15550001',
+            ),
+          ],
+        ),
+      );
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadMessageTile(message: contactMsg),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(IsmChatContactMessage), findsOneWidget);
+      await tester.tap(find.textContaining('View'));
+      await tester.pumpAndSettle();
+      expect(find.byType(IsmChatContactsInfoView), findsOneWidget);
+    }, setUpApi: (api) => api.registerSendDefaults());
 
     testWidgets('a host builder can replace a reply row', (tester) async {
       IsmChatProperties.threadProperties = IsmChatThreadProperties(
@@ -226,6 +308,34 @@ void main() {
       await pumpThreadView(tester, replies: [], rootReplyCount: 0);
       expect(find.byKey(const Key('ism-thread-empty')), findsOneWidget);
       expect(find.text(IsmChatStrings.threadNoReplies), findsOneWidget);
+    });
+
+    testWidgets('HTTP 404 on load shows empty placeholder, not retry',
+        (tester) async {
+      IsmChatConfig.threadsEnabled = true;
+      api.on(
+        'GET',
+        '/chat/messages',
+        const FakeResponse('{"error":"Not found"}', status: 404),
+      );
+      Get.put(
+        IsmChatThreadController(
+          IsmChatThreadViewModel(
+            IsmChatThreadRepository(apiWrapper: api.wrapper()),
+          ),
+        ),
+      );
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadView(
+          rootMessage: threadRoot(replyCount: 0),
+          conversation: directConversation(),
+        ),
+      );
+      await settle(tester);
+
+      expect(find.byKey(const Key('ism-thread-empty')), findsOneWidget);
+      expect(find.byKey(const Key('ism-thread-retry')), findsNothing);
     });
 
     testWidgets('offers a retry when the thread fails to load',
@@ -328,6 +438,27 @@ void main() {
         find.byKey(const Key('ism-thread-attach-button')),
         findsOneWidget,
       );
+    });
+
+    testWidgets('shows mic on the composer when audio is enabled', (tester) async {
+      IsmChatProperties.chatPageProperties = IsmChatPageProperties(
+        features: [IsmChatFeature.audioMessage],
+      );
+      await pumpThreadView(tester, replies: [], rootReplyCount: 0);
+      expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
+    });
+
+    testWidgets('emoji button toggles the thread emoji board', (tester) async {
+      IsmChatProperties.chatPageProperties = IsmChatPageProperties(
+        features: [IsmChatFeature.emojiIcon],
+      );
+      await pumpThreadView(tester, replies: [], rootReplyCount: 0);
+      final threadController = Get.find<IsmChatThreadController>();
+      expect(find.byKey(const Key('ism-thread-emoji-button')), findsOneWidget);
+      expect(threadController.showEmojiBoard, isFalse);
+      await tester.tap(find.byKey(const Key('ism-thread-emoji-button')));
+      await tester.pump();
+      expect(threadController.showEmojiBoard, isTrue);
     });
 
     testWidgets('attachments can be switched off for threads', (tester) async {

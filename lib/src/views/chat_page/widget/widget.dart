@@ -7,6 +7,7 @@ export 'contact.dart';
 export 'contact_info.dart';
 export 'conversation_info.dart';
 export 'conversation_media_widget.dart';
+export 'composer_emoji_board.dart';
 export 'emoji_board.dart';
 export 'giphy_picker_panel.dart';
 export 'focus_menu.dart';

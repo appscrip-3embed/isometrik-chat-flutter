@@ -58,6 +58,9 @@ class IsmChatThreadRepository {
         showLoader: isLoading,
       );
       if (response.hasError) {
+        // A brand-new thread often returns HTTP 404 before the first reply.
+        // Treat that as an empty page, not a hard load failure.
+        if (_isEmptyThreadFetch(response)) return [];
         return null;
       }
       final data = jsonDecode(response.data);
@@ -71,6 +74,10 @@ class IsmChatThreadRepository {
       return null;
     }
   }
+
+  /// Benign errors that mean "this thread exists but has no replies yet".
+  static bool _isEmptyThreadFetch(IsmChatResponseModel response) =>
+      response.errorCode == 404;
 
   /// Server count of every reply in the thread rooted at [threadRootId].
   ///
