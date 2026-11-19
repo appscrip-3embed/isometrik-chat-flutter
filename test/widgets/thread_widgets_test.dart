@@ -289,6 +289,41 @@ void main() {
       await settle(tester);
     }
 
+    testWidgets('scaffold background uses chatPageTheme.backgroundColor',
+        (tester) async {
+      const panelBackground = Color(0xFF123456);
+      IsmChatConfig.threadsEnabled = true;
+      api.on('GET', '/chat/messages', FakeResponse.json({'messages': []}));
+      Get.put(
+        IsmChatThreadController(
+          IsmChatThreadViewModel(
+            IsmChatThreadRepository(apiWrapper: api.wrapper()),
+          ),
+        ),
+      );
+      // ScreenUtil must be initialized before constructing [IsmChatThemeData].
+      await pumpChatHost(tester, child: const SizedBox());
+      IsmChatConfig.chatLightTheme = IsmChatThemeData(
+        chatPageTheme: IsmChatPageTheme(backgroundColor: panelBackground),
+      );
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadView(
+          rootMessage: threadRoot(replyCount: 0),
+          conversation: directConversation(),
+        ),
+      );
+      await settle(tester);
+
+      final scaffold = tester.widget<Scaffold>(
+        find.descendant(
+          of: find.byType(IsmChatThreadView),
+          matching: find.byType(Scaffold),
+        ),
+      );
+      expect(scaffold.backgroundColor, panelBackground);
+    });
+
     testWidgets('shows the root, the reply count and the replies',
         (tester) async {
       await pumpThreadView(tester, replies: [

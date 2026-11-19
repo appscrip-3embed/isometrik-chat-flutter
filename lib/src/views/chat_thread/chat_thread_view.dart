@@ -14,8 +14,10 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 /// - the replies, oldest-first, paging older ones in on scroll,
 /// - the composer with "Also send to channel".
 ///
-/// Customize copy / rows with [IsmChatProperties.threadProperties] and styling
-/// with [IsmChatThemeData.threadTheme]. Requires
+/// Customize copy / rows with [IsmChatProperties.threadProperties]. Panel
+/// background and composer chrome follow [IsmChatThemeData.chatPageTheme] (see
+/// [IsmChatChatPageSurface]); thread-only styles use [IsmChatThemeData.threadTheme].
+/// Requires
 /// [IsmChatConfig.threadsEnabled]; with threads off this view is never shown.
 class IsmChatThreadView extends StatefulWidget {
   const IsmChatThreadView({
@@ -115,54 +117,83 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
   @override
   Widget build(BuildContext context) {
     final theme = IsmChatThemeResolver.threadFromConfig(context);
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: IsmChatAppBar(
-        title: Text(
-          _props.title ?? IsmChatStrings.threadTitle,
-          style: IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
-              IsmChatStyles.w600White18,
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      return GetX<IsmChatPageController>(
+        tag: IsmChat.i.chatPageTag,
+        builder: (pageController) => _buildWithSurface(
+          context,
+          IsmChatChatPageSurface.resolve(pageController),
+          theme,
         ),
-        onBack: () => IsmChatRoute.goBack<void>(),
-      ),
-      body: Obx(
-        () => Column(
-          children: [
-            Expanded(
-              child: _wrapKeyboardDismissBehavior(
-                Column(
-                  children: [
-                    IsmChatThreadMessageTile(
-                      message: _controller.root ?? widget.rootMessage,
-                      isRoot: true,
-                    ),
-                    _replyCountRow(theme),
-                    Expanded(child: _replies(theme)),
-                  ],
-                ),
-              ),
-            ),
-            // Same stack order as [_IsmChatPageView]: shell then emoji board.
-            _threadComposerShell(context),
-            Offstage(
-              offstage: !_controller.showEmojiBoard,
-              child: IsmChatComposerEmojiBoard(
-                key: const Key('ism-thread-emoji-board'),
-                textController: _controller.replyController,
-                emojiBoardTab: _controller.emojiBoardTab,
-                onTabChanged: (tab) => _controller.emojiBoardTab = tab,
-                onBeforeGiphySend: () async {
-                  _controller.syncSendTarget();
-                },
-                onAfterGiphySend: _controller.closeEmojiBoard,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ).withUnfocusGestureDetctor(context);
+      );
+    }
+    return _buildWithSurface(
+      context,
+      IsmChatChatPageSurface.resolve(null),
+      theme,
+    );
   }
+
+  /// Page background/wallpaper matches [IsmChatPageView] via [IsmChatChatPageSurface].
+  Widget _buildWithSurface(
+    BuildContext context,
+    IsmChatChatPageSurface surface,
+    IsmChatThreadTheme theme,
+  ) =>
+      DecoratedBox(
+        decoration: surface.outerDecoration,
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: surface.scaffoldBackgroundColor,
+          appBar: IsmChatAppBar(
+            title: Text(
+              _props.title ?? IsmChatStrings.threadTitle,
+              style: IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
+                  IsmChatStyles.w600White18,
+            ),
+            onBack: () => IsmChatRoute.goBack<void>(),
+          ),
+          body: Obx(
+            () => Column(
+              children: [
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: surface.bodyDecoration,
+                    child: _wrapKeyboardDismissBehavior(
+                      Column(
+                        children: [
+                          IsmChatThreadMessageTile(
+                            message: _controller.root ?? widget.rootMessage,
+                            isRoot: true,
+                          ),
+                          _replyCountRow(theme),
+                          Expanded(child: _replies(theme)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Same stack order as [_IsmChatPageView]: shell then emoji board.
+                _threadComposerShell(context),
+                Offstage(
+                  offstage: !_controller.showEmojiBoard,
+                  child: IsmChatComposerEmojiBoard(
+                    key: const Key('ism-thread-emoji-board'),
+                    textController: _controller.replyController,
+                    emojiBoardTab: _controller.emojiBoardTab,
+                    onTabChanged: (tab) => _controller.emojiBoardTab = tab,
+                    onBeforeGiphySend: () async {
+                      _controller.syncSendTarget();
+                    },
+                    onAfterGiphySend: _controller.closeEmojiBoard,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ).withUnfocusGestureDetctor(context),
+      );
 
   /// Outer composer chrome matches [_IsmChatPageView._defaultComposer].
   Widget _threadComposerShell(BuildContext context) => Container(

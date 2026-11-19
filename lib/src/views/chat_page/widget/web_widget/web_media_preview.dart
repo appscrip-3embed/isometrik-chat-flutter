@@ -257,9 +257,11 @@ class WebMediaPreview extends StatelessWidget {
                                   controller.sendMediaWeb();
                                 }
                               },
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.send,
-                                color: IsmChatColors.whiteColor,
+                                color: IsmChatConfig.chatTheme.chatPageTheme
+                                        ?.sendButtonTheme?.iconColor ??
+                                    IsmChatColors.whiteColor,
                               ),
                             ),
                           ],

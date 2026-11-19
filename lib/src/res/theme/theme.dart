@@ -15,6 +15,7 @@ export 'chat_message_hover_theme.dart';
 export 'chat_message_status_them.dart';
 export 'chat_message_theme.dart';
 export 'chat_page_header.dart';
+export 'chat_page_surface.dart';
 export 'chat_page_theme.dart';
 export 'profile_theme.dart';
 export 'storage_theme.dart';

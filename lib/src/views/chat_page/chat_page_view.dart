@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:custom_will_pop_scope/custom_will_pop_scope.dart';
 import 'package:flutter/material.dart';
@@ -384,43 +383,13 @@ class _IsmChatPageView extends StatelessWidget {
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
         builder: (controller) {
-          final hasImageWallpaper = controller.backgroundImage.isNotEmpty &&
-              controller.backgroundImage.isSupportedChatWallpaperUrl;
-          final hasColorWallpaper = controller.backgroundColor.isNotEmpty;
-          final hasConversationWallpaper =
-              hasImageWallpaper || hasColorWallpaper;
+          final surface = IsmChatChatPageSurface.resolve(controller);
 
           return DecoratedBox(
-            decoration: BoxDecoration(
-              color: hasColorWallpaper
-                  ? controller.backgroundColor.toColor
-                  : hasImageWallpaper
-                      ? Colors.transparent
-                      : IsmChatColors.whiteColor,
-              image: hasImageWallpaper
-                  ? DecorationImage(
-                      image: controller.backgroundImage.isValidUrl
-                          ? NetworkImage(controller.backgroundImage)
-                          : IsmChatProperties.chatPageProperties
-                                  .backgroundImageUrl.isNullOrEmpty
-                              ? controller.backgroundImage.contains(
-                                      'packages/isometrik_chat_flutter/assets')
-                                  ? AssetImage(controller.backgroundImage)
-                                      as ImageProvider
-                                  : FileImage(
-                                      File(controller.backgroundImage),
-                                    )
-                              : AssetImage(controller.backgroundImage),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
+            decoration: surface.outerDecoration,
             child: Scaffold(
               drawerEnableOpenDragGesture: false,
-              backgroundColor: hasConversationWallpaper
-                  ? Colors.transparent
-                  : IsmChatConfig.chatTheme.chatPageTheme?.backgroundColor ??
-                      Colors.transparent,
+              backgroundColor: surface.scaffoldBackgroundColor,
               resizeToAvoidBottomInset: true,
               // App bar: Shows selection mode or normal header
               appBar: controller.isMessageSeleted
@@ -557,10 +526,7 @@ class _IsmChatPageView extends StatelessWidget {
                           alignment: Alignment.bottomRight,
                           children: [
                             Container(
-                              decoration: hasConversationWallpaper
-                                  ? null
-                                  : IsmChatConfig
-                                      .chatTheme.chatPageTheme?.pageDecoration,
+                              decoration: surface.bodyDecoration,
                               height: MediaQuery.of(context).size.height,
                               width: MediaQuery.of(context).size.width,
                               child: Column(
