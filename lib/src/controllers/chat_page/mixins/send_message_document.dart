@@ -174,7 +174,13 @@ mixin IsmChatPageSendMessageDocumentMixin {
       ),
     );
 
-    _controller.messages.add(documentMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      documentMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(documentMessage);
     unawaited(_controller.scrollDown());
 
     if (!_controller.isBroadcast) {
@@ -219,46 +225,29 @@ mixin IsmChatPageSendMessageDocumentMixin {
       customType: IsmChatCustomMessageType.multipleAttachments.value,
       metaData: documentMessage.metaData,
       isBroadcast: _controller.isBroadcast,
+      localEcho: documentMessage,
     );
     _clearMultipleDocumentUploadState(sentAt);
   }
 
   void _clearMultipleDocumentUploadState(int createdAt) {
-    final index = _controller.messages.indexWhere(
-      (message) => message.sentAt == createdAt,
-    );
-    if (index == -1) {
-      return;
-    }
-    final current = _controller.messages[index];
-    if (current.isUploading != true) {
-      return;
-    }
-    current.isUploading = false;
-    _controller.messages[index] = current;
-    if (_controller.messages is RxList<IsmChatMessageModel>) {
-      (_controller.messages as RxList<IsmChatMessageModel>).refresh();
-    }
-    _controller.update();
+    _controller.mutateLocalRow(createdAt, (current) {
+      if (current.isUploading != true) {
+        return false;
+      }
+      current.isUploading = false;
+      return true;
+    });
   }
 
   void _markMultipleDocumentUploadFailed(int createdAt) {
-    final index = _controller.messages.indexWhere(
-      (message) => message.sentAt == createdAt,
-    );
-    if (index == -1) {
-      return;
-    }
-    final current = _controller.messages[index];
-    current
-      ..isUploading = false
-      ..isInvalidMessage = true
-      ..messageId = '';
-    _controller.messages[index] = current;
-    if (_controller.messages is RxList<IsmChatMessageModel>) {
-      (_controller.messages as RxList<IsmChatMessageModel>).refresh();
-    }
-    _controller.update();
+    _controller.mutateLocalRow(createdAt, (current) {
+      current
+        ..isUploading = false
+        ..isInvalidMessage = true
+        ..messageId = '';
+      return true;
+    });
   }
 
   /// True for a picked PDF. Word and Excel must not be opened with pdfx.
@@ -561,7 +550,13 @@ mixin IsmChatPageSendMessageDocumentMixin {
       ),
     );
 
-    _controller.messages.add(documentMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      documentMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(documentMessage);
     unawaited(_controller.scrollDown());
     _controller.isreplying = false;
 

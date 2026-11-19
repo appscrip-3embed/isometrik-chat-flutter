@@ -39,23 +39,44 @@ mixin IsmChatMqttEventMessageHandlersMixin {
         ?.getConversation(message.conversationId ?? '');
     final hideMemberLeave =
         !message.isVisibleInGroupChat(conversation);
+    // Slack-style threads: a reply that lives only in a thread must not land
+    // in the channel list. It goes to the open thread panel (if any) and only
+    // moves the root's "N replies" badge. Always false with threads off.
+    final isThreadOnlyReply =
+        IsmChatThreadCoordinator.shouldHideFromTimeline(message);
+    // True when a thread panel is open on this thread and already moved the
+    // root's badge on the channel row — bumping it again would double-count.
+    final deliveredToOpenThread = isThreadOnlyReply &&
+        IsmChatThreadController.deliverIncomingReply(message);
     if (conversation != null && IsmChatUtility.chatPageControllerRegistered) {
       final controller = IsmChatUtility.chatPageController;
       if (message.conversationId == controller.conversation?.conversationId &&
           !hideMemberLeave) {
-        if (controller.messages.isEmpty) {
-          controller.messages =
-              controller.commonController.sortMessages([message]);
+        if (isThreadOnlyReply) {
+          // Badge only — the reply itself stays out of the channel list.
+          if (!deliveredToOpenThread) {
+            controller.messages =
+                IsmChatThreadCoordinator.applyReplyToRootInList(
+              List<IsmChatMessageModel>.from(controller.messages),
+              message,
+            );
+          }
+          controller.update();
         } else {
-          controller.messages.add(message);
+          if (controller.messages.isEmpty) {
+            controller.messages =
+                controller.commonController.sortMessages([message]);
+          } else {
+            controller.messages.add(message);
+          }
+          // Same rules as [getMessagesFromDB]: merge call events into one bubble.
+          controller.messages = controller.commonController.sortMessages(
+            controller.filterMessages(
+              List<IsmChatMessageModel>.from(controller.messages),
+            ),
+          );
+          controller.update();
         }
-        // Same rules as [getMessagesFromDB]: merge call events into one bubble.
-        controller.messages = controller.commonController.sortMessages(
-          controller.filterMessages(
-            List<IsmChatMessageModel>.from(controller.messages),
-          ),
-        );
-        controller.update();
       }
     }
     if (conversation == null) return;
@@ -90,6 +111,31 @@ mixin IsmChatMqttEventMessageHandlersMixin {
         }
         final base = latest;
         var next = base;
+        // Thread-only replies still bump the unread badge (product decision,
+        // matching the backend) but never replace the conversation preview.
+        if (!hideMemberLeave && isThreadOnlyReply) {
+          if (!isOwnMessage) {
+            next = next.copyWith(
+              unreadMessagesCount: IsmChatResponsive.isWeb(
+                        IsmChatConfig.kNavigatorKey.currentContext ??
+                            IsmChatConfig.context,
+                      ) &&
+                      (IsmChatUtility.chatPageControllerRegistered &&
+                          IsmChatUtility.chatPageController.conversation
+                                  ?.conversationId ==
+                              conversationId)
+                  ? 0
+                  : (next.unreadMessagesCount ?? 0) + 1,
+            );
+          }
+          // Only the root's replyCount / lastThreadReplyAt change on disk.
+          return next.copyWith(
+            messages: IsmChatThreadCoordinator.applyReplyToRootInMap(
+              Map<String, IsmChatMessageModel>.from(next.messages ?? {}),
+              message,
+            ),
+          );
+        }
         if (!hideMemberLeave) {
           final alreadyApplied = !isOwnMessage &&
               next.lastMessageDetails?.messageId == message.messageId;

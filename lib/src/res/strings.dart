@@ -28,7 +28,6 @@ class IsmChatStrings {
   static const String sticker = 'Sticker';
   static const String contact = 'Contact';
 
-
   static String get chats => IsmChatL10n.get('chats');
   static String get you => IsmChatL10n.get('you');
   static String get all => IsmChatL10n.get('all');
@@ -36,7 +35,8 @@ class IsmChatStrings {
   static String get noMatch => IsmChatL10n.get('noMatch');
   static String get noMessages => IsmChatL10n.get('noMessages');
   static String get noInternet => IsmChatL10n.get('noInternet');
-  static String get errorLoadingPreview => IsmChatL10n.get('errorLoadingPreview');
+  static String get errorLoadingPreview =>
+      IsmChatL10n.get('errorLoadingPreview');
   static String get fetchingPreview => IsmChatL10n.get('fetchingPreview');
   static String get errorLoadingImage => IsmChatL10n.get('errorLoadingImage');
   static String get typing => IsmChatL10n.get('typing');
@@ -44,6 +44,7 @@ class IsmChatStrings {
   static String get lastSeen => IsmChatL10n.get('lastSeen');
   static String get today => IsmChatL10n.get('today');
   static String get yesterday => IsmChatL10n.get('yesterday');
+
   /// Deprecated typo alias — use [yesterday].
   @Deprecated('Use yesterday')
   static String get yestarday => yesterday;
@@ -62,7 +63,8 @@ class IsmChatStrings {
   static String get newBroadCast => IsmChatL10n.get('newBroadCast');
   static String get clearChat => IsmChatL10n.get('clearChat');
   static String get clearAllMessages => IsmChatL10n.get('clearAllMessages');
-  static String get chatClearedSuccessfully => IsmChatL10n.get('chatClearedSuccessfully');
+  static String get chatClearedSuccessfully =>
+      IsmChatL10n.get('chatClearedSuccessfully');
   static String get wallpaper => IsmChatL10n.get('wallpaper');
   static String get hintText => IsmChatL10n.get('hintText');
   static String get search => IsmChatL10n.get('search');
@@ -80,26 +82,34 @@ class IsmChatStrings {
   static String get deleteAllMessage => IsmChatL10n.get('deleteAllMessage');
   static String get deleteThiGroup => IsmChatL10n.get('deleteThiGroup');
   static String get enterNewGroupTitle => IsmChatL10n.get('enterNewGroupTitle');
-  static String get chooseNewGroupProfile => IsmChatL10n.get('chooseNewGroupProfile');
+  static String get chooseNewGroupProfile =>
+      IsmChatL10n.get('chooseNewGroupProfile');
   static String get cancel => IsmChatL10n.get('cancel');
   static String get doWantBlckUser => IsmChatL10n.get('doWantBlckUser');
   static String get doWantUnBlckUser => IsmChatL10n.get('doWantUnBlckUser');
   static String get youBlockUser => IsmChatL10n.get('youBlockUser');
   static String get youareBlocked => IsmChatL10n.get('youareBlocked');
   static String get cannotBlock => IsmChatL10n.get('cannotBlock');
-  static String get cannotBlockWhenAlreadyBlocked => IsmChatL10n.get('cannotBlockWhenAlreadyBlocked');
+  static String get cannotBlockWhenAlreadyBlocked =>
+      IsmChatL10n.get('cannotBlockWhenAlreadyBlocked');
   static String get broadcastAlert => IsmChatL10n.get('broadcastAlert');
   static String get micePermission => IsmChatL10n.get('micePermission');
-  static String get micePermissionBlock => IsmChatL10n.get('micePermissionBlock');
-  static String get cameraPermissionBlock => IsmChatL10n.get('cameraPermissionBlock');
-  static String get contactsPermissionBlockedTitle => IsmChatL10n.get('contactsPermissionBlockedTitle');
-  static String get contactsPermissionBlockedMessage => IsmChatL10n.get('contactsPermissionBlockedMessage');
+  static String get micePermissionBlock =>
+      IsmChatL10n.get('micePermissionBlock');
+  static String get cameraPermissionBlock =>
+      IsmChatL10n.get('cameraPermissionBlock');
+  static String get contactsPermissionBlockedTitle =>
+      IsmChatL10n.get('contactsPermissionBlockedTitle');
+  static String get contactsPermissionBlockedMessage =>
+      IsmChatL10n.get('contactsPermissionBlockedMessage');
   static String get openSettings => IsmChatL10n.get('openSettings');
   static String get block => IsmChatL10n.get('block');
   static String get unblock => IsmChatL10n.get('unblock');
   static String get blocked => IsmChatL10n.get('blocked');
-  static String get unBlockedSuccessfully => IsmChatL10n.get('unBlockedSuccessfully');
-  static String get blockedSuccessfully => IsmChatL10n.get('blockedSuccessfully');
+  static String get unBlockedSuccessfully =>
+      IsmChatL10n.get('unBlockedSuccessfully');
+  static String get blockedSuccessfully =>
+      IsmChatL10n.get('blockedSuccessfully');
   static String get noBlockedUsers => IsmChatL10n.get('noBlockedUsers');
   static String get boradcastNotFound => IsmChatL10n.get('boradcastNotFound');
   static String get deleteMessage => IsmChatL10n.get('deleteMessage');
@@ -139,7 +149,8 @@ class IsmChatStrings {
   static String get exit => IsmChatL10n.get('exit');
   static String get tapInfo => IsmChatL10n.get('tapInfo');
   static String get removeReaction => IsmChatL10n.get('removeReaction');
-  static String get alreadyAddedReaction => IsmChatL10n.get('alreadyAddedReaction');
+  static String get alreadyAddedReaction =>
+      IsmChatL10n.get('alreadyAddedReaction');
   static String get remove => IsmChatL10n.get('remove');
   static String get youAreOnlyAdmin => IsmChatL10n.get('youAreOnlyAdmin');
   static String get contactInfo => IsmChatL10n.get('contactInfo');
@@ -159,7 +170,9 @@ class IsmChatStrings {
   static String get noUserFound => IsmChatL10n.get('noUserFound');
   static String get noMessageFound => IsmChatL10n.get('noMessageFound');
   static String get noSearch => IsmChatL10n.get('noSearch');
-  static String get noConversationFound => IsmChatL10n.get('noConversationFound');
+  static String get noConversationFound =>
+      IsmChatL10n.get('noConversationFound');
+
   /// Empty state when conversation / chat search has no matches.
   static String get noResultsFound => IsmChatL10n.get('noResultsFound');
   static String get forwarded => IsmChatL10n.get('forwarded');
@@ -189,7 +202,8 @@ class IsmChatStrings {
   static String get addToContact => IsmChatL10n.get('addToContact');
   static String get noContact => IsmChatL10n.get('noContact');
   static String get downloadingMedia => IsmChatL10n.get('downloadingMedia');
-  static String get thisPhoneNumberNotonChat => IsmChatL10n.get('thisPhoneNumberNotonChat');
+  static String get thisPhoneNumberNotonChat =>
+      IsmChatL10n.get('thisPhoneNumberNotonChat');
   static String get location => IsmChatL10n.get('location');
   static String get image => IsmChatL10n.get('image');
   static String get audio => IsmChatL10n.get('audio');
@@ -220,9 +234,63 @@ class IsmChatStrings {
   static String get exitGroupBody => IsmChatL10n.get('exitGroupBody');
   static String get focusMenuInfo => IsmChatL10n.get('focusMenuInfo');
   static String get focusMenuCopy => IsmChatL10n.get('focusMenuCopy');
-  static String get focusMenuSelectMessage => IsmChatL10n.get('focusMenuSelectMessage');
+  static String get focusMenuSelectMessage =>
+      IsmChatL10n.get('focusMenuSelectMessage');
   static String get focusMenuReply => IsmChatL10n.get('focusMenuReply');
   static String get focusMenuForward => IsmChatL10n.get('focusMenuForward');
+
+  // ------------------------- Slack-style threads -------------------------
+  // Only reachable while [IsmChatConfig.threadsEnabled] is true.
+
+  /// Title of [IsmChatThreadView].
+  static String get threadTitle => IsmChatL10n.get('threadTitle');
+
+  /// Label for the threads on/off switch ([IsmChatThreadsToggleTile]).
+  static String get threadsLabel => IsmChatL10n.get('threadsLabel');
+  static String get threadsToggleSubtitle =>
+      IsmChatL10n.get('threadsToggleSubtitle');
+
+  /// "Reply in thread" focus-menu action.
+  static String get replyInThread => IsmChatL10n.get('replyInThread');
+
+  /// Focus menu on also-sent thread replies (opens the thread panel).
+  static String get viewThread => IsmChatL10n.get('viewThread');
+
+  /// Grey prefix in the channel **replied to a thread: …** line (subject follows).
+  static String get repliedToThreadPrefix =>
+      IsmChatL10n.get('repliedToThreadPrefix');
+
+  /// Parent row missing from the channel list when building thread context.
+  static String get threadContextSubjectFallback =>
+      IsmChatL10n.get('threadContextSubjectFallback');
+
+  /// Singular / plural noun used by [threadReplyCountLabel].
+  static String get threadReplySingular =>
+      IsmChatL10n.get('threadReplySingular');
+  static String get threadReplyPlural => IsmChatL10n.get('threadReplyPlural');
+
+  /// `3 replies` / `1 reply`, localized. Used by the root-message footer.
+  static String threadReplyCountLabel(int count) =>
+      '$count ${count == 1 ? threadReplySingular : threadReplyPlural}';
+
+  static String get threadNoReplies => IsmChatL10n.get('threadNoReplies');
+  static String get threadAlsoSendToChannel =>
+      IsmChatL10n.get('threadAlsoSendToChannel');
+  static String get threadReplyHint => IsmChatL10n.get('threadReplyHint');
+
+  /// Shown when the server rejects deleting a root that still has replies
+  /// (`errorCode: 4`).
+  static String get threadRootDeleteBlocked =>
+      IsmChatL10n.get('threadRootDeleteBlocked');
+  static String get threadLoadFailed => IsmChatL10n.get('threadLoadFailed');
+  static String get threadSendFailed => IsmChatL10n.get('threadSendFailed');
+
+  /// Retry button in the thread panel's error state.
+  static String get threadRetry => IsmChatL10n.get('threadRetry');
+
+  /// Shown when a thread reply could not reach the server and was queued for
+  /// retry (offline send).
+  static String get threadReplyQueued => IsmChatL10n.get('threadReplyQueued');
   static String get sameNameUploadTitle => IsmChatL10n.get('sameNameUploadTitle');
   static String get reshareOlderFile => IsmChatL10n.get('reshareOlderFile');
   static String get uploadACopy => IsmChatL10n.get('uploadACopy');

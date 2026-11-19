@@ -137,6 +137,33 @@ class IsmChatConfig {
   static bool maskSensitiveContent = false;
 
   static NotificationBodyCallback? notificationBody;
+
+  /// Master switch for Slack-style message **threads**.
+  ///
+  /// Default `false` — every existing integration keeps the current chat
+  /// experience exactly as it is (replies stay inline in the timeline, no
+  /// thread panel, no `feedType` query param on message fetches).
+  ///
+  /// When `true` the SDK switches to the threaded model:
+  /// - the channel timeline is fetched with `feedType=main`, so thread-only
+  ///   replies no longer appear inline,
+  /// - root messages show a tappable "N replies" footer
+  ///   ([IsmChatThreadFooter]) built from `replyCount`,
+  /// - the focus menu gains "Reply in thread", which opens [IsmChatThreadView],
+  /// - thread replies are sent with `messageType: 2`, `parentMessageId` and
+  ///   `showInConversation: false` (or `true` for "also send to channel"),
+  /// - incoming thread replies are routed to the open thread instead of the
+  ///   channel list ([IsmChatThreadCoordinator]).
+  ///
+  /// Requires backend `chat-messages` v1.1.0+ (`threadRootId` / `replyCount` /
+  /// `feedType`). Set it at init or flip it at runtime:
+  /// ```dart
+  /// await IsmChat.i.initialize(threadsEnabled: true, /* ... */);
+  /// // or later, e.g. from a settings switch:
+  /// IsmChat.i.setThreadsEnabled(true);
+  /// ```
+  /// See `docs/THREADS.md`.
+  static bool threadsEnabled = false;
 }
 
 class IsmPaidWalletConfig {

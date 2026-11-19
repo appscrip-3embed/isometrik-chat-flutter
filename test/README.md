@@ -9,7 +9,7 @@
 | `data/` | `IsmChatApiWrapper` (status codes, timeout, loader) and `IsmChatDBWrapper` |
 | `repositories/` | Every repository method, success + error + exception paths |
 | `view_models/` | Business rules on top of repositories |
-| `controllers/` | End-to-end flows: 1-to-1, group, attachments, reactions, broadcast, MQTT events |
+| `controllers/` | End-to-end flows: 1-to-1, group, attachments, reactions, broadcast, MQTT events, threads |
 | `utilities/` | Extensions, utility helpers, masker, enums |
 | `widgets/` | Leaf widgets: bubbles, conversation card, headers, input field |
 | `views/` | Full screens: `IsmChatConversations`, `IsmChatPageView`, interactions |
@@ -26,7 +26,10 @@
     Also applies UI test property overrides (stub avatars, registers MQTT).
   - `settle`, `pumpUntil`, `drive`: Hive file IO does not progress inside
     `testWidgets`' fake-async zone on its own. Wrap any controller call that
-    touches the DB in `drive(tester, () => ...)`.
+    touches the DB in `drive(tester, () => ...)`. **Read the DB back with
+    `drive` too** — once the fake-async zone has driven Hive work, a read
+    started with `tester.runAsync` never completes (see
+    `controllers/thread_flow_test.dart`).
   - `resetChatSdk()` clears GetX and config. Always call it in `tearDown`.
 - `helpers/ui_test_helpers.dart`
   - `applyUiTestPropertyOverrides()` / `restoreUiTestPropertyOverrides()`:
@@ -42,7 +45,8 @@
   repository (`IsmChatPageRepository(apiWrapper: api.wrapper())`).
 - `helpers/fixtures.dart`: `directConversation()`, `groupConversation()`,
   `message(...)`, `reaction()`, `attachment(type)`, `attachmentMessages()`, `messageJson()`,
-  `conversationJson()`. Change model construction here, not in tests.
+  `conversationJson()`, `threadRoot()`, `threadReply()`, `threadReplyJson()`.
+  Change model construction here, not in tests.
 - `helpers/mocks.dart`: mocktail mocks for repositories and view models,
   for branch tests that need a repository to return `null` etc.
 
@@ -75,6 +79,25 @@ dart run tool/ui_coverage.dart         # report: views + widgets + theme (no CI 
 **Out of scope for UI widget tests** (platform-heavy; same rationale as
 `coverage:ignore-file` on camera/gallery mixins): camera, gallery picker, video
 trim/player, Giphy network panel, link-preview fetch.
+
+## Feature suites
+
+Threads (Slack-style) are covered flag-on **and** flag-off, because
+`IsmChatConfig.threadsEnabled == false` must keep the classic behaviour:
+
+```bash
+flutter test test/utilities/thread_coordinator_test.dart \
+             test/repositories/chat_thread_repository_test.dart \
+             test/controllers/thread_controller_test.dart \
+             test/controllers/thread_flow_test.dart \
+             test/widgets/thread_widgets_test.dart
+```
+
+Tests that exercise the `IsmChat.i` thread methods must register
+`IsmChatThreadController` with `api.wrapper()` first (see
+`putThreadController` in `thread_flow_test.dart`) — `IsmChatThreadBinding` is
+idempotent, so the delegate reuses that instance instead of building one on the
+real HTTP client. See `docs/THREADS.md`.
 
 ## Running
 

@@ -3,10 +3,13 @@ const Map<String, String> kIsmChatLocalePt = {
   'chats': 'Conversas',
   'you': 'Você',
   'all': 'Todos',
-  'noConversation': 'Parece que você ainda não falou com ninguém. Avise seus amigos que está pensando neles.',
+  'noConversation':
+      'Parece que você ainda não falou com ninguém. Avise seus amigos que está pensando neles.',
   'noMatch': 'Ops! Nenhuma conversa encontrada',
-  'noMessages': 'Este é o início do seu histórico. Comece uma conversa digitando uma mensagem abaixo.',
-  'noInternet': 'Ops! Parece que sua conexão com a internet não está funcionando. Verifique as configurações de rede e certifique-se de estar conectado ao Wi-Fi ou aos dados móveis.',
+  'noMessages':
+      'Este é o início do seu histórico. Comece uma conversa digitando uma mensagem abaixo.',
+  'noInternet':
+      'Ops! Parece que sua conexão com a internet não está funcionando. Verifique as configurações de rede e certifique-se de estar conectado ao Wi-Fi ou aos dados móveis.',
   'errorLoadingPreview': 'Erro ao carregar a prévia do link',
   'fetchingPreview': 'Carregando prévia do link',
   'errorLoadingImage': 'Erro ao carregar a imagem',
@@ -55,13 +58,17 @@ const Map<String, String> kIsmChatLocalePt = {
   'youBlockUser': 'Você bloqueou este usuário.',
   'youareBlocked': 'Você está bloqueado.',
   'cannotBlock': 'Ação não permitida; o usuário já bloqueou você',
-  'cannotBlockWhenAlreadyBlocked': 'Você já está bloqueado e não pode bloquear este usuário.',
+  'cannotBlockWhenAlreadyBlocked':
+      'Você já está bloqueado e não pode bloquear este usuário.',
   'broadcastAlert': 'Selecione pelo menos duas pessoas',
   'micePermission': 'Permita o acesso ao microfone para enviar áudio.',
-  'micePermissionBlock': 'O navegador desativou o acesso ao microfone; permita-o para enviar áudio.',
-  'cameraPermissionBlock': 'O navegador desativou o acesso à câmera; permita-o para enviar foto e vídeo.',
+  'micePermissionBlock':
+      'O navegador desativou o acesso ao microfone; permita-o para enviar áudio.',
+  'cameraPermissionBlock':
+      'O navegador desativou o acesso à câmera; permita-o para enviar foto e vídeo.',
   'contactsPermissionBlockedTitle': 'Permissão de Contatos',
-  'contactsPermissionBlockedMessage': 'O acesso aos contatos está desativado. Permita Contatos em Ajustes para compartilhar um contato.',
+  'contactsPermissionBlockedMessage':
+      'O acesso aos contatos está desativado. Permita Contatos em Ajustes para compartilhar um contato.',
   'openSettings': 'Abrir ajustes',
   'block': 'Bloquear',
   'unblock': 'Desbloquear',
@@ -83,7 +90,8 @@ const Map<String, String> kIsmChatLocalePt = {
   'archive': 'Arquivar',
   'deleteChat': 'Excluir conversa',
   'deleteGroup': 'Excluir grupo',
-  'createGroupAlert': 'Selecione pelo menos um usuário e adicione o nome do grupo',
+  'createGroupAlert':
+      'Selecione pelo menos um usuário e adicione o nome do grupo',
   'youCreatedGroup': 'Você criou o grupo',
   'admin': 'Admin',
   'add': 'Adicionar',
@@ -109,10 +117,12 @@ const Map<String, String> kIsmChatLocalePt = {
   'removeReaction': 'Toque para remover a reação',
   'alreadyAddedReaction': 'Você já adicionou uma reação',
   'remove': 'Remover',
-  'youAreOnlyAdmin': 'Você é o único admin do grupo. Nomeie um admin ou uma pessoa será escolhida aleatoriamente.',
+  'youAreOnlyAdmin':
+      'Você é o único admin do grupo. Nomeie um admin ou uma pessoa será escolhida aleatoriamente.',
   'contactInfo': 'Info do contato',
   'userInfo': 'Info do usuário',
-  'loremIpsum': 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod',
+  'loremIpsum':
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod',
   'demoDate': '25 dez 2016',
   'mediaLinks': 'Mídia e links ',
   'mediaLinksAndDocs': 'Mídia, links e documentos',
@@ -132,7 +142,8 @@ const Map<String, String> kIsmChatLocalePt = {
   'forwarded': 'Encaminhada',
   'logoutMessage': 'Tem certeza de que deseja sair?',
   'removeGroupMessage': 'Você foi removido do grupo…!',
-  'leftGroupMessage': 'Você saiu deste grupo. Pode ver mensagens antigas, mas não pode mais enviar.',
+  'leftGroupMessage':
+      'Você saiu deste grupo. Pode ver mensagens antigas, mas não pode mais enviar.',
   'userDeleteMessage': 'Este usuário não está disponível para mensagens…!',
   'gallery': 'Galeria',
   'camera': 'Câmera',
@@ -182,19 +193,41 @@ const Map<String, String> kIsmChatLocalePt = {
   'messageInfo': 'Info da mensagem',
   'inviteToChat': 'Convidar para',
   'youCanNotSend': 'Você não pode enviar mídia com mais de 20 MB.',
-  'maxPickerAttachmentsReached':
-      'Você pode selecionar até 5 anexos por vez.',
+  'maxPickerAttachmentsReached': 'Você pode selecionar até 5 anexos por vez.',
   'aboutMe': 'Sobre',
   'defaultString': 'Padrão',
   'recipients': 'Destinatários:',
   'addrecipient': 'Adicionar destinatário',
   'deletedUser': 'Usuário excluído',
-  'exitGroupBody': 'Somente os admins do grupo serão notificados de que você saiu do grupo',
+  'exitGroupBody':
+      'Somente os admins do grupo serão notificados de que você saiu do grupo',
   'focusMenuInfo': 'Info',
   'focusMenuCopy': 'Copiar',
   'focusMenuSelectMessage': 'Selecionar mensagem',
   'focusMenuReply': 'Responder',
   'focusMenuForward': 'Encaminhar',
+
+  // ---- Slack-style threads (IsmChatConfig.threadsEnabled) ----
+  'threadTitle': 'Tópico',
+  'threadsLabel': 'Tópicos',
+  'threadsToggleSubtitle': 'Mostrar respostas num painel de tópico',
+  'replyInThread': 'Responder no tópico',
+  'viewThread': 'Ver tópico',
+  'repliedToThreadPrefix': 'respondeu num tópico: ',
+  'threadContextSubjectFallback': 'mensagem',
+  'threadReplySingular': 'resposta',
+  'threadReplyPlural': 'respostas',
+  'threadNoReplies': 'Ainda sem respostas. Comece o tópico.',
+  'threadAlsoSendToChannel': 'Enviar também para a conversa',
+  'threadReplyHint': 'Responder…',
+  'threadRootDeleteBlocked':
+      'Esta mensagem não pode ser eliminada porque o tópico tem respostas.',
+  'threadLoadFailed':
+      'Não foi possível carregar este tópico. Puxe para tentar novamente.',
+  'threadSendFailed': 'Resposta não enviada. Tente novamente.',
+  'threadRetry': 'Tentar novamente',
+  'threadReplyQueued':
+      'Resposta em fila — será enviada quando voltar a ligação.',
   'sameNameUploadTitle': 'Arquivo já no armazenamento',
   'reshareOlderFile': 'Reenviar arquivo anterior',
   'uploadACopy': 'Enviar uma cópia',

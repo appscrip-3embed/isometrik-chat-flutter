@@ -62,10 +62,7 @@ class _IsmChatImageMessageState extends State<IsmChatImageMessage> {
               children: [
                 IsmChatTapHandler(
                   onTap: () {
-                    if (IsmChatUtility.chatPageControllerRegistered) {
-                      IsmChatUtility.chatPageController
-                          .tapForMediaPreview(message);
-                    }
+                    IsmChatThreadCoordinator.openMediaPreviewFromThread(message);
                   },
                   onLongPress: () {
                     if (IsmChatUtility.chatPageControllerRegistered) {

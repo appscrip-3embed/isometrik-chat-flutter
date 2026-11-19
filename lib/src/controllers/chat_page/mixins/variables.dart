@@ -106,6 +106,19 @@ mixin IsmChatPageVariablesMixin on GetxController {
   List<IsmChatMessageModel> get messages => _messages;
   set messages(List<IsmChatMessageModel> value) => _messages.value = value;
 
+  /// Where the next send should land while the user composes inside a thread.
+  ///
+  /// `null` (the default, and always with threads off) means "the channel",
+  /// which is the behaviour every send path has always had. The thread panel
+  /// sets this before it opens the attachment sheet / camera / recorder, so
+  /// the existing media, audio, document, location and contact pipelines post
+  /// a thread reply instead. See [IsmChatThreadSendTarget].
+  final Rx<IsmChatThreadSendTarget?> _threadSendTarget =
+      Rx<IsmChatThreadSendTarget?>(null);
+  IsmChatThreadSendTarget? get threadSendTarget => _threadSendTarget.value;
+  set threadSendTarget(IsmChatThreadSendTarget? value) =>
+      _threadSendTarget.value = value;
+
   /// Bumped when the open chat inserts a message or saves its message map.
   ///
   /// Message loading records this before reading Hive and ignores that

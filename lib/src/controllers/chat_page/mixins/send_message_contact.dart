@@ -30,7 +30,7 @@ mixin IsmChatPageSendMessageContactMixin {
         conversationId: conversationId, userId: userId);
     final sentAt = DateTime.now().millisecondsSinceEpoch;
     final contactMessage = IsmChatMessageModel(
-      body: '',
+      body: IsmChatStrings.contact,
       conversationId: conversationId,
       senderInfo: _controller.currentUser,
       customType: _controller.isreplying
@@ -78,7 +78,13 @@ mixin IsmChatPageSendMessageContactMixin {
       ),
     );
 
-    _controller.messages.add(contactMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      contactMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(contactMessage);
     unawaited(_controller.scrollDown());
     _controller.isreplying = false;
 
@@ -104,6 +110,7 @@ mixin IsmChatPageSendMessageContactMixin {
       notificationTitle: notificationTitle,
       isBroadcast: _controller.isBroadcast,
       parentMessageId: contactMessage.parentMessageId,
+      localEcho: contactMessage,
     );
   }
 }

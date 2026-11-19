@@ -89,6 +89,11 @@ This directory contains comprehensive documentation for the Isometrik Chat Flutt
   - Built-in `openStorageManagement()` screen
   - Upload enforcement + restricted-media placeholders
 
+- **[THREADS.md](./THREADS.md)** - Slack-style message threads (opt-in)
+  - `threadsEnabled` switch (init or runtime) + `IsmChatThreadsToggleTile`
+  - Thread panel, "N replies" footer, "also send to channel"
+  - `IsmChat.i` thread read / send APIs for custom UIs
+
 ### Feature & Issue Tracking
 
 - **[FEATURES.md](./FEATURES.md)** - Feature list and status

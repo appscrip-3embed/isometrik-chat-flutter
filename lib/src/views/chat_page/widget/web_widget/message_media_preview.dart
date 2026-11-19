@@ -163,13 +163,7 @@ class _WebMessageMediaPreviewState extends State<IsmWebMessageMediaPreview> {
                     ) {
                       var media = messageData[index];
                       var url = media.attachments?.first.mediaUrl ?? '';
-                      var customType =
-                          media.messageType == IsmChatMessageType.forward
-                              ? media.customType
-                              : (media.messageType == IsmChatMessageType.reply
-                                  ? media.metaData?.replyMessage
-                                      ?.parentMessageMessageType
-                                  : media.customType);
+                      final customType = media.mediaPreviewContentType;
                       return customType == IsmChatCustomMessageType.image
                           ? PhotoView(
                               backgroundDecoration: const BoxDecoration(

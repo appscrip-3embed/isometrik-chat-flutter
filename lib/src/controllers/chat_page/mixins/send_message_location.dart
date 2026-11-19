@@ -86,7 +86,13 @@ mixin IsmChatPageSendMessageLocationMixin {
       ),
     );
 
-    _controller.messages.add(locationMessage);
+    // Composed inside a thread? Stamp the echo so the row, the pending
+    // save and the API call agree; no-op for channel sends.
+    IsmChatThreadCoordinator.stampThreadTarget(
+      locationMessage,
+      _controller.threadSendTarget,
+    );
+    _controller.addLocalOutgoingRow(locationMessage);
     unawaited(_controller.scrollDown());
     _controller.isreplying = false;
     _controller.chatInputController.clear();
@@ -122,6 +128,7 @@ mixin IsmChatPageSendMessageLocationMixin {
           : null,
       isBroadcast: _controller.isBroadcast,
       parentMessageId: locationMessage.parentMessageId,
+      localEcho: locationMessage,
     );
   }
 }

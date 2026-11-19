@@ -57,6 +57,8 @@ extension MenuIcon on IsmChatFocusMenuType {
         return Icons.info_outline_rounded;
       case IsmChatFocusMenuType.reply:
         return Icons.reply_rounded;
+      case IsmChatFocusMenuType.replyInThread:
+        return Icons.forum_outlined;
       case IsmChatFocusMenuType.forward:
         return Icons.shortcut_rounded;
       case IsmChatFocusMenuType.copy:

@@ -83,6 +83,121 @@ class _MessageCardState extends State<MessageCard>
     return IsmChatMediaGridGrouping.shouldHide(group, widget.message);
   }
 
+  /// Bubble + reactions. When this row is an also-sent thread reply, wraps
+  /// [IsmChatThreadChannelContext] directly above [MessageBubble] so the label
+  /// reads as belonging to the bubble below (not the prior timeline row).
+  Widget _threadAwareMessageBody(
+    BuildContext context,
+    IsmChatPageController controller,
+  ) {
+    final bubble = _messageBubbleStack(context, controller);
+    final showContext = !widget.showMessageInCenter &&
+        widget.message.showChannelThreadContext;
+    if (!showContext) return bubble;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: widget.message.sentByMe
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      children: [
+        // Extra space above the line so it is not mistaken for the previous bubble.
+        IsmChatDimens.boxHeight8,
+        IsmChatThreadChannelContext(message: widget.message),
+        // Match reply-preview → body spacing ([IsmChatReplyMessage]).
+        IsmChatDimens.boxHeight5,
+        bubble,
+      ],
+    );
+  }
+
+  Widget _messageBubbleStack(
+    BuildContext context,
+    IsmChatPageController controller,
+  ) =>
+      Stack(
+        clipBehavior: Clip.none,
+        alignment: widget.message.sentByMe
+            ? Alignment.topRight
+            : Alignment.topLeft,
+        children: [
+          if (widget.message.reactions?.isNotEmpty == true)
+            IgnorePointer(
+              child: SizedBox(
+                width: ImsChatReaction.layoutWidth(
+                  widget.message,
+                ),
+                height: 1,
+              ),
+            ),
+          InkWell(
+            splashColor: IsmChatColors.transparent,
+            hoverColor: IsmChatColors.transparent,
+            highlightColor: IsmChatColors.transparent,
+            onTap: () {
+              if (widget.message.customType ==
+                      IsmChatCustomMessageType.video ||
+                  widget.message.customType ==
+                      IsmChatCustomMessageType.image ||
+                  widget.message.customType ==
+                      IsmChatCustomMessageType.multipleAttachments) {
+                return;
+              }
+              controller.onMessageTap(
+                context: context,
+                message: widget.message,
+              );
+            },
+            child: AutoScrollTag(
+              controller: controller.messagesScrollController,
+              index: widget.index,
+              key: Key('scroll-${widget.message.messageId}'),
+              child: kIsWeb
+                  ? IsmChatProperties.chatPageProperties.messageBuilder?.call(
+                          context,
+                          widget.message,
+                          widget.message.customType!,
+                          widget.showMessageInCenter) ??
+                      MessageBubble(
+                        message: widget.message,
+                        showMessageInCenter: widget.showMessageInCenter,
+                        index: widget.index,
+                      )
+                  : Hero(
+                      tag: widget.message,
+                      child: IsmChatProperties.chatPageProperties.messageBuilder
+                              ?.call(
+                            context,
+                            widget.message,
+                            widget.message.customType!,
+                            widget.showMessageInCenter) ??
+                          MessageBubble(
+                            message: widget.message,
+                            showMessageInCenter: widget.showMessageInCenter,
+                            index: widget.index,
+                          ),
+                    ),
+            ),
+          ),
+          if (widget.message.reactions?.isNotEmpty == true)
+            Positioned(
+              right: widget.message.sentByMe ? 0 : null,
+              left: widget.message.sentByMe ? null : 0,
+              bottom: IsmChatDimens.six,
+              child: UnconstrainedBox(
+                alignment: widget.message.sentByMe
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                constrainedAxis: Axis.vertical,
+                clipBehavior: Clip.none,
+                child: ImsChatReaction(
+                  message: widget.message,
+                ),
+              ),
+            ),
+        ],
+      );
+
   @override
   Widget build(BuildContext context) => GetBuilder<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
@@ -140,93 +255,16 @@ class _MessageCardState extends State<MessageCard>
                       ? CrossAxisAlignment.end
                       : CrossAxisAlignment.start,
                   children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      alignment: widget.message.sentByMe
-                          ? Alignment.topRight
-                          : Alignment.topLeft,
-                      children: [
-                        if (widget.message.reactions?.isNotEmpty == true)
-                          IgnorePointer(
-                            child: SizedBox(
-                              width: ImsChatReaction.layoutWidth(
-                                widget.message,
-                              ),
-                              height: 1,
-                            ),
-                          ),
-                        InkWell(
-                          splashColor: IsmChatColors.transparent,
-                          hoverColor: IsmChatColors.transparent,
-                          highlightColor: IsmChatColors.transparent,
-                          onTap: () {
-                            if (widget.message.customType ==
-                                    IsmChatCustomMessageType.video ||
-                                widget.message.customType ==
-                                    IsmChatCustomMessageType.image ||
-                                widget.message.customType ==
-                                    IsmChatCustomMessageType.multipleAttachments) {
-                              return;
-                            }
-                            controller.onMessageTap(
-                              context: context,
-                              message: widget.message,
-                            );
-                          },
-                          child: AutoScrollTag(
-                            controller: controller.messagesScrollController,
-                            index: widget.index,
-                            key: Key('scroll-${widget.message.messageId}'),
-                            child: kIsWeb
-                                ? IsmChatProperties
-                                        .chatPageProperties.messageBuilder
-                                        ?.call(
-                                            context,
-                                            widget.message,
-                                            widget.message.customType!,
-                                            widget.showMessageInCenter) ??
-                                    MessageBubble(
-                                      message: widget.message,
-                                      showMessageInCenter:
-                                          widget.showMessageInCenter,
-                                      index: widget.index,
-                                    )
-                                : Hero(
-                                    tag: widget.message,
-                                    child: IsmChatProperties
-                                            .chatPageProperties.messageBuilder
-                                            ?.call(
-                                                context,
-                                                widget.message,
-                                                widget.message.customType!,
-                                                widget.showMessageInCenter) ??
-                                        MessageBubble(
-                                          message: widget.message,
-                                          showMessageInCenter:
-                                              widget.showMessageInCenter,
-                                          index: widget.index,
-                                        ),
-                                  ),
-                          ),
-                        ),
-                        if (widget.message.reactions?.isNotEmpty == true)
-                          Positioned(
-                            right: widget.message.sentByMe ? 0 : null,
-                            left: widget.message.sentByMe ? null : 0,
-                            bottom: IsmChatDimens.six,
-                            child: UnconstrainedBox(
-                              alignment: widget.message.sentByMe
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                              constrainedAxis: Axis.vertical,
-                              clipBehavior: Clip.none,
-                              child: ImsChatReaction(
-                                message: widget.message,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                    _threadAwareMessageBody(context, controller),
+                    // Slack-style threads: "N replies" under the root bubble.
+                    // [IsmChatThreadCoordinator.shouldShowFooter] is false
+                    // whenever threading is off, so nothing changes for
+                    // existing integrations.
+                    if (!widget.showMessageInCenter &&
+                        IsmChatThreadCoordinator.shouldShowFooter(
+                          widget.message,
+                        ))
+                      IsmChatThreadFooter(message: widget.message),
                     if (!widget.showMessageInCenter &&
                         (IsmChatProperties.chatPageProperties.messageStatus
                                 ?.shouldShowTimeStatusOuter ??

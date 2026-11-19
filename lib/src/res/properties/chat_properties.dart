@@ -12,6 +12,11 @@ class IsmChatProperties {
   static IsmChatStorageManagementProperties storageManagementProperties =
       IsmChatStorageManagementProperties.defaults;
 
+  /// Copy / builders for the Slack-style thread panel and the "N replies"
+  /// footer. Only used while [IsmChatConfig.threadsEnabled] is `true`.
+  static IsmChatThreadProperties threadProperties =
+      IsmChatThreadProperties.defaults;
+
   /// Icons / widgets for Group Info and 1:1 conversation info screens.
   /// Prefer this over stuffing icon overrides into [chatPageProperties].
   static IsmChatConversationInfoAssets conversationInfoAssets =

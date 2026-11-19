@@ -9,10 +9,18 @@ import 'package:isometrik_chat_flutter/src/services/giphy_service.dart';
 class GiphyPickerPanel extends StatefulWidget {
   const GiphyPickerPanel({
     required this.stickers,
+    this.onBeforeSend,
+    this.onAfterSend,
     super.key,
   });
 
   final bool stickers;
+
+  /// Runs before [IsmChatPageController.sendGiphyItem] (thread target sync).
+  final Future<void> Function()? onBeforeSend;
+
+  /// Runs after send; defaults to closing the channel emoji board.
+  final VoidCallback? onAfterSend;
 
   @override
   State<GiphyPickerPanel> createState() => _GiphyPickerPanelState();
@@ -209,12 +217,17 @@ class _GiphyPickerPanelState extends State<GiphyPickerPanel> {
                           if (!IsmChatUtility.chatPageControllerRegistered) {
                             return;
                           }
+                          await widget.onBeforeSend?.call();
                           final controller = IsmChatUtility.chatPageController;
                           await controller.sendGiphyItem(
                             item,
                             isSticker: widget.stickers,
                           );
-                          controller.toggleEmojiBoard(false, false);
+                          if (widget.onAfterSend != null) {
+                            widget.onAfterSend!();
+                          } else {
+                            controller.toggleEmojiBoard(false, false);
+                          }
                         },
                         child: ClipRRect(
                           borderRadius:

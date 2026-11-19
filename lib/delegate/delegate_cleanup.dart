@@ -18,6 +18,9 @@ mixin IsmChatDelegateCleanupMixin {
         // Drop cached storage-quota usage/media so the next user starts clean.
         if (Get.isRegistered<IsmChatStorageQuotaController>())
           Get.delete<IsmChatStorageQuotaController>(force: true),
+        // Drop any open thread panel state (replies are memory-only).
+        if (Get.isRegistered<IsmChatThreadController>())
+          Get.delete<IsmChatThreadController>(force: true),
       ]);
     } catch (e, st) {
       IsmChatLog.error('Error $e stackTree $st');

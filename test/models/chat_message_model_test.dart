@@ -143,6 +143,35 @@ void main() {
     });
   });
 
+  group('IsmChatMessageModel.contacts', () {
+    test('empty body uses metadata instead of jsonDecode', () {
+      final model = message(
+        body: '',
+        customType: IsmChatCustomMessageType.contact,
+        metaData: IsmChatMetaData(
+          contacts: [
+            IsmChatContactMetaDatModel(contactName: 'Alice'),
+          ],
+        ),
+      );
+      expect(model.contacts, hasLength(1));
+      expect(model.contacts.first.contactName, 'Alice');
+    });
+
+    test('Contact body uses metadata', () {
+      final model = message(
+        body: IsmChatStrings.contact,
+        customType: IsmChatCustomMessageType.contact,
+        metaData: IsmChatMetaData(
+          contacts: [
+            IsmChatContactMetaDatModel(contactName: 'Bob'),
+          ],
+        ),
+      );
+      expect(model.contacts.single.contactName, 'Bob');
+    });
+  });
+
   group('fixtures', () {
     test('every attachment message has the matching custom type', () {
       attachmentMessages().forEach((type, msg) {

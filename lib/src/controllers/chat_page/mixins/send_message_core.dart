@@ -39,6 +39,13 @@ mixin IsmChatPageSendMessageCoreMixin {
   /// [sendPushNotification] - Whether to send push notification
   /// [encrypted] - Whether the message is encrypted
   ///
+  /// [localEcho] - the local row this send belongs to (media, voice note,
+  ///   document, location, contact). When that row was composed inside a
+  ///   thread it carries `threadRootId` / `parentMessageId` /
+  ///   `showInConversation`, and this method posts a **thread reply** instead
+  ///   of a channel message. Channel sends pass `null` (or a plain row) and
+  ///   behave exactly as before.
+  ///
   /// Note: This method requires `sendBroadcastMessage` to be available through
   /// send_message_broadcast mixin on the controller.
   Future<void> sendMessage({
@@ -58,7 +65,19 @@ mixin IsmChatPageSendMessageCoreMixin {
     bool sendPushNotification = true,
     bool encrypted = false,
     List<String>? searchableTags,
+    IsmChatMessageModel? localEcho,
   }) async {
+    // Thread fields are read off the echo, never off the ambient target, so a
+    // target that changes mid-upload cannot relabel a message already in
+    // flight. All three are the pre-threading values for a channel send.
+    final isThreadSend = IsmChatThreadCoordinator.isThreadReply(localEcho);
+    final threadShowInConversation =
+        isThreadSend ? localEcho!.showInConversation ?? false : true;
+    final threadParentMessageId =
+        isThreadSend ? localEcho!.parentMessageId : parentMessageId;
+    final threadMessageType = isThreadSend
+        ? IsmChatMessageType.reply.value
+        : messageType;
     // Same as local MQTT notifications: conversationTitle, else full name.
     notificationTitle = IsmChatUtility.resolveSendNotificationTitle(
       conversation: _controller.conversation,
@@ -91,8 +110,8 @@ mixin IsmChatPageSendMessageCoreMixin {
         messageMetaData['customType'] = customType;
       }
       final response = await _controller.commonController.sendPaidWalletMessage(
-        showInConversation: true,
-        messageType: messageType,
+        showInConversation: threadShowInConversation,
+        messageType: threadMessageType,
         encrypted: encrypted,
         deviceId: deviceId,
         conversationId: conversationId,
@@ -107,7 +126,7 @@ mixin IsmChatPageSendMessageCoreMixin {
         },
         mentionedUsers: mentionedUsers,
         metaData: messageMetaData,
-        parentMessageId: parentMessageId,
+        parentMessageId: threadParentMessageId,
         createdAt: createdAt,
       );
       if (response.$1) {
@@ -127,7 +146,7 @@ mixin IsmChatPageSendMessageCoreMixin {
     } else if (_controller.conversation?.customType !=
         IsmChatStrings.broadcast) {
       final isMessageSent = await _controller.commonController.sendMessage(
-        showInConversation: true,
+        showInConversation: threadShowInConversation,
         encrypted: encrypted,
         events: {
           'updateUnreadCount': true,
@@ -136,9 +155,9 @@ mixin IsmChatPageSendMessageCoreMixin {
         attachments: attachments,
         mentionedUsers: mentionedUsers,
         metaData: metaData,
-        messageType: messageType,
+        messageType: threadMessageType,
         customType: customType,
-        parentMessageId: parentMessageId,
+        parentMessageId: threadParentMessageId,
         deviceId: deviceId,
         conversationId: conversationId,
         notificationBody: notificationBody,

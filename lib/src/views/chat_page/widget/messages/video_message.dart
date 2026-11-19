@@ -47,9 +47,7 @@ class _IsmChatVideoMessageState extends State<IsmChatVideoMessage> {
             // Keep media interactions isolated to thumbnail.
             IsmChatTapHandler(
               onTap: () {
-                if (IsmChatUtility.chatPageControllerRegistered) {
-                  IsmChatUtility.chatPageController.tapForMediaPreview(message);
-                }
+                IsmChatThreadCoordinator.openMediaPreviewFromThread(message);
               },
               onLongPress: () {
                 if (IsmChatUtility.chatPageControllerRegistered) {

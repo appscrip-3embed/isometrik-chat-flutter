@@ -18,6 +18,7 @@ export 'chat_page_header.dart';
 export 'chat_page_theme.dart';
 export 'profile_theme.dart';
 export 'storage_theme.dart';
+export 'thread_theme.dart';
 export 'chat_reaction_theme.dart';
 export 'chat_replay_messae_theme.dart';
 export 'chat_send_button_them.dart';

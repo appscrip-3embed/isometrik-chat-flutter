@@ -252,18 +252,15 @@ class _MoreIcon extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  IsmChatProperties
-                          .conversationProperties
-                          .storageQuotaListBannerProperties
-                          .menuIcon ??
+                  IsmChatProperties.conversationProperties
+                          .storageQuotaListBannerProperties.menuIcon ??
                       Icons.sd_storage_outlined,
                   color: IsmChatConfig.chatTheme.primaryColor,
                 ),
                 IsmChatDimens.boxWidth8,
                 Text(
                   IsmChatProperties
-                      .conversationProperties
-                      .storageQuotaListBannerProperties
+                      .conversationProperties.storageQuotaListBannerProperties
                       .resolveMenuLabel(
                     _,
                     Get.isRegistered<IsmChatStorageQuotaController>()

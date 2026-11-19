@@ -46,6 +46,14 @@ class IsmChatPageViewModel {
   /// and managing messages.
   final IsmChatPageRepository _repository;
 
+  /// Loads channel messages.
+  ///
+  /// **Threads:** when [IsmChatConfig.threadsEnabled] is on, the request adds
+  /// `feedType=main` ([IsmChatThreadCoordinator.timelineFeedType]) so the
+  /// server leaves thread-only replies out, and any that still arrive (legacy
+  /// rows, "also sent to channel" edge cases) are filtered before they reach
+  /// the local database. With threads off nothing changes: no query param, no
+  /// filtering.
   Future<List<IsmChatMessageModel>> getChatMessages({
     required String conversationId,
     int? lastMessageTimestamp,
@@ -54,6 +62,7 @@ class IsmChatPageViewModel {
     String? searchText,
     bool isLoading = false,
     bool isBroadcast = false,
+    IsmChatFeedType? feedType,
   }) async {
     var messages = await _repository.getChatMessages(
       conversationId: conversationId,
@@ -62,11 +71,14 @@ class IsmChatPageViewModel {
       skip: skip,
       searchText: searchText,
       isLoading: isLoading,
+      feedType: feedType ?? IsmChatThreadCoordinator.timelineFeedType,
     );
 
     if (messages == null) {
       return [];
     }
+    // Keep thread-only replies out of the channel list and the local DB.
+    messages.removeWhere(IsmChatThreadCoordinator.shouldHideFromTimeline);
     messages.removeWhere((e) => [
           IsmChatActionEvents.clearConversation.name,
           IsmChatActionEvents.deleteConversationLocally.name,
@@ -395,10 +407,28 @@ class IsmChatPageViewModel {
         messages: messageId,
       );
       if (response == null || response.hasError) {
+        // Slack-style threads: the server refuses to delete a root that still
+        // has replies (errorCode 4). Tell the user instead of failing silently.
+        if (IsmChatThreadCoordinator.isRootDeleteBlocked(response)) {
+          IsmChatUtility.showToast(IsmChatStrings.threadRootDeleteBlocked);
+        }
         return;
       }
       // Media-storage quota: sync freed bytes into cached usage when quota is on.
       IsmChatStorageQuotaGuard.syncUsageFromResponse(response);
+      // A deleted thread reply lowers its root's badge; keep the open panel and
+      // the cached root in step (no-op with threads off).
+      final deleted = messages.values.cast<IsmChatMessageModel?>().firstWhere(
+            (e) => (e?.messageId ?? '') == messageId,
+            orElse: () => null,
+          );
+      if (deleted != null && IsmChatThreadCoordinator.isThreadReply(deleted)) {
+        IsmChatThreadController.instance?.applyReplyDeleted(messageId);
+        await _decrementCachedRootReplyCount(
+          conversationId: conversationId,
+          threadRootId: deleted.threadRootId ?? '',
+        );
+      }
     }
     var conversation =
         await IsmChatConfig.dbWrapper?.getConversation(conversationId);
@@ -427,6 +457,33 @@ class IsmChatPageViewModel {
           ?.saveConversation(conversation: conversation);
     }
     await IsmChatUtility.chatPageController.getMessagesFromDB(conversationId);
+  }
+
+  /// Lowers the cached root's `replyCount` after one of its replies was
+  /// deleted, so the "N replies" footer does not over-count until the next
+  /// fetch. No-op when threads are off or the root is not cached.
+  Future<void> _decrementCachedRootReplyCount({
+    required String conversationId,
+    required String threadRootId,
+  }) async {
+    if (!IsmChatThreadCoordinator.isEnabled) return;
+    if (conversationId.isEmpty || threadRootId.isEmpty) return;
+    await IsmChatConfig.dbWrapper?.updateConversation(
+      conversationId: conversationId,
+      update: (latest) {
+        if (latest == null) return null;
+        final messages = Map<String, IsmChatMessageModel>.from(
+          latest.messages ?? {},
+        );
+        for (final entry in messages.entries.toList()) {
+          if ((entry.value.messageId ?? '') != threadRootId) continue;
+          messages[entry.key] =
+              IsmChatThreadCoordinator.applyReplyRemovalToRoot(entry.value);
+          return latest.copyWith(messages: messages);
+        }
+        return null;
+      },
+    );
   }
 
   Future<bool> clearAllMessages({

@@ -39,6 +39,7 @@ part 'delegate/delegate_paid_media.dart';
 part 'delegate/delegate_composer.dart';
 part 'delegate/delegate_chat_list.dart';
 part 'delegate/delegate_storage.dart';
+part 'delegate/delegate_threads.dart';
 part 'delegate/delegate_ui.dart';
 part 'delegate/delegate_user.dart';
 
@@ -55,6 +56,7 @@ part 'mixins/paid_media_operations.dart';
 part 'mixins/composer_operations.dart';
 part 'mixins/chat_list_operations.dart';
 part 'mixins/storage_operations.dart';
+part 'mixins/threads_operations.dart';
 part 'mixins/cleanup_operations.dart';
 part 'mixins/update_operations.dart';
 
@@ -115,6 +117,7 @@ class IsmChat
         IsmChatComposerOperationsMixin,
         IsmChatChatListOperationsMixin,
         IsmChatStorageOperationsMixin,
+        IsmChatThreadsOperationsMixin,
         IsmChatCleanupOperationsMixin,
         IsmChatUpdateOperationsMixin {
   /// Factory constructor for creating a new instance of [IsmChat].
