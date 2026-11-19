@@ -115,9 +115,14 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
   @override
   Widget build(BuildContext context) {
     final theme = IsmChatThemeResolver.threadFromConfig(context);
+    // Match [IsmChatConversations] unless the host set [IsmChatThemeData.threadTheme].
+    final scaffoldBackground = IsmChatConfig.chatTheme.threadTheme != null
+        ? theme.scaffoldBackgroundColor
+        : IsmChatConfig.chatTheme.chatListTheme?.backGroundColor ??
+            theme.scaffoldBackgroundColor;
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: scaffoldBackground,
       appBar: IsmChatAppBar(
         title: Text(
           _props.title ?? IsmChatStrings.threadTitle,
@@ -130,15 +135,22 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
         () => Column(
           children: [
             Expanded(
+              // Single scrollable: root + replies. A nested [Column] with a
+              // fixed root tile overflowed when the keyboard shrank the body.
               child: _wrapKeyboardDismissBehavior(
-                Column(
-                  children: [
-                    IsmChatThreadMessageTile(
-                      message: _controller.root ?? widget.rootMessage,
-                      isRoot: true,
+                CustomScrollView(
+                  controller: _scrollController,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: IsmChatThreadMessageTile(
+                        message: _controller.root ?? widget.rootMessage,
+                        isRoot: true,
+                      ),
                     ),
-                    _replyCountRow(theme),
-                    Expanded(child: _replies(theme)),
+                    SliverToBoxAdapter(child: _replyCountRow(theme)),
+                    ..._replySlivers(theme),
                   ],
                 ),
               ),
@@ -165,6 +177,8 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
   }
 
   /// Outer composer chrome matches [_IsmChatPageView._defaultComposer].
+  /// Field background, border, emoji, and attach icons use the same
+  /// [IsmChatPageTheme.textFiledTheme] as [IsmChatMessageField].
   Widget _threadComposerShell(BuildContext context) => Container(
         padding: IsmChatConfig
             .chatTheme.chatPageTheme?.textFiledTheme?.textfieldInsets,
@@ -198,69 +212,101 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
     );
   }
 
-  Widget _replies(IsmChatThreadTheme theme) {
+  /// Reply list as slivers for [CustomScrollView] (keyboard-safe layout).
+  List<Widget> _replySlivers(IsmChatThreadTheme theme) {
     if (!_isPanelSynced && _controller.replies.isNotEmpty) {
-      return const Center(child: IsmChatLoadingDialog());
+      return [
+        const SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: IsmChatLoadingDialog()),
+        ),
+      ];
     }
     if (_controller.isLoading && _controller.replies.isEmpty) {
-      return const Center(child: IsmChatLoadingDialog());
+      return [
+        const SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: IsmChatLoadingDialog()),
+        ),
+      ];
     }
     if (_controller.replies.isEmpty) {
       if (_controller.loadErrorMessage.isNotEmpty) {
-        return _retry(theme);
+        return [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _retry(theme),
+          ),
+        ];
       }
-      return _props.emptyPlaceholder ??
-          Center(
-            child: Padding(
-              padding: EdgeInsets.all(IsmChatDimens.twenty),
-              child: Text(
-                IsmChatStrings.threadNoReplies,
-                key: const Key('ism-thread-empty'),
-                textAlign: TextAlign.center,
-                style: theme.emptyTextStyle,
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: _props.emptyPlaceholder ??
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.all(IsmChatDimens.twenty),
+                  child: Text(
+                    IsmChatStrings.threadNoReplies,
+                    key: const Key('ism-thread-empty'),
+                    textAlign: TextAlign.center,
+                    style: theme.emptyTextStyle,
+                  ),
+                ),
               ),
-            ),
-          );
+        ),
+      ];
     }
-    return ListView.separated(
-      key: const Key('ism-thread-replies'),
-      controller: _scrollController,
-      padding: EdgeInsets.only(bottom: IsmChatDimens.eight),
-      itemCount:
-          _controller.replies.length + (_controller.isPaginating ? 1 : 0),
-      separatorBuilder: (_, __) => Divider(
-        height: IsmChatDimens.one,
-        color: theme.dividerColor,
+
+    final replyCount = _controller.replies.length;
+    final hasPaginator = _controller.isPaginating;
+    final childCount = replyCount * 2 - 1 + (hasPaginator ? 1 : 0);
+
+    return [
+      SliverPadding(
+        key: const Key('ism-thread-replies'),
+        padding: EdgeInsets.only(bottom: IsmChatDimens.eight),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (_, index) {
+              if (hasPaginator && index == childCount - 1) {
+                return Padding(
+                  padding: EdgeInsets.all(IsmChatDimens.twelve),
+                  child: Center(
+                    child: SizedBox(
+                      height: IsmChatDimens.twenty,
+                      width: IsmChatDimens.twenty,
+                      child: const CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+              if (index.isOdd) {
+                return Divider(
+                  height: IsmChatDimens.one,
+                  color: theme.dividerColor,
+                );
+              }
+              final reply = _controller.replies[index ~/ 2];
+              final tile = IsmChatThreadMessageTile(message: reply);
+              // Media rows handle their own taps (preview / open file). Text keeps
+              // the Slack-style "tap to reply to this message" gesture.
+              if (IsmChatThreadMessageTile.usesMediaTapBehavior(reply)) {
+                return tile;
+              }
+              return IsmChatTapHandler(
+                onTap: () {
+                  IsmChatUtility.hideKeyboard();
+                  _controller.replyTo = reply;
+                },
+                child: tile,
+              );
+            },
+            childCount: childCount,
+          ),
+        ),
       ),
-      itemBuilder: (_, index) {
-        if (index >= _controller.replies.length) {
-          return Padding(
-            padding: EdgeInsets.all(IsmChatDimens.twelve),
-            child: Center(
-              child: SizedBox(
-                height: IsmChatDimens.twenty,
-                width: IsmChatDimens.twenty,
-                child: const CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
-        }
-        final reply = _controller.replies[index];
-        final tile = IsmChatThreadMessageTile(message: reply);
-        // Media rows handle their own taps (preview / open file). Text keeps
-        // the Slack-style "tap to reply to this message" gesture.
-        if (IsmChatThreadMessageTile.usesMediaTapBehavior(reply)) {
-          return tile;
-        }
-        return IsmChatTapHandler(
-          onTap: () {
-            IsmChatUtility.hideKeyboard();
-            _controller.replyTo = reply;
-          },
-          child: tile,
-        );
-      },
-    );
+    ];
   }
 
   Widget _retry(IsmChatThreadTheme theme) => Center(

@@ -170,33 +170,54 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
   }
 
   /// Gets the list of mentioned users from the message data.
+  ///
+  /// Matches each `@` segment against [mentionLabelForUser], [UserDetails.displayName],
+  /// and [UserDetails.userName]. [MentionModel.wordCount] follows the label actually
+  /// inserted in the composer, not [UserDetails.userName] alone.
   Future<void> getMentionedUserList(String data) async {
     _controller.userMentionedList.clear();
     final mentionedList = (data.split('@').toList())
       ..removeWhere((e) => e.trim().isEmpty);
 
-    for (var x = 0; x < _controller.groupMembers.length; x++) {
-      final member = _controller.groupMembers[x];
-      final userName = member.userName.trim();
-      if (userName.isEmpty) continue;
-      if (member.userId.trim() ==
-          IsmChatConfig.communicationConfig.userConfig.userId.trim()) {
-        continue;
-      }
+    final currentUserId =
+        IsmChatConfig.communicationConfig.userConfig.userId.trim();
+    final seenUserIds = <String>{};
 
-      for (final segment in mentionedList) {
-        final seg = segment.trimLeft();
-        if (mentionSegmentMatchesMemberName(seg, userName)) {
-          _controller.userMentionedList.add(
-            MentionModel(
-              wordCount: userName.split(RegExp(r'\s+')).length,
-              userId: member.userId,
-              order: x,
-            ),
-          );
+    for (var mentionIndex = 0; mentionIndex < mentionedList.length;
+        mentionIndex++) {
+      final seg = mentionedList[mentionIndex].trimLeft();
+      UserDetails? matchedMember;
+
+      for (final member in _controller.groupMembers) {
+        if (member.userId.trim() == currentUserId) continue;
+        final userName = member.userName.trim();
+        if (userName.isEmpty) continue;
+
+        final label = mentionLabelForUser(member);
+        final displayName = member.displayName.trim();
+        final matches = mentionSegmentMatchesMemberName(seg, label) ||
+            (displayName.isNotEmpty &&
+                mentionSegmentMatchesMemberName(seg, displayName)) ||
+            mentionSegmentMatchesMemberName(seg, userName);
+        if (matches) {
+          matchedMember = member;
           break;
         }
       }
+
+      if (matchedMember == null) continue;
+      if (!seenUserIds.add(matchedMember.userId.trim())) continue;
+
+      final label = mentionLabelForUser(matchedMember);
+      final wordCount =
+          label.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+      _controller.userMentionedList.add(
+        MentionModel(
+          wordCount: wordCount,
+          userId: matchedMember.userId,
+          order: mentionIndex,
+        ),
+      );
     }
   }
 }

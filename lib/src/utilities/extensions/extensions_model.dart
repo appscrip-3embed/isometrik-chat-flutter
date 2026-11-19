@@ -618,16 +618,80 @@ int? _mentionWordCountEndAfterAt(String body, int atIndex, int wordCount) {
 }
 
 List<String> _mentionNamesForUser(UserDetails user) {
+  final seen = <String>{};
   final names = <String>[];
-  final userName = user.userName.trim();
-  if (userName.isNotEmpty) names.add(userName);
-  final display = user.displayName.trim();
-  if (display.isNotEmpty &&
-      display.toLowerCase() != userName.toLowerCase()) {
-    names.add(display);
+
+  void addName(String raw) {
+    final name = raw.trim();
+    if (name.isEmpty) return;
+    final key = name.toLowerCase();
+    if (!seen.add(key)) return;
+    names.add(name);
   }
+
+  // Composer inserts [mentionLabelForUser]; try that before userName/displayName.
+  addName(mentionLabelForUser(user));
+  addName(user.userName);
+  addName(user.displayName);
   return names;
 }
+
+int _mentionLabelWordCount(UserDetails user) {
+  final wc = user.wordCount ?? 0;
+  if (wc >= 1) return wc;
+  return mentionLabelForUser(user)
+      .split(RegExp(r'\s+'))
+      .where((w) => w.isNotEmpty)
+      .length;
+}
+
+/// Mention candidates for segment parsing (message body or reply snippets).
+List<UserDetails> buildMentionLookupCandidates({
+  List<UserDetails>? mentionedUsers,
+}) {
+  final seen = <String>{};
+  final list = <UserDetails>[];
+
+  void add(UserDetails user) {
+    if (isCurrentChatUser(user.userId)) return;
+    final key = user.userId.trim().isNotEmpty
+        ? user.userId.trim()
+        : '${user.memberId ?? ''}|${user.userName}';
+    if (!seen.add(key)) return;
+    list.add(
+      user.userId.trim().isNotEmpty
+          ? user
+          : (user.memberId?.trim().isNotEmpty == true
+              ? user.copyWith(userId: user.memberId!.trim())
+              : user),
+    );
+  }
+
+  for (final user in mentionedUsers ?? const <UserDetails>[]) {
+    add(user);
+  }
+  if (IsmChatUtility.chatPageControllerRegistered) {
+    for (final member in IsmChatUtility.chatPageController.groupMembers) {
+      add(member);
+    }
+  }
+
+  list.sort((a, b) {
+    final la = mentionLabelForUser(a).length;
+    final lb = mentionLabelForUser(b).length;
+    return lb.compareTo(la);
+  });
+  return list;
+}
+
+/// Builds mention/link segments for arbitrary chat text.
+///
+/// Reuse for reply parent snippets via [buildMentionLookupCandidates].
+List<LocalMentionAndLinkData> ismChatMentionSegmentsForBody(
+  String text,
+  List<UserDetails> mentionCandidates,
+) =>
+    _buildMentionAndLinkSegments(text, mentionCandidates);
 
 /// True when [segmentAfterAt] (text after `@`) starts with [memberName].
 bool mentionSegmentMatchesMemberName(
@@ -653,6 +717,18 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
   bool hasLinkAt(int index) =>
       nonMentionLink.allMatches(text).any((m) => m.start == index);
 
+  final orderedMentionUsers = <UserDetails>[];
+  final orderedSeen = <String>{};
+  for (final user in mentionCandidates) {
+    if ((user.wordCount ?? 0) < 1) continue;
+    final id = user.userId.trim();
+    if (id.isEmpty || !orderedSeen.add(id)) continue;
+    orderedMentionUsers.add(user);
+  }
+  orderedMentionUsers.sort(
+    (a, b) => (a.order ?? 0).compareTo(b.order ?? 0),
+  );
+
   int? mentionEndAt(int index) {
     int? best;
     for (final user in mentionCandidates) {
@@ -660,8 +736,8 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
         final end = _mentionNameEndAfterAt(text, index, name);
         if (end != null && (best == null || end > best)) best = end;
       }
-      final wordCount = user.wordCount ?? 0;
-      if (wordCount > 1) {
+      final wordCount = _mentionLabelWordCount(user);
+      if (wordCount >= 1) {
         final end = _mentionWordCountEndAfterAt(text, index, wordCount);
         if (end != null && (best == null || end > best)) best = end;
       }
@@ -688,9 +764,23 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
 
   final segments = <LocalMentionAndLinkData>[];
   var i = 0;
+  var mentionAtIndex = 0;
   while (i < text.length) {
     if (text[i] == '@') {
-      final end = mentionEndAt(i);
+      var end = mentionEndAt(i);
+
+      // When name matching fails, use n-th [mentionedUsers] entry (by [order]).
+      if ((end == null || end <= i + 1) &&
+          mentionAtIndex < orderedMentionUsers.length) {
+        final user = orderedMentionUsers[mentionAtIndex];
+        final wc = _mentionLabelWordCount(user);
+        if (wc >= 1) {
+          final byOrder = _mentionWordCountEndAfterAt(text, i, wc);
+          if (byOrder != null) end = byOrder;
+        }
+      }
+      mentionAtIndex++;
+
       if (end != null &&
           end > i + 1 &&
           !isSelfMentionSpan(i, end)) {
@@ -703,6 +793,7 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
         i = end;
         continue;
       }
+      // Last resort: single token after `@` (legacy bodies without wordCount).
       final fallback = singleWordMention.matchAsPrefix(text, i);
       if (fallback != null && !isSelfMentionSpan(i, fallback.end)) {
         segments.add(
@@ -752,40 +843,38 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
 
 /// Extension for IsmChatMessageModel to get mention list, focus menu, and styling.
 extension MentionMessage on IsmChatMessageModel {
-  List<UserDetails> _mentionLookupCandidates() {
-    final seen = <String>{};
-    final list = <UserDetails>[];
+  List<UserDetails> _mentionLookupCandidates() =>
+      buildMentionLookupCandidates(mentionedUsers: mentionedUsers);
 
-    void add(UserDetails user) {
-      if (isCurrentChatUser(user.userId)) return;
-      final key = user.userId.trim().isNotEmpty
-          ? user.userId.trim()
-          : '${user.memberId ?? ''}|${user.userName}';
-      if (!seen.add(key)) return;
-      list.add(
-        user.userId.trim().isNotEmpty
-            ? user
-            : (user.memberId?.trim().isNotEmpty == true
-                ? user.copyWith(userId: user.memberId!.trim())
-                : user),
+  /// Segments for [bodyText] using this message's [mentionedUsers] plus group members.
+  List<LocalMentionAndLinkData> mentionListForBody(String bodyText) {
+    try {
+      if (bodyText.isEmpty) return [];
+      return ismChatMentionSegmentsForBody(
+        bodyText,
+        _mentionLookupCandidates(),
       );
+    } catch (e, st) {
+      IsmChatLog.error(e, st);
+      return [];
     }
+  }
 
-    for (final user in mentionedUsers ?? const <UserDetails>[]) {
-      add(user);
+  /// Segments when only [bodyText] and optional [mentionedUsers] are known (e.g. reply).
+  static List<LocalMentionAndLinkData> mentionSegmentsForReplyBody(
+    String bodyText, {
+    List<UserDetails>? mentionedUsers,
+  }) {
+    try {
+      if (bodyText.isEmpty) return [];
+      return ismChatMentionSegmentsForBody(
+        bodyText,
+        buildMentionLookupCandidates(mentionedUsers: mentionedUsers),
+      );
+    } catch (e, st) {
+      IsmChatLog.error(e, st);
+      return [];
     }
-    if (IsmChatUtility.chatPageControllerRegistered) {
-      for (final member in IsmChatUtility.chatPageController.groupMembers) {
-        add(member);
-      }
-    }
-
-    list.sort((a, b) {
-      final la = mentionLabelForUser(a).length;
-      final lb = mentionLabelForUser(b).length;
-      return lb.compareTo(la);
-    });
-    return list;
   }
 
   /// Extracts mentions and links from the message body.

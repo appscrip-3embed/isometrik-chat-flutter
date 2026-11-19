@@ -17,6 +17,30 @@ class _FocusMenuItemStyle {
   final Color iconColor;
 }
 
+/// Rounds only the top or bottom of a focus-menu row so the last item (often
+/// [IsmChatFocusMenuType.delete]) fills the card through the bottom corners.
+BorderRadius? _focusMenuItemBorderRadius(
+  int index,
+  int itemCount,
+  BorderRadius menuRadius,
+) {
+  if (itemCount <= 0) return null;
+  if (itemCount == 1) return menuRadius;
+  if (index == 0) {
+    return BorderRadius.only(
+      topLeft: menuRadius.topLeft,
+      topRight: menuRadius.topRight,
+    );
+  }
+  if (index == itemCount - 1) {
+    return BorderRadius.only(
+      bottomLeft: menuRadius.bottomLeft,
+      bottomRight: menuRadius.bottomRight,
+    );
+  }
+  return null;
+}
+
 _FocusMenuItemStyle _focusMenuItemStyle(
   BuildContext context,
   IsmChatFocusMenuType item,
@@ -115,11 +139,18 @@ class IsmChatFocusMenu extends StatelessWidget {
                       clipBehavior: Clip.antiAlias,
                       child: GetBuilder<IsmChatPageController>(
                           tag: IsmChat.i.chatPageTag,
-                          builder: (controller) => ListView.builder(
-                                itemCount: message.focusMenuList.length,
+                          builder: (controller) {
+                            final menuItems = message.focusMenuList;
+                            final menuRadius = BorderRadius.circular(
+                              IsmChatDimens.sixteen,
+                            );
+                            return ListView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: menuItems.length,
                                 shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
                                 itemBuilder: (_, index) {
-                                  var item = message.focusMenuList[index];
+                                  var item = menuItems[index];
                                   final itemStyle =
                                       _focusMenuItemStyle(context, item);
                                   return IsmChatTapHandler(
@@ -149,6 +180,12 @@ class IsmChatFocusMenu extends StatelessWidget {
                                       padding: IsmChatDimens.edgeInsets16_0,
                                       decoration: BoxDecoration(
                                         color: itemStyle.backgroundColor,
+                                        borderRadius:
+                                            _focusMenuItemBorderRadius(
+                                          index,
+                                          menuItems.length,
+                                          menuRadius,
+                                        ),
                                       ),
                                       child: Row(
                                         children: [
@@ -184,7 +221,8 @@ class IsmChatFocusMenu extends StatelessWidget {
                                     ),
                                   );
                                 },
-                              )),
+                              );
+                          }),
                     ),
                   ),
                 ),
@@ -270,15 +308,6 @@ class IsmChatFocusMenu extends StatelessWidget {
                                   child: Container(
                                     width: IsmChatDimens.oneHundredSeventy,
                                     decoration: BoxDecoration(
-                                      color: IsmChatConfig
-                                              .chatTheme
-                                              .chatPageHeaderTheme
-                                              ?.popupBackgroundColor ??
-                                          (IsmChatThemeResolver.brightness(
-                                                      context) ==
-                                                  Brightness.dark
-                                              ? const Color(0xFF353535)
-                                              : IsmChatColors.whiteColor),
                                       borderRadius: BorderRadius.circular(
                                         IsmChatDimens.sixteen,
                                       ),
@@ -286,16 +315,21 @@ class IsmChatFocusMenu extends StatelessWidget {
                                     clipBehavior: Clip.antiAlias,
                                     child: GetBuilder<IsmChatPageController>(
                                         tag: IsmChat.i.chatPageTag,
-                                        builder: (controller) =>
-                                            ListView.builder(
-                                              itemCount:
-                                                  message.focusMenuList.length,
+                                        builder: (controller) {
+                                          final menuItems =
+                                              message.focusMenuList;
+                                          final menuRadius =
+                                              BorderRadius.circular(
+                                            IsmChatDimens.sixteen,
+                                          );
+                                          return ListView.builder(
+                                              padding: EdgeInsets.zero,
+                                              itemCount: menuItems.length,
                                               shrinkWrap: true,
                                               physics:
                                                   const NeverScrollableScrollPhysics(),
                                               itemBuilder: (_, index) {
-                                                var item = message
-                                                    .focusMenuList[index];
+                                                var item = menuItems[index];
                                                 final itemStyle =
                                                     _focusMenuItemStyle(
                                                         context, item);
@@ -341,6 +375,12 @@ class IsmChatFocusMenu extends StatelessWidget {
                                                     decoration: BoxDecoration(
                                                       color: itemStyle
                                                           .backgroundColor,
+                                                      borderRadius:
+                                                          _focusMenuItemBorderRadius(
+                                                        index,
+                                                        menuItems.length,
+                                                        menuRadius,
+                                                      ),
                                                     ),
                                                     child: Row(
                                                       children: [
@@ -372,7 +412,8 @@ class IsmChatFocusMenu extends StatelessWidget {
                                                   ),
                                                 );
                                               },
-                                            )),
+                                            );
+                                        }),
                                   ),
                                 ),
                               ],

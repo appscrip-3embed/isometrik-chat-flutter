@@ -260,9 +260,11 @@ class _IsmChatVideoViewState extends State<IsmChatVideoView> {
                     }
                   }
                 },
-                child: const Icon(
+                child: Icon(
                   Icons.send,
-                  color: IsmChatColors.whiteColor,
+                  color: IsmChatConfig.chatTheme.chatPageTheme?.sendButtonTheme
+                          ?.iconColor ??
+                      IsmChatColors.whiteColor,
                 ),
               ),
             ],

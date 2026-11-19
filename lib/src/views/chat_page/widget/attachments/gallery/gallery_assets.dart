@@ -67,13 +67,13 @@ class IsmChatGalleryAssetsView extends StatelessWidget {
                 ),
                 action: [
                   IsmChatConstants.imageExtensions.contains(controller
-                          .webMedia[controller.assetsIndex]
-                          .platformFile
-                          .extension) &&
-                      controller.webMedia[controller.assetsIndex].platformFile
-                              .extension
-                              ?.toLowerCase() !=
-                          'gif'
+                              .webMedia[controller.assetsIndex]
+                              .platformFile
+                              .extension) &&
+                          controller.webMedia[controller.assetsIndex]
+                                  .platformFile.extension
+                                  ?.toLowerCase() !=
+                              'gif'
                       ? Row(
                           children: [
                             InkWell(
@@ -381,9 +381,11 @@ class IsmChatGalleryAssetsView extends StatelessWidget {
                                   controller.textEditingController.text;
                               controller.sendMedia();
                             },
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.send,
-                              color: IsmChatColors.whiteColor,
+                              color: IsmChatConfig.chatTheme.chatPageTheme
+                                      ?.sendButtonTheme?.iconColor ??
+                                  IsmChatColors.whiteColor,
                             ),
                           ),
                         ],

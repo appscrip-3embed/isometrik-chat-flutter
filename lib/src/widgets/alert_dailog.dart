@@ -21,6 +21,14 @@ class IsmChatAlertDialogBox extends StatelessWidget {
           'Equal number of actionLabels & callbackActions must be passed',
         );
 
+  /// Dialog body copy styled with [IsmChatDialogTheme.contentTextStyle].
+  ///
+  /// Use when building confirmation dialog content from a [body] string.
+  static Widget themedBodyText(BuildContext context, String text) {
+    final dialogTheme = IsmChatThemeResolver.dialogFromConfig(context);
+    return Text(text, style: dialogTheme.contentTextStyle);
+  }
+
   final String title;
   final List<String>? actionLabels;
   final List<VoidCallback>? callbackActions;
@@ -64,12 +72,18 @@ class IsmChatAlertDialogBox extends StatelessWidget {
           ? AlertDialog(
               titlePadding: titlePadding,
               actionsPadding: actionsPadding,
-              title: Text(title),
+              title: Text(
+                title,
+                style: dialogTheme.titleTextStyle,
+              ),
               backgroundColor: dialogTheme.backgroundColor,
-              titleTextStyle: dialogTheme.titleTextStyle,
               contentPadding: resolvedContentPadding,
-              contentTextStyle: resolvedContentStyle,
-              content: content,
+              content: content == null
+                  ? null
+                  : DefaultTextStyle(
+                      style: resolvedContentStyle,
+                      child: content!,
+                    ),
               shape: resolvedShape,
               actions: [
                 IsmChatTapHandler(

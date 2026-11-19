@@ -79,7 +79,14 @@ mixin IsmChatShowDialogMixin on GetxController {
     await _showThemedAlertDialog(
       title: request.title,
       content: request.content ??
-          (request.body == null ? null : Text(request.body!)),
+          (request.body == null
+              ? null
+              : Builder(
+                  builder: (context) => IsmChatAlertDialogBox.themedBodyText(
+                    context,
+                    request.body!,
+                  ),
+                )),
       actionLabels: request.actions.isEmpty
           ? null
           : request.actions.map((a) => a.label).toList(),

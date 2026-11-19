@@ -24,9 +24,15 @@ class IsmChatThreadComposer extends StatelessWidget {
 
   IsmChatThreadProperties get _props => IsmChatProperties.threadProperties;
 
+  /// Composer colors/icons follow [IsmChatMessageField] via
+  /// [IsmChatPageTheme.textFiledTheme] (same paths as the channel composer).
+  IsmChatTextFiledTheme? get _textFiledTheme =>
+      IsmChatConfig.chatTheme.chatPageTheme?.textFiledTheme;
+
   @override
   Widget build(BuildContext context) {
     final threadTheme = IsmChatThemeResolver.threadFromConfig(context);
+    // Recording timer only — matches [IsmChatMessageField] (resolved defaults).
     final textFieldTheme = IsmChatThemeResolver.textFieldFromConfig(context);
     return Obx(
       () => Column(
@@ -71,10 +77,7 @@ class IsmChatThreadComposer extends StatelessWidget {
                         shape: BoxShape.circle,
                         color: IsmChatConfig.chatTheme.primaryColor,
                       ),
-                      child: _ThreadWebAttachButton(
-                        controller: controller,
-                        textFieldTheme: textFieldTheme,
-                      ),
+                      child: _ThreadWebAttachButton(controller: controller),
                     ),
                     IsmChatDimens.boxWidth2,
                   ],
@@ -88,11 +91,11 @@ class IsmChatThreadComposer extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: textFieldTheme.borderColor ??
+                        color: _textFiledTheme?.borderColor ??
                             IsmChatConfig.chatTheme.primaryColor!,
                       ),
                       borderRadius: BorderRadius.circular(IsmChatDimens.twenty),
-                      color: textFieldTheme.backgroundColor ??
+                      color: _textFiledTheme?.backgroundColor ??
                           IsmChatConfig.chatTheme.backgroundColor,
                     ),
                     child: Row(
@@ -105,8 +108,8 @@ class IsmChatThreadComposer extends StatelessWidget {
                             minLines: 1,
                             maxLines: 4,
                             textCapitalization: TextCapitalization.sentences,
-                            style: textFieldTheme.inputTextStyle,
-                            cursorColor: textFieldTheme.cursorColor ??
+                            style: _textFiledTheme?.inputTextStyle,
+                            cursorColor: _textFiledTheme?.cursorColor ??
                                 IsmChatConfig.chatTheme.primaryColor,
                             onSubmitted: (_) => _sendText(),
                             onTapOutside: (_) => IsmChatUtility.hideKeyboard(),
@@ -114,9 +117,9 @@ class IsmChatThreadComposer extends StatelessWidget {
                             decoration: InputDecoration(
                               hintText: _props.composerHintText ??
                                   IsmChatStrings.threadReplyHint,
-                              hintStyle: textFieldTheme.hintTextStyle ??
+                              hintStyle: _textFiledTheme?.hintTextStyle ??
                                   IsmChatStyles.w400Black12,
-                              fillColor: textFieldTheme.backgroundColor ??
+                              fillColor: _textFiledTheme?.backgroundColor ??
                                   IsmChatConfig.chatTheme.backgroundColor,
                               contentPadding: IsmChatResponsive.isWeb(context)
                                   ? IsmChatDimens.edgeInsets12
@@ -126,7 +129,7 @@ class IsmChatThreadComposer extends StatelessWidget {
                                   : (_props.isEmojiEnabled
                                       ? _ThreadEmojiButton(
                                           controller: controller,
-                                          color: textFieldTheme.emojiColor,
+                                          color: _textFiledTheme?.emojiColor,
                                         )
                                       : null),
                               enabledBorder: OutlineInputBorder(
@@ -148,7 +151,7 @@ class IsmChatThreadComposer extends StatelessWidget {
                         ),
                         if (_props.showAttachments &&
                             !IsmChatResponsive.isWeb(context))
-                          _attachButton(context, textFieldTheme),
+                          const _ThreadAttachmentIcon(),
                       ],
                     ),
                   ),
@@ -247,24 +250,6 @@ class IsmChatThreadComposer extends StatelessWidget {
         ),
       );
 
-  Widget _attachButton(
-    BuildContext context,
-    IsmChatTextFiledTheme textFieldTheme,
-  ) =>
-      IconButton(
-        key: const Key('ism-thread-attach-button'),
-        onPressed: () {
-          if (!IsmChatUtility.chatPageControllerRegistered) return;
-          controller.syncSendTarget();
-          unawaited(
-            IsmChatUtility.chatPageController.openAttachmentPicker(context),
-          );
-        },
-        color: textFieldTheme.attchmentColor ??
-            IsmChatConfig.chatTheme.primaryColor,
-        icon: const Icon(Icons.attach_file_rounded),
-      );
-
   Widget _replyToChip(IsmChatThreadTheme theme) {
     final target = controller.replyTo!;
     final name = target.sentByMe
@@ -346,14 +331,34 @@ class _ThreadEmojiButton extends StatelessWidget {
       );
 }
 
+/// Mobile attach control — same [attchmentColor] path as [IsmChatMessageField].
+class _ThreadAttachmentIcon extends StatelessWidget {
+  const _ThreadAttachmentIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    final threadController = Get.find<IsmChatThreadController>();
+    return IconButton(
+      key: const Key('ism-thread-attach-button'),
+      onPressed: () {
+        if (!IsmChatUtility.chatPageControllerRegistered) return;
+        threadController.syncSendTarget();
+        unawaited(
+          IsmChatUtility.chatPageController.openAttachmentPicker(context),
+        );
+      },
+      color: IsmChatConfig.chatTheme.chatPageTheme?.textFiledTheme
+              ?.attchmentColor ??
+          IsmChatConfig.chatTheme.primaryColor,
+      icon: const Icon(Icons.attach_file_rounded),
+    );
+  }
+}
+
 class _ThreadWebAttachButton extends StatelessWidget {
-  const _ThreadWebAttachButton({
-    required this.controller,
-    required this.textFieldTheme,
-  });
+  const _ThreadWebAttachButton({required this.controller});
 
   final IsmChatThreadController controller;
-  final IsmChatTextFiledTheme textFieldTheme;
 
   @override
   Widget build(BuildContext context) => IconButton(

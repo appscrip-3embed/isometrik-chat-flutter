@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 /// `ChatConversationList` can be used to show the list of all the conversations user has done.
 class IsmChatConversationList extends StatelessWidget {
@@ -17,8 +18,6 @@ class IsmChatConversationList extends StatelessWidget {
       return;
     }
     final controller = IsmChatUtility.conversationController;
-    // If user pulled-to-refresh while a search query is present,
-    // clear it first so the refreshed list & query stay consistent.
     FocusManager.instance.primaryFocus?.unfocus();
     controller.searchConversationTEC.clear();
     await controller.getChatConversations(
@@ -44,109 +43,187 @@ class IsmChatConversationList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // GetX must only rebuild list/empty/loading content. [IsmChatPullToRefresh]
-    // stays outside so host TabBarView / multiple list instances never share
-    // one RefreshController (pull_to_refresh `_refresherState == null`).
-    final content = GetX<IsmChatConversationsController>(
-      tag: IsmChat.i.chatListPageTag,
-      builder: (controller) {
-        if (controller.isConversationsLoading) {
-          return const IsmChatLoadingDialog();
-        }
-        if (controller.userConversations.isEmpty) {
-          final isSearching = controller.isSearchingConversations;
-          return Center(
-            child: isSearching
-                ? IsmChatProperties.conversationProperties.searchPlaceholder ??
-                    IsmChatEmptyView(
-                      icon: Icon(
-                        Icons.search_off_outlined,
-                        size: IsmChatDimens.fifty,
-                        color: IsmChatColors.greyColor,
-                      ),
-                      text: IsmChatStrings.noResultsFound,
-                    )
-                : IsmChatProperties.conversationProperties.placeholder ??
-                    IsmChatEmptyView(
-                      icon: Icon(Icons.chat_outlined),
-                      text: IsmChatStrings.noConversation,
-                    ),
+    final maxHeight = IsmChatProperties.conversationProperties.height;
+
+    final listBody = kIsWeb
+        ? _ConversationPullRefresh(
+            onRefresh: _onRefresh,
+            onLoading: _onLoading,
+            enablePullToRefresh: false,
+          )
+        : SlidableAutoCloseBehavior(
+            child: _ConversationPullRefresh(
+              onRefresh: _onRefresh,
+              onLoading: _onLoading,
+              enablePullToRefresh: true,
+            ),
           );
-        }
-        // Fill the [Expanded] parent — do not force `percentHeight(1)` (full
-        // screen). That made short lists scroll into a large empty region.
-        final list = SlidableAutoCloseBehavior(
-          child: _ConversationList(),
-        );
-        final maxHeight = IsmChatProperties.conversationProperties.height;
-        if (maxHeight != null) {
-          return SizedBox(height: maxHeight, child: list);
-        }
-        return list;
-      },
-    );
 
-    if (kIsWeb) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const IsmChatStorageQuotaListBanner(),
-          Expanded(child: content),
-        ],
-      );
-    }
+    final body = maxHeight != null
+        ? SizedBox(height: maxHeight, child: listBody)
+        : listBody;
 
-    return IsmChatPullToRefresh(
-      footer: const RefreshFooter(),
-      onRefresh: _onRefresh,
-      onLoading: _onLoading,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const IsmChatStorageQuotaListBanner(),
-          Expanded(child: content),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const IsmChatStorageQuotaListBanner(),
+        Expanded(child: body),
+      ],
     );
   }
 }
 
-class _ConversationList extends StatelessWidget {
-  _ConversationList();
+/// One stable [ListView] under [SmartRefresher] so [conversationScrollController]
+/// is not re-bound after pull-to-refresh (GetX used to rebuild a new list).
+class _ConversationPullRefresh extends StatefulWidget {
+  const _ConversationPullRefresh({
+    required this.onRefresh,
+    required this.onLoading,
+    required this.enablePullToRefresh,
+  });
 
-  final controller = IsmChatUtility.conversationController;
+  final Future<void> Function() onRefresh;
+  final Future<bool> Function() onLoading;
+  final bool enablePullToRefresh;
 
   @override
-  Widget build(BuildContext context) => ListView.separated(
-        padding: IsmChatDimens.edgeInsets0_10,
-        // Fill available height from parent [Expanded] / [SmartRefresher].
-        // shrinkWrap + full-screen height left blank scroll space under few chats.
-        itemCount: controller.userConversations.length,
-        controller: controller.conversationScrollController,
-        physics: const ClampingScrollPhysics(),
-        separatorBuilder: (_, __) =>
-            IsmChatProperties.conversationProperties.conversationDivider ??
-            IsmChatDimens.boxHeight2,
-        addAutomaticKeepAlives: true,
-        itemBuilder: (_, index) {
-          var conversation = controller.userConversations[index];
-          return IsmChatTapHandler(
-            onTap: () async {
-              IsmChatProperties.conversationProperties.onChatTap
-                  ?.call(_, conversation);
-              if (IsmChatProperties.conversationProperties.shouldGoToChatPage
-                      ?.call(context, conversation) ??
-                  true) {
-                await controller.updateLocalConversation(conversation);
-                await controller.goToChatPage();
-              }
-            },
-            child: IsmChatProperties.conversationProperties.cardBuilder
-                    ?.call(_, conversation, index) ??
-                _SlidableWidget(conversation: conversation),
+  State<_ConversationPullRefresh> createState() =>
+      _ConversationPullRefreshState();
+}
+
+class _ConversationPullRefreshState extends State<_ConversationPullRefresh> {
+  static const _listKey = PageStorageKey<String>('ism_chat_conversation_list');
+
+  late final IsmChatConversationsController _controller;
+  Worker? _conversationsWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = IsmChatUtility.conversationController;
+    _conversationsWorker = ever<List<IsmChatConversationModel>>(
+      _controller.conversations as RxInterface<List<IsmChatConversationModel>>,
+      (_) {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _conversationsWorker?.dispose();
+    super.dispose();
+  }
+
+  int _itemCount() {
+    if (_controller.userConversations.isNotEmpty) {
+      return _controller.userConversations.length;
+    }
+    return 1;
+  }
+
+  bool get _showingPlaceholder => _controller.userConversations.isEmpty;
+
+  double _placeholderExtent(BuildContext context) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    return screenHeight * 0.45;
+  }
+
+  Widget _emptyChild() {
+    final isSearching = _controller.isSearchingConversations;
+    if (isSearching) {
+      return IsmChatProperties.conversationProperties.searchPlaceholder ??
+          IsmChatEmptyView(
+            icon: Icon(
+              Icons.search_off_outlined,
+              size: IsmChatDimens.fifty,
+              color: IsmChatColors.greyColor,
+            ),
+            text: IsmChatStrings.noResultsFound,
           );
-        },
-      );
+    }
+    return IsmChatProperties.conversationProperties.placeholder ??
+        IsmChatEmptyView(
+          icon: Icon(Icons.chat_outlined),
+          text: IsmChatStrings.noConversation,
+        );
+  }
+
+  Widget _placeholderTile(BuildContext context) {
+    final content = _controller.isConversationsLoading
+        ? const IsmChatLoadingDialog()
+        : _emptyChild();
+    return SizedBox(
+      height: _placeholderExtent(context),
+      child: Center(child: content),
+    );
+  }
+
+  Widget _conversationTile(BuildContext context, int index) {
+    final conversation = _controller.userConversations[index];
+    return IsmChatTapHandler(
+      onTap: () async {
+        IsmChatProperties.conversationProperties.onChatTap
+            ?.call(context, conversation);
+        if (IsmChatProperties.conversationProperties.shouldGoToChatPage
+                ?.call(context, conversation) ??
+            true) {
+          await _controller.updateLocalConversation(conversation);
+          await _controller.goToChatPage();
+        }
+      },
+      child: IsmChatProperties.conversationProperties.cardBuilder
+              ?.call(context, conversation, index) ??
+          _SlidableWidget(conversation: conversation),
+    );
+  }
+
+  Widget _listView() {
+    return ListView.separated(
+      key: _listKey,
+      padding: IsmChatDimens.edgeInsets0_10,
+      itemCount: _itemCount(),
+      controller: _controller.conversationScrollController,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
+      separatorBuilder: (context, index) {
+        if (_showingPlaceholder) return const SizedBox.shrink();
+        return IsmChatProperties.conversationProperties.conversationDivider ??
+            IsmChatDimens.boxHeight2;
+      },
+      addAutomaticKeepAlives: true,
+      itemBuilder: (context, index) {
+        if (_showingPlaceholder) {
+          return _placeholderTile(context);
+        }
+        return _conversationTile(context, index);
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final list = _listView();
+
+    if (!widget.enablePullToRefresh) {
+      return list;
+    }
+
+    return RefreshConfiguration(
+      enableScrollWhenRefreshCompleted: true,
+      child: IsmChatPullToRefresh(
+        header: const RefreshHeader(),
+        footer: const RefreshFooter(),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: ClampingScrollPhysics(),
+        ),
+        onRefresh: widget.onRefresh,
+        onLoading: widget.onLoading,
+        child: list,
+      ),
+    );
+  }
 }
 
 class _SlidableWidget extends StatefulWidget {
@@ -257,7 +334,6 @@ class _SlidableWidgetState extends State<_SlidableWidget>
                                 : Icons.delete_rounded,
                             color: IsmChatColors.whiteColor,
                           ).icon,
-                          // Groups: swipe shows Exit Group; 1:1 keeps Delete.
                           label: widget.conversation.isGroup == true
                               ? IsmChatStrings.exitGroup
                               : IsmChatStrings.delete,
