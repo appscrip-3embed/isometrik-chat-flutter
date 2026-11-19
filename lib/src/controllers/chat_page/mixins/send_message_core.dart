@@ -362,15 +362,18 @@ mixin IsmChatPageSendMessageCoreMixin {
       }(),
       mentionedUsers: _controller.userMentionedList.map(
         (e) {
-          var user =
-              _controller.groupMembers.where((m) => m.userId == e.userId);
+          final member =
+              _controller.groupMembers.firstWhere((m) => m.userId == e.userId);
           return UserDetails(
-            userProfileImageUrl: user.first.profileUrl,
-            userName: user.first.userName,
-            userIdentifier: user.first.userIdentifier,
+            userProfileImageUrl: member.profileUrl,
+            userName: member.userName,
+            userIdentifier: member.userIdentifier,
             userId: e.userId,
             online: false,
             lastSeen: 0,
+            metaData: member.metaData,
+            wordCount: e.wordCount,
+            order: e.order,
           );
         },
       ).toList(),

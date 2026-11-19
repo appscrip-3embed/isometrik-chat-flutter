@@ -318,7 +318,18 @@ class IsmChatThreadController extends GetxController {
   void closeThread() {
     final rootMessage = root;
     if (rootMessage != null) {
-      _publishRootToTimeline(rootMessage);
+      // Pop/dispose locks the widget tree; syncing the channel timeline touches
+      // [IsmChatPageController.messages] and rebuilds stacked GetX on the chat
+      // route. Defer until after the frame and pass [conversationIdOverride]
+      // because panel state is cleared below before the callback runs.
+      final convId = conversationId;
+      final snapshot = rootMessage;
+      IsmChatUtility.doLater(
+        () => _publishRootToTimeline(
+          snapshot,
+          conversationIdOverride: convId,
+        ),
+      );
     }
     _root.value = null;
     _conversation.value = null;
@@ -920,11 +931,23 @@ class IsmChatThreadController extends GetxController {
 
   /// Writes the updated root back into the channel timeline so the
   /// "N replies" footer updates live. Best-effort: the chat page may be gone.
-  void _publishRootToTimeline(IsmChatMessageModel updatedRoot) {
+  ///
+  /// [conversationIdOverride] is used when the panel was already torn down
+  /// (e.g. deferred [closeThread] publish).
+  void _publishRootToTimeline(
+    IsmChatMessageModel updatedRoot, {
+    String? conversationIdOverride,
+  }) {
     if (!IsmChatUtility.chatPageControllerRegistered) return;
     final pageController = IsmChatUtility.chatPageController;
-    if (pageController.conversation?.conversationId != conversationId) return;
-    _syncRootOnChannelTimeline(pageController, updatedRoot);
+    final convId = conversationIdOverride ?? conversationId;
+    if (convId.isEmpty ||
+        pageController.conversation?.conversationId != convId) {
+      return;
+    }
+    IsmChatUtility.notifyRxSafely(
+      () => _syncRootOnChannelTimeline(pageController, updatedRoot),
+    );
   }
 
   /// Mirrors [IsmChatThreadCoordinator.applyReplyToRootInList] but applies an

@@ -184,16 +184,40 @@ class _ReplyMessage extends StatelessWidget {
                                         _replayParentIcon(message),
                                         IsmChatDimens.boxWidth4,
                                         Flexible(
-                                          child: Text(
-                                            IsmChatUtility.decryptMessage(
-                                              message.metaData?.replyMessage
-                                                      ?.parentMessageBody ??
-                                                  '',
-                                              message.conversationId ?? '',
-                                            ),
-                                            maxLines: 3,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: message.style,
+                                          child: Builder(
+                                            builder: (context) {
+                                              final parentBody =
+                                                  IsmChatUtility.decryptMessage(
+                                                message.metaData?.replyMessage
+                                                        ?.parentMessageBody ??
+                                                    '',
+                                                message.conversationId ?? '',
+                                              );
+                                              final parentId =
+                                                  (message.parentMessageId ?? '')
+                                                      .trim();
+                                              final parentMessage = parentId
+                                                      .isEmpty
+                                                  ? null
+                                                  : controller.messages
+                                                      .firstWhereOrNull(
+                                                      (m) =>
+                                                          (m.messageId ?? '')
+                                                              .trim() ==
+                                                          parentId,
+                                                    );
+                                              return IsmChatMentionRichText(
+                                                body: parentBody,
+                                                style: message.style,
+                                                message: parentMessage,
+                                                mentionedUsers:
+                                                    parentMessage?.mentionedUsers,
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
+                                                enableMentionTap:
+                                                    parentMessage != null,
+                                              );
+                                            },
                                           ),
                                         ),
                                         if (message.metaData?.replyMessage

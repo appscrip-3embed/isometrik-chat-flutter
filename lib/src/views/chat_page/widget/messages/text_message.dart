@@ -1,9 +1,6 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class IsmChatTextMessage extends StatefulWidget {
   const IsmChatTextMessage(this.message, {super.key});
@@ -51,119 +48,21 @@ class _IsmChatTextMessageState extends State<IsmChatTextMessage> {
               ? themeConstraints.maxWidth
               : maxByScreen;
 
-          final isOverflowing = _isTextOverflowing(maxWidth);
+          final isOverflowing = _isTextOverflowing(maxWidth, message);
 
           return Column(
             crossAxisAlignment: message.sentByMe
                 ? CrossAxisAlignment.end
                 : CrossAxisAlignment.start,
             children: [
-              RichText(
-                text: TextSpan(
-                  style: message.style,
-                  children: message.mentionList.map(
-                    (e) {
-                      if (e.isLink) {
-                        if (e.text.startsWith('@')) {
-                          return WidgetSpan(
-                            alignment: PlaceholderAlignment.baseline,
-                            baseline: TextBaseline.alphabetic,
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () async {
-                                if (!IsmChatUtility
-                                    .chatPageControllerRegistered) {
-                                  return;
-                                }
-                                final mentioned = message.resolveMentionedUser(
-                                  e.text.substring(1),
-                                );
-                                if (mentioned == null) return;
-                                await IsmChatUtility.chatPageController
-                                    .onMentionLinkTapped(message, e.text);
-                              },
-                              child: Text(
-                                e.text,
-                                style: message.style.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: IsmChatConfig.chatTheme.mentionColor,
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-                        return TextSpan(
-                          text: e.text,
-                          style: message.style.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: IsmChatConfig.chatTheme.mentionColor,
-                          ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () async {
-                              if (e.isLink) {
-                                if (e.text.contains(RegExp(r'^\d{9,13}$'))) {
-                                  await IsmChatContextWidget.showDialogContext(
-                                    content: IsmChatAlertDialogBox(
-                                      title: IsmChatStrings
-                                          .thisPhoneNumberNotonChat,
-                                      actionLabels: [
-                                        '${IsmChatStrings.dial} ${e.text}',
-                                        IsmChatStrings.addToContact,
-                                      ],
-                                      callbackActions: [
-                                        () {
-                                          IsmChatUtility.dialNumber(
-                                            e.text,
-                                          );
-                                        },
-                                        () async {
-                                          await IsmChatUtility
-                                              .openContactSaveScreen(
-                                            Contact(
-                                              phones: [Phone(number: e.text)],
-                                            ),
-                                          );
-                                        },
-                                      ],
-                                    ),
-                                  );
-                                } else if (e.text.contains('@') &&
-                                    !e.text.startsWith('@')) {
-                                  final emailUri =
-                                      Uri(scheme: 'mailto', path: e.text);
-
-                                  if (await canLaunchUrl(emailUri)) {
-                                    await launchUrl(emailUri);
-                                  }
-                                } else if (e.text.startsWith('http') ||
-                                    e.text.startsWith('www')) {
-                                  String? url;
-                                  if (e.text.startsWith('www')) {
-                                    url = 'https://${e.text}';
-                                  } else {
-                                    url = e.text;
-                                  }
-
-                                  if (await canLaunchUrl(Uri.parse(url))) {
-                                    await launchUrl(Uri.parse(url));
-                                  }
-                                }
-                              }
-                            },
-                        );
-                      } else {
-                        return TextSpan(
-                          text: e.text,
-                          style: message.style,
-                        );
-                      }
-                    },
-                  ).toList(),
-                ),
-                softWrap: true,
+              IsmChatMentionRichText(
+                body: message.body,
+                style: message.style,
+                message: message,
                 maxLines: isExpanded ? null : 15,
-                overflow:
-                    isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                overflow: isExpanded
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
               ),
               if (isOverflowing)
                 Align(
@@ -243,21 +142,15 @@ class _IsmChatTextMessageState extends State<IsmChatTextMessage> {
     );
   }
 
-  bool _isTextOverflowing(double maxWidth) {
-    final message = widget.message;
+  bool _isTextOverflowing(double maxWidth, IsmChatMessageModel message) {
+    final segments = message.mentionList;
     final textSpan = TextSpan(
       style: message.style,
-      children: message.mentionList
-          .map((e) => TextSpan(
-                text: e.text,
-                style: e.isLink
-                    ? message.style.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: IsmChatConfig.chatTheme.mentionColor,
-                      )
-                    : message.style,
-              ))
-          .toList(),
+      children: IsmChatMentionRichText.measurementSpans(
+        message.body,
+        message.style,
+        segments,
+      ),
     );
 
     final textPainter = TextPainter(

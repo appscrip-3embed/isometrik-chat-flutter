@@ -39,7 +39,12 @@ class IsmChatConfirmationHelper {
       content: IsmChatAlertDialogBox(
         title: request.title,
         content: request.content ??
-            (body != null ? Text(body) : null),
+            (body == null
+                ? null
+                : Builder(
+                    builder: (context) =>
+                        IsmChatAlertDialogBox.themedBodyText(context, body),
+                  )),
         actionLabels: labels.isEmpty ? null : labels,
         callbackActions: callbacks.isEmpty ? null : callbacks,
         cancelLabel: request.cancelLabel ?? IsmChatStrings.cancel,

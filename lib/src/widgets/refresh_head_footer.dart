@@ -12,8 +12,10 @@ import 'package:pull_to_refresh/pull_to_refresh.dart';
 /// apps that put chat inside a [TabBarView] / [IndexedStack] / bottom nav
 /// (the SDK example does not, so it never hits the race).
 ///
-/// Keep this widget **outside** (or at a stable slot of) GetX/Obx builders so
-/// rebuilds update [child] instead of creating a second [SmartRefresher].
+/// [child] must be a [ScrollView] (e.g. [ListView]), not [GetX]/[GetBuilder].
+/// Put reactive builders **above** this widget and pass a fresh [ListView] when
+/// data changes. Wrapping the list in another widget makes [SmartRefresher] nest
+/// scrollables and pull-to-refresh will not fire.
 class IsmChatPullToRefresh extends StatefulWidget {
   const IsmChatPullToRefresh({
     super.key,

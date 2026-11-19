@@ -288,14 +288,9 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
       );
     }
 
-    if (origin == ApiCallOrigin.referesh) {
-      _controller.refreshController.refreshCompleted(
-        resetFooterState: true,
-      );
-      _controller.refreshControllerOnEmptyList.refreshCompleted(
-        resetFooterState: true,
-      );
-    } else if (origin == ApiCallOrigin.loadMore) {
+    // List pull-to-refresh completes via [IsmChatPullToRefresh] — do not call
+    // [refreshController] here (detached controllers can confuse scroll physics).
+    if (origin == ApiCallOrigin.loadMore) {
       if (chats.isEmpty) {
         _controller.refreshController.loadNoData();
         _controller.refreshControllerOnEmptyList.loadNoData();

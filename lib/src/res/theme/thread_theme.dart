@@ -33,7 +33,9 @@ class IsmChatThreadTheme {
   });
 
   factory IsmChatThreadTheme.light() => IsmChatThreadTheme(
-        scaffoldBackgroundColor: IsmChatColors.backgroundColorLight,
+        scaffoldBackgroundColor:
+            IsmChatConfig.chatTheme.chatListTheme?.backGroundColor ??
+                IsmChatColors.whiteColor,
         footerLabelStyle: TextStyle(
           fontSize: 12.5,
           fontWeight: FontWeight.w600,
@@ -96,7 +98,9 @@ class IsmChatThreadTheme {
       );
 
   factory IsmChatThreadTheme.dark() => IsmChatThreadTheme(
-        scaffoldBackgroundColor: IsmChatColors.backgroundColorDark,
+        scaffoldBackgroundColor:
+            IsmChatConfig.chatTheme.chatListTheme?.backGroundColor ??
+                IsmChatColors.whiteColor,
         footerLabelStyle: TextStyle(
           fontSize: 12.5,
           fontWeight: FontWeight.w600,
@@ -169,7 +173,7 @@ class IsmChatThreadTheme {
         ),
       );
 
-  /// Background of the thread panel.
+  /// Background of the thread panel. Defaults follow [IsmChatListTheme.backGroundColor].
   final Color scaffoldBackgroundColor;
 
   /// "3 replies" label under a root message in the channel timeline.

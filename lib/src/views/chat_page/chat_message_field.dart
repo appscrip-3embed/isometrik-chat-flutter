@@ -386,8 +386,16 @@ class _ReplyMessage extends StatelessWidget {
                                       .conversation?.chatName.capitalizeFirst ??
                                   '',
                     ),
-                    Text(
-                      messageBody,
+                    IsmChatMentionRichText(
+                      body: messageBody,
+                      style: IsmChatConfig
+                              .chatTheme.chatPageTheme?.textFiledTheme
+                              ?.inputTextStyle ??
+                          controller.replayMessage?.style ??
+                          const TextStyle(),
+                      message: controller.replayMessage,
+                      mentionedUsers:
+                          controller.replayMessage?.mentionedUsers,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),

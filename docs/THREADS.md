@@ -171,33 +171,16 @@ IsmChatProperties.threadProperties = IsmChatThreadProperties(
 A `replyFooterBuilder` owns its tap handling — call
 `IsmChat.i.openThread(message)` (or your own screen) from it.
 
-### Styling — chat page theme + `threadTheme`
-
-**Panel background and composer** use the same sources as the channel chat page
-([`IsmChatChatPageSurface`](../lib/src/res/theme/chat_page_surface.dart)):
-
-- `IsmChatThemeData.chatPageTheme` — `backgroundColor`, `pageDecoration`, and
-  `textFiledTheme` (composer insets, decoration, and field colors)
-- Per-conversation wallpaper on the open chat — `IsmChatPageController.backgroundColor` /
-  `backgroundImage` (when the thread is opened from chat)
-
-Configure those once in your app theme; you do not need a separate thread background.
-
-**Thread-specific chrome** (root card, dividers, footer label, reply typography) uses
-`IsmChatThemeData.threadTheme`:
+### Styling — `IsmChatThemeData.threadTheme`
 
 ```dart
 IsmChatConfig.chatLightTheme = IsmChatThemeData(
   primaryColor: yourPrimary,
-  chatPageTheme: IsmChatPageTheme(
-    backgroundColor: yourChatBackground,
-    textFiledTheme: yourComposerTheme,
-  ),
-  threadTheme: IsmChatThreadTheme.light(),  // optional; cards/dividers only
+  threadTheme: IsmChatThreadTheme.light(),  // or a fully custom instance
 );
 ```
 
-Omit `threadTheme` for SDK light/dark defaults on those thread-only surfaces
+Omit `threadTheme` for SDK light/dark defaults
 ([`IsmChatThemeResolver.threadFromConfig`](../lib/src/res/theme/chat_theme_resolver.dart)).
 The panel's app bar uses your existing `IsmChatHeaderTheme`.
 
