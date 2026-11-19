@@ -437,8 +437,8 @@ mixin IsmChatPageSendMessageCoreMixin {
             bytes = (replyMessage?.parentMessageAttachmentUrl ?? '')
                 .strigToUnit8List;
           }
-          final parentMessageUrl =
-              await _controller.commonController.postMediaUrl(
+          final parentOutcome = await _controller.commonController
+              .postMediaUrlWithSameNameHandling(
             conversationId: textMessage.conversationId ?? '',
             nameWithExtension:
                 _controller.replayMessage?.attachments?.first.name ?? '',
@@ -447,7 +447,7 @@ mixin IsmChatPageSendMessageCoreMixin {
             bytes: bytes ?? Uint8List(0),
             isLoading: false,
           );
-          parentMessageAttachmentUrl = parentMessageUrl?.mediaUrl;
+          parentMessageAttachmentUrl = parentOutcome?.presigned?.mediaUrl;
         } else {
           parentMessageAttachmentUrl = replyMessage?.parentMessageAttachmentUrl;
         }

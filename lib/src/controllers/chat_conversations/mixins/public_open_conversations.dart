@@ -18,7 +18,7 @@ mixin IsmChatConversationsPublicOpenConversationsMixin on GetxController {
       IsmChatConversationType conversationType) async {
     _controller.publicAndOpenConversation.clear();
     _controller.isLoadResponse = false;
-    _controller.showSearchField = false;
+    _controller.userSearchNameController.clear();
     _controller.callApiOrNot = true;
     await _controller.getPublicAndOpenConversation(
       conversationType: conversationType.value,

@@ -13,7 +13,7 @@ class IsmChatEligibleMembersView extends StatelessWidget {
           IsmChatUtility.doLater(() async {
             final controller = Get.find<IsmChatBroadcastController>()
               ..isApiCall = false
-              ..showSearchField = false
+              ..searchMemberController.clear()
               ..selectedUserList.clear()
               ..eligibleMembers.clear();
             await controller.getEligibleMembers(
@@ -23,89 +23,39 @@ class IsmChatEligibleMembersView extends StatelessWidget {
         },
         builder: (controller) => Scaffold(
           appBar: IsmChatAppBar(
-            title: controller.showSearchField
-                ? IsmChatInputField(
-                    fillColor: IsmChatConfig.chatTheme.primaryColor,
-                    controller: controller.searchMemberController,
-                    style: IsmChatStyles.w400White16,
-                    hint: IsmChatStrings.searchUser,
-                    hintStyle: IsmChatStyles.w400White16,
-                    onChanged: (value) {
-                      if (value.isNullOrEmpty) {
-                        controller
-                          ..eligibleMembers = controller
-                              .eligibleMembersduplicate
-                              .map((e) => SelectedMembers(
-                                    isUserSelected: controller.selectedUserList
-                                        .any((d) =>
-                                            d.userId == e.userDetails.userId),
-                                    userDetails: e.userDetails,
-                                    isBlocked: e.isBlocked,
-                                    tagIndex: e.tagIndex,
-                                  ))
-                              .toList()
-                          ..handleList(controller.eligibleMembers);
-                        return;
-                      }
-                      controller.debounce.run(() async {
-                        if (value.length > 4) {
-                          await controller.getEligibleMembers(
-                            groupcastId: groupcastId,
-                            shouldShowLoader: false,
-                            searchTag: value,
-                          );
-                        }
-                      });
-                    },
-                  )
-                : Text(
-                    IsmChatStrings.eligibleMembers,
-                    style: IsmChatConfig
-                            .chatTheme.chatPageHeaderTheme?.titleStyle ??
-                        IsmChatStyles.w600White18,
-                  ),
-            action: [
-              IconButton(
-                  onPressed: () {
-                    controller.showSearchField = !controller.showSearchField;
-                    controller.searchMemberController.clear();
-                    if (!controller.showSearchField &&
-                        controller.eligibleMembersduplicate.isNotEmpty) {
-                      controller
-                        ..eligibleMembers = controller.eligibleMembersduplicate
-                            .map((e) => SelectedMembers(
-                                isUserSelected: controller.selectedUserList.any(
-                                    (d) => d.userId == e.userDetails.userId),
-                                userDetails: e.userDetails,
-                                isBlocked: e.isBlocked,
-                                tagIndex: e.tagIndex))
-                            .toList()
-                        ..handleList(controller.eligibleMembers);
-                    }
-                  },
-                  icon: Icon(
-                    controller.showSearchField
-                        ? Icons.clear_rounded
-                        : Icons.search_rounded,
-                    color: IsmChatConfig
-                            .chatTheme.chatPageHeaderTheme?.iconColor ??
-                        IsmChatColors.whiteColor,
-                  ))
-            ],
+            title: Text(
+              IsmChatStrings.eligibleMembers,
+              style: IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
+                  IsmChatStyles.w600White18,
+            ),
           ),
           body: controller.isApiCall
-              ? IsmChatLoadingDialog()
-              : controller.eligibleMembers.isEmpty
-                  ? Center(
-                      child: IsmIconAndText(
-                        icon: Icons.supervised_user_circle_rounded,
-                        text: IsmChatStrings.boradcastNotFound,
+              ? const IsmChatLoadingDialog()
+              : Column(
+                  children: [
+                    IsmChatUserListSearchBar(
+                      controller: controller.searchMemberController,
+                      onChanged: (value) =>
+                          _onEligibleMemberSearchChanged(
+                        controller,
+                        groupcastId,
+                        value,
                       ),
-                    )
-                  : Column(
-                      children: [
-                        Expanded(
-                          child: AzListWidgtet(
+                      onClear: () =>
+                          _onEligibleMemberSearchClear(controller),
+                    ),
+                    Expanded(
+                      child: controller.eligibleMembers.isEmpty
+                          ? Center(
+                              child: IsmIconAndText(
+                                icon: Icons.supervised_user_circle_rounded,
+                                text: IsmChatStrings.boradcastNotFound,
+                              ),
+                            )
+                          : NotificationListener<ScrollNotification>(
+                              onNotification:
+                                  dismissKeyboardOnPickerScroll,
+                              child: AzListWidgtet(
                             data: controller.eligibleMembers,
                             builderList: controller.eligibleMembers,
                             imageUrl: (data) => data.userDetails.profileUrl,
@@ -129,12 +79,14 @@ class IsmChatEligibleMembersView extends StatelessWidget {
                             },
                             onScollRefresh: () {
                               controller.getEligibleMembers(
-                                  groupcastId: groupcastId,
-                                  shouldShowLoader: false);
+                                groupcastId: groupcastId,
+                                shouldShowLoader: false,
+                              );
                             },
                           ),
-                        ),
-                        if (controller.selectedUserList.isNotEmpty)
+                            ),
+                    ),
+                    if (controller.selectedUserList.isNotEmpty)
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -256,8 +208,56 @@ class IsmChatEligibleMembersView extends StatelessWidget {
                               ],
                             ),
                           ),
-                      ],
-                    ),
+                  ],
+                ),
         ),
       );
+
+  static void _onEligibleMemberSearchChanged(
+    IsmChatBroadcastController controller,
+    String groupcastId,
+    String value,
+  ) {
+    if (value.isNullOrEmpty) {
+      controller
+        ..eligibleMembers = controller.eligibleMembersduplicate
+            .map((e) => SelectedMembers(
+                  isUserSelected: controller.selectedUserList
+                      .any((d) => d.userId == e.userDetails.userId),
+                  userDetails: e.userDetails,
+                  isBlocked: e.isBlocked,
+                  tagIndex: e.tagIndex,
+                ))
+            .toList()
+        ..handleList(controller.eligibleMembers);
+      return;
+    }
+    controller.debounce.run(() async {
+      if (value.length > 4) {
+        await controller.getEligibleMembers(
+          groupcastId: groupcastId,
+          shouldShowLoader: false,
+          searchTag: value,
+        );
+      }
+    });
+  }
+
+  static void _onEligibleMemberSearchClear(
+    IsmChatBroadcastController controller,
+  ) {
+    if (controller.eligibleMembersduplicate.isNotEmpty) {
+      controller
+        ..eligibleMembers = controller.eligibleMembersduplicate
+            .map((e) => SelectedMembers(
+                  isUserSelected: controller.selectedUserList
+                      .any((d) => d.userId == e.userDetails.userId),
+                  userDetails: e.userDetails,
+                  isBlocked: e.isBlocked,
+                  tagIndex: e.tagIndex,
+                ))
+            .toList()
+        ..handleList(controller.eligibleMembers);
+    }
+  }
 }

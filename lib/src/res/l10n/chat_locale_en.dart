@@ -226,4 +226,7 @@ const Map<String, String> kIsmChatLocaleEn = {
   'threadSendFailed': 'Reply not sent. Try again.',
   'threadRetry': 'Retry',
   'threadReplyQueued': "Reply queued — it will send when you're back online.",
+  'sameNameUploadTitle': 'File already in storage',
+  'reshareOlderFile': 'Reshare older file',
+  'uploadACopy': 'Upload a copy',
 };

@@ -1,11 +1,36 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 
-class IsmChatBroadCastView extends StatelessWidget {
+/// Broadcast list (Settings → Broadcast List, or in-app menu).
+///
+/// Uses a [StatefulWidget] shell so the list API always runs when the route
+/// opens. Relying only on [GetX] `initState` missed loads when
+/// [IsmChatBroadcastController] was already registered (e.g. from broadcast chat).
+class IsmChatBroadCastView extends StatefulWidget {
   const IsmChatBroadCastView({super.key});
+
+  @override
+  State<IsmChatBroadCastView> createState() => _IsmChatBroadCastViewState();
+}
+
+class _IsmChatBroadCastViewState extends State<IsmChatBroadCastView> {
+  @override
+  void initState() {
+    super.initState();
+    IsmChatUtility.doLater(_loadBroadcastList);
+  }
+
+  Future<void> _loadBroadcastList() async {
+    if (!Get.isRegistered<IsmChatBroadcastController>()) {
+      IsmChatBroadcastBinding().dependencies();
+    }
+    await Get.find<IsmChatBroadcastController>().openBroadcastList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,9 +38,6 @@ class IsmChatBroadCastView extends StatelessWidget {
       IsmChatBroadcastBinding().dependencies();
     }
     return GetX<IsmChatBroadcastController>(
-      initState: (state) {
-        Get.find<IsmChatBroadcastController>().getBroadCast();
-      },
       builder: (controller) => Scaffold(
         appBar: IsmChatAppBar(
           height: IsmChatDimens.fiftyFive,
@@ -70,7 +92,6 @@ class IsmChatBroadCastView extends StatelessWidget {
                                   ?.map((e) => e.memberName)
                                   .toList() ??
                               [];
-                          // Show only first 3 member names
                           var members = allMembers.take(3).toList();
                           var remainingCount =
                               allMembers.length > 3 ? allMembers.length - 3 : 0;
@@ -92,7 +113,6 @@ class IsmChatBroadCastView extends StatelessWidget {
                                         ),
                                       ),
                                     );
-                                    // Refresh broadcast list when returning from edit
                                     await controller.getBroadCast(
                                       isShowLoader: false,
                                     );

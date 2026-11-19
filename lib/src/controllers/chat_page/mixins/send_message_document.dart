@@ -15,6 +15,25 @@ mixin IsmChatPageSendMessageDocumentMixin {
   /// Gets the controller instance.
   IsmChatPageController get _controller => this as IsmChatPageController;
 
+  /// file_picker 13+ loads bytes via [PlatformFile.readAsBytes] (no `withData`).
+  Future<Uint8List> _pickedFileBytes(PlatformFile file) => file.readAsBytes();
+
+  Future<int> _pickedFileByteLength(PlatformFile file) async {
+    final known = file.lengthSync();
+    if (known != null) {
+      return known;
+    }
+    if (!kIsWeb && file.path != null && file.path!.isNotEmpty) {
+      return File(file.path!).length();
+    }
+    final length = await file.length();
+    if (length != null) {
+      return length;
+    }
+    final bytes = await _pickedFileBytes(file);
+    return bytes.length;
+  }
+
   /// Sends a document message.
   ///
   /// [conversationId] - ID of the conversation
@@ -54,15 +73,13 @@ mixin IsmChatPageSendMessageDocumentMixin {
       return;
     }
 
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
+    final picked = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'],
-      withData: true,
     );
 
-    if (result?.files.isNotEmpty ?? false) {
-      final files = IsmChatUtility.clampOutboundPickerSelection(result!.files);
+    if (picked.isNotEmpty) {
+      final files = IsmChatUtility.clampOutboundPickerSelection(picked);
       if (files.length == 1) {
         await _sendPickedDocumentFile(
           conversationId: resolvedConversationId,
@@ -93,14 +110,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
     }
 
     for (final file in files) {
-      final bytes = file.bytes;
-      var fileBytes = bytes?.length ?? 0;
-      if (fileBytes == 0 &&
-          !kIsWeb &&
-          file.path != null &&
-          file.path!.isNotEmpty) {
-        fileBytes = await File(file.path!).length();
-      }
+      final fileBytes = await _pickedFileByteLength(file);
       final allowed =
           await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
         fileBytes: fileBytes,
@@ -114,19 +124,19 @@ mixin IsmChatPageSendMessageDocumentMixin {
     final localAttachments = <AttachmentModel>[];
     for (var i = 0; i < files.length; i++) {
       final file = files[i];
-      final bytes = file.bytes;
+      final bytes = await _pickedFileBytes(file);
       final mediaId = '${sentAt}_$i';
       localAttachments.add(
         AttachmentModel(
           attachmentType: IsmChatMediaType.file,
-          size: bytes?.length,
+          size: bytes.length,
           name: file.name,
           // Real MIME, not the bare extension. Web reads mimeType with mediaType 3.
           mimeType: mimeTypeForAttachmentExtension(
             file.extension,
             mediaType: IsmChatMediaType.file,
           ),
-          mediaUrl: kIsWeb ? (bytes).toString() : file.path,
+          mediaUrl: kIsWeb ? bytes.toString() : file.path,
           mediaId: mediaId,
           extension: file.extension,
         ),
@@ -242,8 +252,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
 
   /// True for a picked PDF. Word and Excel must not be opened with pdfx.
   bool _pickedDocumentIsPdf(PlatformFile file) {
-    final extension =
-        (file.extension ?? '').toLowerCase().replaceAll('.', '');
+    final extension = (file.extension ?? '').toLowerCase().replaceAll('.', '');
     if (extension.isNotEmpty) return extension == 'pdf';
     return file.name.toLowerCase().endsWith('.pdf');
   }
@@ -270,9 +279,8 @@ mixin IsmChatPageSendMessageDocumentMixin {
     } else {
       img.fill(
         canvas,
-        color: isExcel
-            ? img.ColorRgb8(33, 115, 70)
-            : img.ColorRgb8(43, 87, 154),
+        color:
+            isExcel ? img.ColorRgb8(33, 115, 70) : img.ColorRgb8(43, 87, 154),
       );
       // x and y omitted so the label is centered.
       img.drawString(
@@ -316,7 +324,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
     required String mediaId,
   }) async {
     try {
-      final bytes = file.bytes ?? Uint8List(0);
+      final bytes = await _pickedFileBytes(file);
       final bytesForUpload = Uint8List.fromList(bytes);
       final isPdf = _pickedDocumentIsPdf(file);
       // pdfx throws on docx/xlsx. Office files get a JPEG, same role as
@@ -330,6 +338,9 @@ mixin IsmChatPageSendMessageDocumentMixin {
       final nameWithExtension = file.name;
 
       PresignedUrlModel? presignedUrlModel;
+      SameNameUploadOutcome? mediaOutcome;
+      var forceUploadOnMessage = false;
+      final presignConversationType = _controller.isBroadcast ? 1 : 0;
       if (_controller.isBroadcast) {
         presignedUrlModel = await _controller.commonController.getPresignedUrl(
           isLoading: false,
@@ -339,38 +350,55 @@ mixin IsmChatPageSendMessageDocumentMixin {
           bytes: bytesForUpload,
         );
       } else {
-        presignedUrlModel = await _controller.commonController.postMediaUrl(
+        final outcome =
+            await _controller.commonController.postMediaUrlWithSameNameHandling(
           conversationId: conversationId,
           nameWithExtension: nameWithExtension,
           mediaType: IsmChatMediaType.file.value,
           mediaId: mediaId,
           bytes: bytesForUpload,
           isLoading: false,
+          conversationType: presignConversationType,
         );
+        if (outcome == null || outcome.cancelled) {
+          return null;
+        }
+        mediaOutcome = outcome;
+        presignedUrlModel = outcome.presigned;
+        forceUploadOnMessage = outcome.forceUploadOnMessage;
       }
 
       var mediaUrlPath = presignedUrlModel?.mediaUrl ?? '';
-      final resolvedMediaId =
-          _controller.isBroadcast ? mediaId : presignedUrlModel?.mediaId ?? '';
+      final resolvedMediaId = _controller.isBroadcast
+          ? mediaId
+          : mediaOutcome?.resolveOutgoingMediaId(clientMediaId: mediaId) ??
+              presignedUrlModel?.mediaId ??
+              '';
 
-      if (mediaUrlPath.isEmpty) {
+      if (mediaUrlPath.isEmpty || resolvedMediaId.isEmpty) {
         return null;
       }
 
-      final mediaResponse =
-          await _controller.commonController.updatePresignedUrl(
-        presignedUrl: _controller.isBroadcast
-            ? presignedUrlModel?.presignedUrl
-            : presignedUrlModel?.mediaPresignedUrl,
-        bytes: bytesForUpload,
-        isLoading: false,
-      );
-      if (mediaResponse != 200) {
-        return null;
+      if (_controller.isBroadcast) {
+        final mediaResponse =
+            await _controller.commonController.updatePresignedUrl(
+          presignedUrl: presignedUrlModel?.presignedUrl,
+          bytes: bytesForUpload,
+          isLoading: false,
+        );
+        if (mediaResponse != 200) {
+          return null;
+        }
       }
 
       var thumbnailUrlPath = '';
       if (thumbnailBytes.isNotEmpty) {
+        if (!_controller.isBroadcast &&
+            mediaOutcome != null &&
+            mediaOutcome.isReshareExistingFile &&
+            (presignedUrlModel?.thumbnailUrl?.isNotEmpty ?? false)) {
+          thumbnailUrlPath = presignedUrlModel!.thumbnailUrl!;
+        } else {
         PresignedUrlModel? thumbPresigned;
         if (_controller.isBroadcast) {
           thumbPresigned = await _controller.commonController.getPresignedUrl(
@@ -382,7 +410,8 @@ mixin IsmChatPageSendMessageDocumentMixin {
           );
           thumbnailUrlPath = thumbPresigned?.mediaUrl ?? '';
         } else {
-          thumbPresigned = await _controller.commonController.postMediaUrl(
+          final thumbOutcome = await _controller.commonController
+              .postMediaUrlWithSameNameHandling(
             conversationId: conversationId,
             nameWithExtension: thumbnailNameWithExtension,
             mediaType: IsmChatMediaType.image.value,
@@ -390,18 +419,22 @@ mixin IsmChatPageSendMessageDocumentMixin {
             bytes: thumbnailBytes,
             isLoading: false,
             isUpdateThumbnail: true,
+            conversationType: presignConversationType,
           );
+          if (thumbOutcome == null || thumbOutcome.cancelled) {
+            return null;
+          }
+          thumbPresigned = thumbOutcome.presigned;
           thumbnailUrlPath = thumbPresigned?.thumbnailUrl ?? '';
         }
 
-        if (thumbnailUrlPath.isNotEmpty) {
+        if (thumbnailUrlPath.isNotEmpty && _controller.isBroadcast) {
           await _controller.commonController.updatePresignedUrl(
-            presignedUrl: _controller.isBroadcast
-                ? thumbPresigned?.presignedUrl
-                : thumbPresigned?.thumbnailPresignedUrl,
+            presignedUrl: thumbPresigned?.presignedUrl,
             bytes: thumbnailBytes,
             isLoading: false,
           );
+        }
         }
       }
 
@@ -414,9 +447,8 @@ mixin IsmChatPageSendMessageDocumentMixin {
       return {
         'mediaId': resolvedMediaId,
         'mediaUrl': mediaUrlPath,
-        'thumbnailUrl': thumbnailUrlPath.isNotEmpty
-            ? thumbnailUrlPath
-            : mediaUrlPath,
+        'thumbnailUrl':
+            thumbnailUrlPath.isNotEmpty ? thumbnailUrlPath : mediaUrlPath,
         'mediaType': IsmChatMediaType.file.value,
         'nameWithExtension': nameWithExtension,
         'name': nameWithExtension,
@@ -428,6 +460,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
         'size': bytes.length,
         // 3 = doc. 0 is image and must not be sent for a document.
         'attachmentType': IsmChatMediaType.file.value,
+        if (forceUploadOnMessage) 'forceUpload': true,
       };
     } catch (e, st) {
       IsmChatLog.error(e, st);
@@ -440,14 +473,8 @@ mixin IsmChatPageSendMessageDocumentMixin {
     required String conversationId,
     required PlatformFile file,
   }) async {
-    final bytes = file.bytes;
-    var fileBytes = bytes?.length ?? 0;
-    if (fileBytes == 0 &&
-        !kIsWeb &&
-        file.path != null &&
-        file.path!.isNotEmpty) {
-      fileBytes = await File(file.path!).length();
-    }
+    final bytes = await _pickedFileBytes(file);
+    final fileBytes = bytes.length;
     final allowed = await IsmChatStorageQuotaGuard.ensureAttachmentSizeAllowed(
       fileBytes: fileBytes,
     );
@@ -459,11 +486,11 @@ mixin IsmChatPageSendMessageDocumentMixin {
     final pdfThumbnail = isPdf
         ? await _renderPdfPageThumbnail(
             file,
-            Uint8List.fromList(bytes ?? []),
+            Uint8List.fromList(bytes),
           )
         : null;
-    final thumbnailBytes =
-        pdfThumbnail?.bytes ?? (isPdf ? null : _officeDocumentThumbnailJpeg(file));
+    final thumbnailBytes = pdfThumbnail?.bytes ??
+        (isPdf ? null : _officeDocumentThumbnailJpeg(file));
     final thumbnailNameWithExtension =
         pdfThumbnail?.name ?? '$mediaId-thumb.jpg';
     final thumbnailMediaId = mediaId;
@@ -480,13 +507,13 @@ mixin IsmChatPageSendMessageDocumentMixin {
         AttachmentModel(
           attachmentType: IsmChatMediaType.file,
           thumbnailUrl: thumbnailBytes?.toString(),
-          size: bytes?.length,
+          size: bytes.length,
           name: nameWithExtension,
           mimeType: mimeTypeForAttachmentExtension(
             file.extension,
             mediaType: IsmChatMediaType.file,
           ),
-          mediaUrl: kIsWeb ? (bytes).toString() : file.path,
+          mediaUrl: kIsWeb ? bytes.toString() : file.path,
           mediaId: mediaId,
           extension: file.extension,
         )
@@ -550,7 +577,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
     // Note: ismPostMediaUrl is provided by send_message_media mixin
     await _controller.ismPostMediaUrl(
       imageAndFile: false,
-      bytes: bytes ?? Uint8List(0),
+      bytes: bytes,
       createdAt: sentAt,
       ismChatChatMessageModel: documentMessage,
       mediaId: mediaId,

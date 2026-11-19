@@ -65,6 +65,28 @@ class IsmChatCommonController extends GetxController {
   /// * `isUpdateThumbnail`: A boolean indicating whether to update the thumbnail.
   ///
   /// Returns a future that resolves to a PresignedUrlModel instance.
+  /// Presign (+ PUT) with duplicate-name handling when storage quota is on.
+  Future<SameNameUploadOutcome?> postMediaUrlWithSameNameHandling({
+    required String conversationId,
+    required String nameWithExtension,
+    required int mediaType,
+    required String mediaId,
+    required Uint8List bytes,
+    required bool isLoading,
+    bool isUpdateThumbnail = false,
+    int conversationType = 0,
+  }) async =>
+      viewModel.postMediaUrlWithSameNameHandling(
+        conversationId: conversationId,
+        nameWithExtension: nameWithExtension,
+        mediaType: mediaType,
+        mediaId: mediaId,
+        isLoading: isLoading,
+        bytes: bytes,
+        isUpdateThumbnail: isUpdateThumbnail,
+        conversationType: conversationType,
+      );
+
   Future<PresignedUrlModel?> postMediaUrl({
     required String conversationId,
     required String nameWithExtension,
@@ -73,8 +95,9 @@ class IsmChatCommonController extends GetxController {
     required Uint8List bytes,
     required bool isLoading,
     bool isUpdateThumbnail = false,
+    int conversationType = 0,
   }) async =>
-      await viewModel.postMediaUrl(
+      viewModel.postMediaUrl(
         conversationId: conversationId,
         nameWithExtension: nameWithExtension,
         mediaType: mediaType,
@@ -82,6 +105,7 @@ class IsmChatCommonController extends GetxController {
         isLoading: isLoading,
         bytes: bytes,
         isUpdateThumbnail: isUpdateThumbnail,
+        conversationType: conversationType,
       );
 
   /// Sorts a list of messages.

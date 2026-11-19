@@ -291,4 +291,7 @@ class IsmChatStrings {
   /// Shown when a thread reply could not reach the server and was queued for
   /// retry (offline send).
   static String get threadReplyQueued => IsmChatL10n.get('threadReplyQueued');
+  static String get sameNameUploadTitle => IsmChatL10n.get('sameNameUploadTitle');
+  static String get reshareOlderFile => IsmChatL10n.get('reshareOlderFile');
+  static String get uploadACopy => IsmChatL10n.get('uploadACopy');
 }

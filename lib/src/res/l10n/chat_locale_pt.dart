@@ -228,4 +228,7 @@ const Map<String, String> kIsmChatLocalePt = {
   'threadRetry': 'Tentar novamente',
   'threadReplyQueued':
       'Resposta em fila — será enviada quando voltar a ligação.',
+  'sameNameUploadTitle': 'Arquivo já no armazenamento',
+  'reshareOlderFile': 'Reenviar arquivo anterior',
+  'uploadACopy': 'Enviar uma cópia',
 };

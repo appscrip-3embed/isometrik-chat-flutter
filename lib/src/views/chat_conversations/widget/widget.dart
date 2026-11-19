@@ -10,3 +10,4 @@ export 'open_conversation.dart';
 export 'public_conversation.dart';
 export 'search_conversations.dart';
 export 'user_info.dart';
+export 'user_list_search_bar.dart';

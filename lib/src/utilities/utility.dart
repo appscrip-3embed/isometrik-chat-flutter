@@ -861,6 +861,87 @@ class IsmChatUtility {
     await Gal.putVideo(path, album: albumName ?? 'IsmChat');
   }
 
+  /// iOS [image_picker] copies each gallery pick to a unique `image_picker_<uuid>`
+  /// temp file — same photo, different name every pick.
+  static final RegExp _iosImagePickerEphemeralName = RegExp(
+    r'^image_picker_.+\.(jpe?g|png|heic|webp|mp4|mov)$',
+    caseSensitive: false,
+  );
+
+  static final RegExp _contentAddressedPresignName = RegExp(
+    r'^img_[a-f0-9]{16}\.[a-z0-9]+$',
+    caseSensitive: false,
+  );
+
+  /// True when the picker supplied a one-off temp name (not a stable gallery name).
+  static bool isEphemeralPickerFileName(String? name) {
+    final trimmed = name?.trim() ?? '';
+    if (trimmed.isEmpty) return false;
+    return _iosImagePickerEphemeralName.hasMatch(trimmed);
+  }
+
+  /// Keeps user-facing names (e.g. `vacation.jpg`) after crop; recomputes hash names.
+  static bool shouldPreservePresignNameOnGalleryEdit(String? existing) {
+    final trimmed = existing?.trim() ?? '';
+    if (trimmed.isEmpty) return false;
+    if (isEphemeralPickerFileName(trimmed)) return false;
+    if (_contentAddressedPresignName.hasMatch(trimmed)) return false;
+    return true;
+  }
+
+  /// Presign / same-name storage key: prefer [pickerName] (`XFile.name`), not a
+  /// temp path or timestamp. See [IsmChatSameNameAttachmentUpload].
+  ///
+  /// When [fileBytes] is set and the picker name is ephemeral, uses
+  /// `img_<sha256-prefix>.<ext>` so the same bytes get the same presign name.
+  static String resolveOutboundPresignFileName({
+    String? pickerName,
+    String? path,
+    String? extension,
+    Uint8List? fileBytes,
+  }) {
+    final trimmed = pickerName?.trim() ?? '';
+    final pathTrimmed = path?.trim() ?? '';
+    final fromPath =
+        pathTrimmed.isNotEmpty ? basename(pathTrimmed) : '';
+    final effective = trimmed.isNotEmpty ? trimmed : fromPath;
+    final ext = _presignExtensionFrom(
+      effectiveName: effective,
+      fallbackExtension: extension,
+    );
+
+    if (fileBytes != null &&
+        fileBytes.isNotEmpty &&
+        isEphemeralPickerFileName(effective)) {
+      return _contentAddressedPresignFileName(fileBytes, ext);
+    }
+
+    if (trimmed.isNotEmpty) return trimmed;
+    if (fromPath.isNotEmpty) return fromPath;
+
+    final extOnly = extension?.trim().toLowerCase() ?? '';
+    return extOnly.isNotEmpty ? 'media_$extOnly' : 'media';
+  }
+
+  static String _presignExtensionFrom({
+    required String effectiveName,
+    String? fallbackExtension,
+  }) {
+    if (effectiveName.contains('.')) {
+      return effectiveName.split('.').last.toLowerCase();
+    }
+    return fallbackExtension?.trim().toLowerCase() ?? '';
+  }
+
+  static String _contentAddressedPresignFileName(
+    Uint8List bytes,
+    String extension,
+  ) {
+    final digest = sha256.convert(bytes).toString().substring(0, 16);
+    final ext = extension.isNotEmpty ? extension : 'jpg';
+    return 'img_$digest.$ext';
+  }
+
   /// Resolves a stable on-disk file name from attachment metadata or URL.
   static String resolveSaveFileName({
     required String fileName,
@@ -1016,7 +1097,11 @@ class IsmChatUtility {
     return null;
   }
 
-  static Widget buildSusWidget(String susTag) => Container(
+  static Widget buildSusWidget(
+    String susTag, {
+    bool showTrailingDivider = true,
+  }) =>
+      Container(
         padding: IsmChatDimens.edgeInsets10_0,
         height: IsmChatDimens.forty,
         width: double.infinity,
@@ -1030,9 +1115,10 @@ class IsmChatUtility {
                     textScaler: const TextScaler.linear(1.5),
                     style: IsmChatStyles.w600Black14,
                   ),
-                  if (!IsmChatResponsive.isWeb(
-                      IsmChatConfig.kNavigatorKey.currentContext ??
-                          IsmChatConfig.context))
+                  if (showTrailingDivider &&
+                      !IsmChatResponsive.isWeb(
+                          IsmChatConfig.kNavigatorKey.currentContext ??
+                              IsmChatConfig.context))
                     SizedBox(
                         width: IsmChatDimens.percentWidth(.8),
                         child: Divider(

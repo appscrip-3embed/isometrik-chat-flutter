@@ -201,8 +201,9 @@ class _IsmChatConverstaionInfoViewState
                 controller.conversation?.isGroup ?? false
                     ? IsmChatStrings.groupInfo
                     : IsmChatStrings.profileInfo,
-                style:
-                    headerTheme?.titleStyle ?? groupTheme.sectionTitleTextStyle,
+                // App bar uses header/primary background — not [groupTheme]
+                // body colors. Match other [IsmChatAppBar] screens (e.g. user_info).
+                style: headerTheme?.titleStyle ?? IsmChatStyles.w600White18,
               ),
               action: [
                 if (controller.conversation?.isGroup ?? false)

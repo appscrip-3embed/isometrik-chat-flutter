@@ -230,4 +230,7 @@ const Map<String, String> kIsmChatLocaleFr = {
   'threadRetry': 'Réessayer',
   'threadReplyQueued':
       'Réponse en file — elle sera envoyée dès le retour de la connexion.',
+  'sameNameUploadTitle': 'Fichier déjà dans le stockage',
+  'reshareOlderFile': 'Partager l’ancien fichier',
+  'uploadACopy': 'Téléverser une copie',
 };
