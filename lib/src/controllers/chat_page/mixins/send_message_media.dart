@@ -452,6 +452,13 @@ mixin IsmChatPageSendMessageMediaMixin {
             ? thumbnailBytes.toString()
             : localPath;
 
+    final pixelSize = mediaType == IsmChatMediaType.image
+        ? IsmChatImageAttachmentDimensions.forOutboundPick(
+            bytes: bytes.isNotEmpty ? bytes : null,
+            localPath: localPath,
+          )
+        : null;
+
     return AttachmentModel(
       attachmentType: mediaType,
       thumbnailUrl: thumbnailUrl,
@@ -465,6 +472,8 @@ mixin IsmChatPageSendMessageMediaMixin {
       mediaId: mediaId,
       bytes: bytes,
       extension: extension,
+      mediaWidth: pixelSize?.width,
+      mediaHeight: pixelSize?.height,
     );
   }
 
@@ -605,6 +614,8 @@ mixin IsmChatPageSendMessageMediaMixin {
           : fallback.extension,
       name: (parsed.name?.isNotEmpty == true) ? parsed.name : fallback.name,
       attachmentType: parsed.attachmentType ?? fallback.attachmentType,
+      mediaWidth: parsed.mediaWidth ?? fallback.mediaWidth,
+      mediaHeight: parsed.mediaHeight ?? fallback.mediaHeight,
     );
   }
 
@@ -831,6 +842,10 @@ mixin IsmChatPageSendMessageMediaMixin {
       caption,
       mediaType: IsmChatMediaType.image,
     );
+    final pixelSize = IsmChatImageAttachmentDimensions.forOutboundPick(
+      bytes: webMediaModel.platformFile.bytes,
+      localPath: kIsWeb ? null : webMediaModel.platformFile.path,
+    );
     final imageMessage = IsmChatMessageModel(
       body: body,
       conversationId: conversationId,
@@ -849,6 +864,8 @@ mixin IsmChatPageSendMessageMediaMixin {
           mediaId: mediaId,
           bytes: webMediaModel.platformFile.bytes,
           extension: extension,
+          mediaWidth: pixelSize?.width,
+          mediaHeight: pixelSize?.height,
         )
       ],
       deliveredToAll: false,
@@ -1282,17 +1299,19 @@ mixin IsmChatPageSendMessageMediaMixin {
           mediaUrl: mediaUrlPath,
           thumbnailUrl: resolvedThumbnail,
         );
+        final prior = ismChatChatMessageModel.attachments?.firstOrNull;
         final uploadedAttachment = AttachmentModel(
           thumbnailUrl: resolvedThumbnail,
-          size: ismChatChatMessageModel.attachments?.first.size ?? 0,
-          name: ismChatChatMessageModel.attachments?.first.name,
-          mimeType: ismChatChatMessageModel.attachments?.first.mimeType,
+          size: prior?.size ?? 0,
+          name: prior?.name,
+          mimeType: prior?.mimeType,
           mediaUrl: mediaUrlPath,
           mediaId: mediaId,
-          extension: ismChatChatMessageModel.attachments?.first.extension,
-          attachmentType:
-              ismChatChatMessageModel.attachments?.first.attachmentType,
+          extension: prior?.extension,
+          attachmentType: prior?.attachmentType,
           stillUrl: mediaUrlPath,
+          mediaWidth: prior?.mediaWidth,
+          mediaHeight: prior?.mediaHeight,
           forceUpload: forceUploadOnMessage ? true : null,
         );
         final attachment = <Map<String, dynamic>>[
@@ -1356,6 +1375,9 @@ mixin IsmChatPageSendMessageMediaMixin {
                 ? thumbnailUrl
                 : (fallbackThumbnailToMedia ? mediaUrl : ''),
             stillUrl: thumbnailUrl.isNotEmpty ? thumbnailUrl : mediaUrl,
+            mediaWidth: attachment.mediaWidth,
+            mediaHeight: attachment.mediaHeight,
+            bytes: attachment.bytes,
           ),
         ]
         ..isUploading = false;

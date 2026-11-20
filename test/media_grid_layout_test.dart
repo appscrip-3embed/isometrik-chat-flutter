@@ -60,5 +60,51 @@ void main() {
         IsmChatMediaGridLayout.baseAspectRatio,
       );
     });
+
+    group('constrainedMediaDisplaySize', () {
+      const maxWidth = 240.0;
+      const maxHeight = 240.0;
+
+      test('unknown aspect ratio uses 1:1 square within max box', () {
+        final size = IsmChatMediaGridLayout.constrainedMediaDisplaySize(
+          maxWidth: maxWidth,
+          maxHeight: maxHeight,
+        );
+        expect(size.width, maxHeight);
+        expect(size.height, maxHeight);
+      });
+
+      test('portrait clamps height to maxHeight', () {
+        const aspectRatio = 0.75;
+        final size = IsmChatMediaGridLayout.constrainedMediaDisplaySize(
+          maxWidth: maxWidth,
+          maxHeight: maxHeight,
+          aspectRatio: aspectRatio,
+        );
+        expect(size.height, maxHeight);
+        expect(size.width, closeTo(maxHeight * aspectRatio, 0.001));
+      });
+
+      test('landscape fills maxWidth when height fits', () {
+        const aspectRatio = 1.5;
+        final size = IsmChatMediaGridLayout.constrainedMediaDisplaySize(
+          maxWidth: maxWidth,
+          maxHeight: maxHeight,
+          aspectRatio: aspectRatio,
+        );
+        expect(size.width, maxWidth);
+        expect(size.height, closeTo(maxWidth / aspectRatio, 0.001));
+      });
+
+      test('tall image height never exceeds maxHeight', () {
+        final size = IsmChatMediaGridLayout.constrainedMediaDisplaySize(
+          maxWidth: maxWidth,
+          maxHeight: maxHeight,
+          aspectRatio: 0.5,
+        );
+        expect(size.height, lessThanOrEqualTo(maxHeight));
+        expect(size.width, lessThanOrEqualTo(maxWidth));
+      });
+    });
   });
 }
