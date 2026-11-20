@@ -35,7 +35,7 @@ class AttachmentModel {
                 (map['size'] as double? ?? 0).toString(),
               )
             : map['size'] as int? ?? 0,
-        name: map['name'] as String? ?? '',
+        name: _parseAttachmentName(map),
         mimeType: map['mimeType'] as String? ?? '',
         mediaUrl: map['mediaUrl'] as String? ?? '',
         mediaId: map['mediaId'] as String? ?? '',
@@ -96,6 +96,33 @@ class AttachmentModel {
   /// When `true`, send on `POST /chat/message` after uploading a new copy of an
   /// existing file name (storage quota). Omit on reshare and first-time uploads.
   bool? forceUpload;
+
+  /// File name from API maps (`name` or `nameWithExtension`).
+  static String _parseAttachmentName(Map<String, dynamic> map) {
+    final name = (map['name'] as String? ?? '').trim();
+    if (name.isNotEmpty) return name;
+    return (map['nameWithExtension'] as String? ?? '').trim();
+  }
+
+  /// Label for document bubbles when [name] is blank after parsing.
+  ///
+  /// Thread replies often keep the real file name on [messageBody] (`report.pdf`)
+  /// while wire `customType` is `AttachmentMessage:Reply`.
+  String resolvedFileName({String? messageBody}) {
+    final direct = (name ?? '').trim();
+    if (direct.isNotEmpty) return direct;
+    final body = (messageBody ?? '').trim();
+    if (body.isNotEmpty && IsmChatUtility.looksLikeDocumentFileName(body)) {
+      return body;
+    }
+    final url = (mediaUrl ?? '').trim();
+    if (url.isNotEmpty && url.isValidUrl) {
+      final fromUrl =
+          IsmChatUtility.resolveSaveFileName(fileName: '', url: url);
+      if (fromUrl.trim().isNotEmpty) return fromUrl.trim();
+    }
+    return '';
+  }
 
   /// Parses width/height that may arrive as int, double, or string.
   static int? _parseDimension(dynamic value) {

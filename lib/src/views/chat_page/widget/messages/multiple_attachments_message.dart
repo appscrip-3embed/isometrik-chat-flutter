@@ -225,8 +225,8 @@ class _DocumentAttachmentRow extends StatelessWidget {
               IsmChatDimens.boxWidth4,
               Flexible(
                 child: Text(
-                  attachment.name ?? '',
-                  style: message.style,
+                  attachment.resolvedFileName(messageBody: message.body),
+                  style: message.fileAttachmentNameStyle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),

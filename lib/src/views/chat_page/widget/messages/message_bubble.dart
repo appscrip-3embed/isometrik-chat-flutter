@@ -63,6 +63,35 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  /// Theme / default width limits for the decorated bubble shell.
+  ///
+  /// Reply messages use [minWidth] 0 so short quotes shrink-wrap; other types
+  /// keep the theme minimum (e.g. 25% on mobile in host apps).
+  BoxConstraints _messageBubbleConstraints(BuildContext context) {
+    if (showMessageInCenter) {
+      return BoxConstraints(
+        maxWidth: context.width * .8,
+        minWidth: context.width * .1,
+      );
+    }
+
+    final base = IsmChatConfig.chatTheme.chatPageTheme?.messageConstraints
+            ?.messageConstraints ??
+        BoxConstraints(
+          maxWidth: (IsmChatResponsive.isWeb(context))
+              ? context.width * .25
+              : context.width * .6,
+          minWidth: IsmChatResponsive.isWeb(context)
+              ? context.width * .05
+              : context.width * .25,
+        );
+
+    if (_message.customType == IsmChatCustomMessageType.reply) {
+      return base.copyWith(minWidth: 0);
+    }
+    return base;
+  }
+
   /// Gets the bottom position for time/status indicator
   /// Adjusts position when grid message has caption to avoid overlap
   double _getTimeBottomPosition(IsmChatPageController controller) {
@@ -115,18 +144,7 @@ class MessageBubble extends StatelessWidget {
           : null,
       alignment:
           _message.sentByMe ? Alignment.centerRight : Alignment.centerLeft,
-      constraints: showMessageInCenter
-          ? BoxConstraints(
-              maxWidth: context.width * .8,
-              minWidth: context.width * .1,
-            )
-          : IsmChatConfig.chatTheme.chatPageTheme?.messageConstraints
-                  ?.messageConstraints ??
-              BoxConstraints(
-                maxWidth: IsmChatResponsive.isWeb(context)
-                    ? context.width * .25
-                    : context.width * .6,
-              ),
+      constraints: _messageBubbleConstraints(context),
       child: BlurFilter.widget(
         isBlured: data?.shouldBlured ?? false,
         sigmaX: data?.sigmaX ?? 3,
@@ -146,21 +164,7 @@ class MessageBubble extends StatelessWidget {
             ? IsmChatDimens.edgeInsetsB25
             : null,
         padding: showMessageInCenter ? IsmChatDimens.edgeInsets4 : null,
-        constraints: showMessageInCenter
-            ? BoxConstraints(
-                maxWidth: context.width * .8,
-                minWidth: context.width * .1,
-              )
-            : IsmChatConfig.chatTheme.chatPageTheme?.messageConstraints
-                    ?.messageConstraints ??
-                BoxConstraints(
-                  maxWidth: (IsmChatResponsive.isWeb(context))
-                      ? context.width * .25
-                      : context.width * .6,
-                  minWidth: IsmChatResponsive.isWeb(context)
-                      ? context.width * .05
-                      : context.width * .25,
-                ),
+        constraints: _messageBubbleConstraints(context),
         decoration: showMessageInCenter || _message.isStickerMessage
             ? null
             : BoxDecoration(
@@ -182,6 +186,7 @@ class MessageBubble extends StatelessWidget {
                         ),
               ),
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             SingleChildScrollView(
               padding: !showMessageInCenter

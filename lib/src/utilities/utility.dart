@@ -238,18 +238,19 @@ class IsmChatUtility {
     final name = (attachmentName ?? '').trim();
     final notification = (notificationBody ?? '').trim();
     final isFileName = content.isNotEmpty &&
-        (content == name || _looksLikeDocumentFileName(content));
+        (content == name || looksLikeDocumentFileName(content));
     if (!isFileName) {
       if (content.isNotEmpty) return content;
       if (notification.isNotEmpty &&
-          !_looksLikeDocumentFileName(notification)) {
+          !looksLikeDocumentFileName(notification)) {
         return notification;
       }
     }
     return IsmChatStrings.document;
   }
 
-  static bool _looksLikeDocumentFileName(String value) {
+  /// Whether [value] looks like a document file name (e.g. `report.pdf`).
+  static bool looksLikeDocumentFileName(String value) {
     final lower = value.trim().toLowerCase();
     const extensions = <String>[
       '.pdf',
