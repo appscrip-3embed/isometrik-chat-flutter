@@ -9,10 +9,25 @@ part of '../isometrik_chat_flutter.dart';
 ///
 /// Everything here is inert while [IsmChatConfig.threadsEnabled] is `false`.
 mixin IsmChatDelegateThreadsMixin {
+  /// While non-null, a thread panel route/dialog is on screen (awaiting pop).
+  Future<void>? _threadPanelPresentation;
+
+  /// Root id for an [openThread] call still running before presentation starts.
+  /// Absorbs rapid double-taps on "N replies" / "View thread" before [goToRoute].
+  String? _threadPanelOpeningId;
+
   /// The thread controller, registering it first when needed.
   IsmChatThreadController get _threadController {
     IsmChatThreadBinding().dependencies();
     return Get.find<IsmChatThreadController>();
+  }
+
+  /// True when [openThread] should not push another panel for [threadRootId].
+  bool _shouldSkipThreadPanelNavigation(String threadRootId) {
+    if (_threadPanelOpeningId == threadRootId) return true;
+    if (_threadPanelPresentation == null) return false;
+    return Get.isRegistered<IsmChatThreadController>() &&
+        Get.find<IsmChatThreadController>().threadRootId == threadRootId;
   }
 
   /// Whether the Slack-style thread interface is on.
@@ -60,28 +75,43 @@ mixin IsmChatDelegateThreadsMixin {
     final panelRoot =
         IsmChatThreadCoordinator.resolveThreadPanelRoot(message, timeline);
     if (!IsmChatThreadCoordinator.canOpenThread(panelRoot)) return;
-    IsmChatThreadBinding().dependencies();
-    final resolvedConversation = conversation ??
-        (IsmChatUtility.chatPageControllerRegistered
-            ? IsmChatUtility.chatPageController.conversation
-            : null);
-    await _threadController.openThread(
-      root: panelRoot,
-      conversation: resolvedConversation,
-    );
-    final view = IsmChatThreadView(
-      rootMessage: panelRoot,
-      conversation: resolvedConversation,
-    );
-    final context =
-        IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context;
-    if (IsmChatResponsive.isWeb(context)) {
-      await IsmChatContextWidget.showDialogContext(
-        content: IsmChatPageDailog(child: view),
+    final threadRootId = IsmChatThreadCoordinator.threadIdOf(panelRoot);
+    if (_shouldSkipThreadPanelNavigation(threadRootId)) return;
+
+    _threadPanelOpeningId = threadRootId;
+    try {
+      IsmChatThreadBinding().dependencies();
+      final resolvedConversation = conversation ??
+          (IsmChatUtility.chatPageControllerRegistered
+              ? IsmChatUtility.chatPageController.conversation
+              : null);
+      await _threadController.openThread(
+        root: panelRoot,
+        conversation: resolvedConversation,
       );
-      return;
+      final view = IsmChatThreadView(
+        rootMessage: panelRoot,
+        conversation: resolvedConversation,
+      );
+      final context =
+          IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context;
+      final Future<void> presentation;
+      if (IsmChatResponsive.isWeb(context)) {
+        presentation = IsmChatContextWidget.showDialogContext(
+          content: IsmChatPageDailog(child: view),
+        );
+      } else {
+        presentation = IsmChatRoute.goToRoute<void>(view);
+      }
+      _threadPanelOpeningId = null;
+      _threadPanelPresentation = presentation;
+      await presentation;
+    } finally {
+      if (_threadPanelOpeningId == threadRootId) {
+        _threadPanelOpeningId = null;
+      }
+      _threadPanelPresentation = null;
     }
-    await IsmChatRoute.goToRoute<void>(view);
   }
 
   /// The thread currently open in the panel, or `null`.

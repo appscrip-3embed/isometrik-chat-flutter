@@ -557,13 +557,16 @@ void main() {
               ),
               IsmChatThreadMessageTile(
                 message: message(
-                  body: '',
-                  customType: IsmChatCustomMessageType.file,
+                  body: 'policy.pdf',
+                  customType: IsmChatCustomMessageType.reply,
                   messageType: IsmChatMessageType.reply,
                   // Local-looking URLs: a VM widget test must not fetch.
                   attachments: [
-                    attachment(IsmChatMediaType.file)
-                        .copyWith(thumbnailUrl: '', mediaUrl: ''),
+                    attachment(IsmChatMediaType.file).copyWith(
+                      name: '',
+                      thumbnailUrl: '',
+                      mediaUrl: '',
+                    ),
                   ],
                 ),
               ),
@@ -577,6 +580,7 @@ void main() {
       // "Document" fallback label.
       expect(find.byType(IsmChatMessageWrapper), findsOneWidget);
       expect(find.text('Document'), findsNothing);
+      expect(find.text('policy.pdf'), findsOneWidget);
     }, setUpApi: (api) => api.registerSendDefaults());
 
   });

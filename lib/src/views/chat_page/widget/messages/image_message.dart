@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -40,11 +41,8 @@ class _IsmChatImageMessageState extends State<IsmChatImageMessage> {
         : (IsmChatResponsive.isWeb(context)
             ? context.width * .35
             : context.width * .6);
-    final maxHeight = isSticker
-        ? IsmChatDimens.hundredFourty
-        : (IsmChatResponsive.isWeb(context)
-            ? context.height * .35
-            : context.height * .6);
+    final maxHeight =
+        isSticker ? IsmChatDimens.hundredFourty : IsmChatDimens.twoHundredFifty;
     final data = IsmChatProperties.chatPageProperties.isShowMessageBlur
         ?.call(context, message);
     return Material(
@@ -62,7 +60,8 @@ class _IsmChatImageMessageState extends State<IsmChatImageMessage> {
               children: [
                 IsmChatTapHandler(
                   onTap: () {
-                    IsmChatThreadCoordinator.openMediaPreviewFromThread(message);
+                    IsmChatThreadCoordinator.openMediaPreviewFromThread(
+                        message);
                   },
                   onLongPress: () {
                     if (IsmChatUtility.chatPageControllerRegistered) {
@@ -77,22 +76,12 @@ class _IsmChatImageMessageState extends State<IsmChatImageMessage> {
                       maxWidth: maxWidth,
                       maxHeight: maxHeight,
                     ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final gridWidth =
-                            // constraints.maxWidth > 0
-                            //     ? constraints.maxWidth
-                            //     :
-                            maxWidth;
-                        return _MessageMediaImage(
-                          message: message,
-                          isSticker: isSticker,
-                          isGif: isGif,
-                          maxWidth: maxWidth,
-                          maxHeight: maxHeight,
-                          gridWidth: gridWidth,
-                        );
-                      },
+                    child: _MessageMediaImage(
+                      message: message,
+                      isSticker: isSticker,
+                      isGif: isGif,
+                      maxWidth: maxWidth,
+                      maxHeight: maxHeight,
                     ),
                   ),
                 ),
@@ -199,14 +188,13 @@ class _IsmChatImageMessageState extends State<IsmChatImageMessage> {
   }
 }
 
-class _MessageMediaImage extends StatelessWidget {
+class _MessageMediaImage extends StatefulWidget {
   const _MessageMediaImage({
     required this.message,
     required this.isSticker,
     required this.isGif,
     required this.maxWidth,
     required this.maxHeight,
-    required this.gridWidth,
   });
 
   final IsmChatMessageModel message;
@@ -214,62 +202,149 @@ class _MessageMediaImage extends StatelessWidget {
   final bool isGif;
   final double maxWidth;
   final double maxHeight;
-  final double gridWidth;
 
-  /// GIF frame size from aspect ratio only — no fixed height.
-  ///
-  /// Fits within [maxWidth]/[maxHeight] using attachment mediaWidth/mediaHeight
-  /// when present (Giphy). Falls back to 1:1 if ratio is unknown so layout is
-  /// still reserved before decode (avoids Android expand-then-shrink).
-  ///
-  /// Reuse this helper for any future GIF/sticker surface that needs the
-  /// same reserved-size behavior.
-  static Size _gifDisplaySize(
-    double maxWidth,
-    double maxHeight, {
-    double? aspectRatio,
-  }) {
-    final ar = (aspectRatio != null && aspectRatio > 0) ? aspectRatio : 1.0;
-    // Size from ratio only: fill max width, then clamp height if needed.
-    var width = maxWidth;
-    var height = width / ar;
-    if (height > maxHeight) {
-      height = maxHeight;
-      width = height * ar;
+  @override
+  State<_MessageMediaImage> createState() => _MessageMediaImageState();
+
+  static bool hasDisplayableMedia(IsmChatMessageModel message) {
+    final attachment = message.attachments?.firstOrNull;
+    if (attachment == null) {
+      return false;
     }
-    return Size(width, height);
+    final mediaUrl = attachment.mediaUrl ?? '';
+    if (mediaUrl.isValidUrl) {
+      return true;
+    }
+    if (attachment.bytes != null && attachment.bytes!.isNotEmpty) {
+      return true;
+    }
+    if (!kIsWeb && mediaUrl.isNotEmpty && File(mediaUrl).existsSync()) {
+      return true;
+    }
+    if (kIsWeb && mediaUrl.isNotEmpty && mediaUrl.strigToUnit8List.isNotEmpty) {
+      return true;
+    }
+    return false;
+  }
+}
+
+class _MessageMediaImageState extends State<_MessageMediaImage> {
+  double? _aspectRatio;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageStreamListener;
+
+  IsmChatMessageModel get message => widget.message;
+  bool get isSticker => widget.isSticker;
+  bool get isGif => widget.isGif;
+  double get maxWidth => widget.maxWidth;
+  double get maxHeight => widget.maxHeight;
+
+  double? _layoutAspectRatio(AttachmentModel? attachment) =>
+      _aspectRatio ??
+      IsmChatImageAttachmentDimensions.aspectRatioFromAttachment(attachment);
+
+  @override
+  void initState() {
+    super.initState();
+    final attachment = message.attachments?.firstOrNull;
+    _aspectRatio = IsmChatImageAttachmentDimensions.aspectRatioFromAttachment(
+      attachment,
+    );
+    if (_aspectRatio == null && !isSticker) {
+      _scheduleAspectRatioResolution(attachment);
+    }
   }
 
-  /// Still image frame matched to one media-grid tile (see [IsmChatMediaGridLayout]).
-  ///
-  /// Returns null when aspect ratio is unknown — caller keeps legacy max-box layout.
-  static Size? _stillImageDisplaySize(
-    double gridWidth,
-    double maxWidth,
-    double maxHeight, {
-    double? aspectRatio,
-  }) {
-    if (aspectRatio == null || aspectRatio <= 0 || gridWidth <= 0) {
-      return null;
+  @override
+  void didUpdateWidget(covariant _MessageMediaImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_aspectRatio != null) {
+      return;
     }
-    var size = IsmChatMediaGridLayout.singleStillImageDisplaySize(
-      gridWidth: gridWidth,
-      aspectRatio: aspectRatio,
+    final attachment = message.attachments?.firstOrNull;
+    final fromMeta = IsmChatImageAttachmentDimensions.aspectRatioFromAttachment(
+      attachment,
     );
-    if (size.width <= maxWidth && size.height <= maxHeight) {
-      return size;
+    if (fromMeta != null) {
+      _stopNetworkAspectListen();
+      setState(() => _aspectRatio = fromMeta);
+      return;
     }
-    var width = size.width;
-    var height = size.height;
-    if (width > maxWidth) {
-      width = maxWidth;
-      height = width / aspectRatio;
+    _scheduleAspectRatioResolution(attachment);
+  }
+
+  void _scheduleAspectRatioResolution(AttachmentModel? attachment) {
+    final bytes = attachment?.bytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      unawaited(_decodeAspectFromCodec(bytes));
+      return;
     }
-    if (height > maxHeight) {
-      height = maxHeight;
-      width = height * aspectRatio;
+    if (!kIsWeb) {
+      final path = attachment?.mediaUrl ?? '';
+      if (path.isNotEmpty && !path.isValidUrl) {
+        unawaited(_decodeAspectFromLocalFile(path));
+        return;
+      }
     }
-    return Size(width, height);
+    final mediaUrl = attachment?.mediaUrl ?? '';
+    if (mediaUrl.isValidUrl) {
+      _listenNetworkAspectRatio(mediaUrl);
+    }
+  }
+
+  Future<void> _decodeAspectFromLocalFile(String path) async {
+    if (_aspectRatio != null) return;
+    try {
+      final fileBytes = await File(path).readAsBytes();
+      await _decodeAspectFromCodec(fileBytes);
+    } catch (_) {}
+  }
+
+  Future<void> _decodeAspectFromCodec(Uint8List bytes) async {
+    if (_aspectRatio != null) return;
+    final ratio =
+        await IsmChatImageAttachmentDimensions.aspectRatioFromBytesCodec(bytes);
+    if (!mounted || _aspectRatio != null || ratio == null || ratio <= 0) {
+      return;
+    }
+    setState(() => _aspectRatio = ratio);
+  }
+
+  @override
+  void dispose() {
+    _stopNetworkAspectListen();
+    super.dispose();
+  }
+
+  void _stopNetworkAspectListen() {
+    if (_imageStream != null && _imageStreamListener != null) {
+      _imageStream!.removeListener(_imageStreamListener!);
+    }
+    _imageStream = null;
+    _imageStreamListener = null;
+  }
+
+  void _listenNetworkAspectRatio(String url) {
+    if (_aspectRatio != null) return;
+    _stopNetworkAspectListen();
+    final provider = CachedNetworkImageProvider(url);
+    _imageStream = provider.resolve(const ImageConfiguration());
+    _imageStreamListener = ImageStreamListener(
+      (ImageInfo info, bool _) {
+        if (_aspectRatio != null) {
+          _stopNetworkAspectListen();
+          return;
+        }
+        final w = info.image.width;
+        final h = info.image.height;
+        if (w > 0 && h > 0 && mounted) {
+          setState(() => _aspectRatio = w / h);
+        }
+        _stopNetworkAspectListen();
+      },
+      onError: (_, __) => _stopNetworkAspectListen(),
+    );
+    _imageStream!.addListener(_imageStreamListener!);
   }
 
   static Widget _loadingPlaceholder(Size size) => ColoredBox(
@@ -306,27 +381,6 @@ class _MessageMediaImage extends StatelessWidget {
     );
   }
 
-  static bool hasDisplayableMedia(IsmChatMessageModel message) {
-    final attachment = message.attachments?.firstOrNull;
-    if (attachment == null) {
-      return false;
-    }
-    final mediaUrl = attachment.mediaUrl ?? '';
-    if (mediaUrl.isValidUrl) {
-      return true;
-    }
-    if (attachment.bytes != null && attachment.bytes!.isNotEmpty) {
-      return true;
-    }
-    if (!kIsWeb && mediaUrl.isNotEmpty && File(mediaUrl).existsSync()) {
-      return true;
-    }
-    if (kIsWeb && mediaUrl.isNotEmpty && mediaUrl.strigToUnit8List.isNotEmpty) {
-      return true;
-    }
-    return false;
-  }
-
   @override
   Widget build(BuildContext context) {
     final attachment = message.attachments?.firstOrNull;
@@ -342,44 +396,19 @@ class _MessageMediaImage extends StatelessWidget {
     final borderRadius = isSticker
         ? BorderRadius.zero
         : BorderRadius.circular(IsmChatDimens.eight);
-    final gifSize = isGif
-        ? _gifDisplaySize(
-            maxWidth,
-            maxHeight,
-            aspectRatio: attachment?.mediaAspectRatio,
-          )
-        : null;
-    final stillSize = !isSticker && !isGif
-        ? _stillImageDisplaySize(
-            gridWidth,
-            maxWidth,
-            maxHeight,
-            aspectRatio: attachment?.mediaAspectRatio,
-          )
-        : null;
-    final reservedSize = gifSize ?? stillSize;
+    final layoutAspect = _layoutAspectRatio(attachment);
+    final reservedSize = isSticker
+        ? null
+        : IsmChatMediaGridLayout.constrainedMediaDisplaySize(
+            maxWidth: maxWidth,
+            maxHeight: maxHeight,
+            aspectRatio: layoutAspect,
+          );
     final placeholderUrl = isGif ? _gifPlaceholderUrl(attachment) : null;
 
     Widget child;
-    if (hasNetworkUrl) {
-      child = CachedNetworkImage(
-        imageUrl: mediaUrl,
-        fit: fit,
-        // Zero fade avoids a brief dual-layout during placeholder → image.
-        fadeInDuration: Duration.zero,
-        fadeOutDuration: Duration.zero,
-        width: reservedSize?.width,
-        height: reservedSize?.height,
-        memCacheWidth: reservedSize?.width.round(),
-        memCacheHeight: reservedSize?.height.round(),
-        placeholder: (_, __) => _placeholderImage(
-          size: reservedSize ?? Size(maxWidth, maxHeight),
-          imageUrl: placeholderUrl,
-          fit: fit,
-        ),
-        errorWidget: (_, __, ___) => _mediaError(reservedSize),
-      );
-    } else if (hasBytes) {
+    // Keep local preview while upload finishes — avoids swap to network spinner.
+    if (hasBytes) {
       child = Image.memory(
         bytes,
         fit: fit,
@@ -394,6 +423,25 @@ class _MessageMediaImage extends StatelessWidget {
         width: reservedSize?.width,
         height: reservedSize?.height,
         gaplessPlayback: true,
+      );
+    } else if (hasNetworkUrl) {
+      child = CachedNetworkImage(
+        imageUrl: mediaUrl,
+        fit: fit,
+        // Zero fade avoids a brief dual-layout during placeholder → image.
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        useOldImageOnUrlChange: true,
+        width: reservedSize?.width,
+        height: reservedSize?.height,
+        memCacheWidth: reservedSize?.width.round(),
+        memCacheHeight: reservedSize?.height.round(),
+        placeholder: (_, __) => _placeholderImage(
+          size: reservedSize ?? Size(maxWidth, maxHeight),
+          imageUrl: placeholderUrl,
+          fit: fit,
+        ),
+        errorWidget: (_, __, ___) => _mediaError(reservedSize),
       );
     } else if (IsmChatResponsive.isWeb(context) && mediaUrl.isNotEmpty) {
       final webBytes = mediaUrl.strigToUnit8List;

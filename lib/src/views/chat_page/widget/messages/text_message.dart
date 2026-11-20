@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
+import 'package:isometrik_chat_flutter/src/views/chat_page/widget/messages/message_inner_time_metrics.dart';
 
 class IsmChatTextMessage extends StatefulWidget {
-  const IsmChatTextMessage(this.message, {super.key});
+  const IsmChatTextMessage(
+    this.message, {
+    super.key,
+    this.useIntrinsicBubbleWidth = true,
+  });
 
   final IsmChatMessageModel message;
+
+  /// When `false`, width comes from the parent (reply bubble column).
+  final bool useIntrinsicBubbleWidth;
 
   @override
   State<IsmChatTextMessage> createState() => _IsmChatTextMessageState();
@@ -119,26 +127,33 @@ class _IsmChatTextMessageState extends State<IsmChatTextMessage> {
     final message = widget.message;
     final data = IsmChatProperties.chatPageProperties.isShowMessageBlur
         ?.call(context, message);
+    final bubble = BlurFilter.widget(
+      isBlured: data?.shouldBlured ?? false,
+      sigmaX: data?.sigmaX ?? 3,
+      sigmaY: data?.sigmaY ?? 3,
+      child: Container(
+        width: widget.useIntrinsicBubbleWidth ? null : double.infinity,
+        alignment:
+            message.sentByMe ? Alignment.centerRight : Alignment.centerLeft,
+        constraints: BoxConstraints(
+          minHeight: (IsmChatResponsive.isWeb(context))
+              ? context.height * .04
+              : context.height * .05,
+        ),
+        padding: widget.useIntrinsicBubbleWidth
+            ? IsmChatDimens.edgeInsets4
+            : IsmChatDimens.edgeInsets4.copyWith(
+                // Room for [MessageBubble]'s bottom-right time overlay.
+                bottom: IsmChatDimens.sixteen + IsmChatDimens.four,
+              ),
+        child: _buildMessageBody(context, message),
+      ),
+    );
     return Material(
       color: Colors.transparent,
-      child: IntrinsicWidth(
-        child: BlurFilter.widget(
-          isBlured: data?.shouldBlured ?? false,
-          sigmaX: data?.sigmaX ?? 3,
-          sigmaY: data?.sigmaY ?? 3,
-          child: Container(
-            alignment:
-                message.sentByMe ? Alignment.centerRight : Alignment.centerLeft,
-            constraints: BoxConstraints(
-              minHeight: (IsmChatResponsive.isWeb(context))
-                  ? context.height * .04
-                  : context.height * .05,
-            ),
-            padding: IsmChatDimens.edgeInsets4,
-            child: _buildMessageBody(context, message),
-          ),
-        ),
-      ),
+      child: widget.useIntrinsicBubbleWidth
+          ? IntrinsicWidth(child: bubble)
+          : bubble,
     );
   }
 

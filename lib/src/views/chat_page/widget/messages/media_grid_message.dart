@@ -78,6 +78,11 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
     // Relationship: 1-row height = 2x (per-row height of 2-row grid)
     final aspectRatio =
         IsmChatMediaGridLayout.childAspectRatioForDisplayCount(displayCount);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final gridWidth = IsmChatMediaGridLayout.multipleAttachmentGridWidth(
+      screenWidth,
+      isWeb: IsmChatResponsive.isWeb(context),
+    );
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -87,18 +92,20 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 3),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
-              mainAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
-              childAspectRatio: aspectRatio,
-            ),
-            itemCount: displayCount,
-            itemBuilder: (context, index) {
+          child: SizedBox(
+            width: gridWidth,
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
+                mainAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
+                childAspectRatio: aspectRatio,
+              ),
+              itemCount: displayCount,
+              itemBuilder: (context, index) {
               final message = messages[index];
               final isImage =
                   message.customType == IsmChatCustomMessageType.image;
@@ -242,6 +249,7 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
                 ),
               );
             },
+            ),
           ),
         ),
         // Caption lives on the host message body for web multi-attachment

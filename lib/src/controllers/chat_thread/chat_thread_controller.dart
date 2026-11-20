@@ -752,6 +752,205 @@ class IsmChatThreadController extends GetxController {
     }
   }
 
+  /// Patches [reactions] (and related fields from [updated]) onto the open
+  /// panel row with the same server [messageId].
+  ///
+  /// Returns `true` when this panel owned that message (root or loaded reply).
+  bool applyMessageUpdate(IsmChatMessageModel updated) {
+    final id = (updated.messageId ?? '').trim();
+    if (id.isEmpty) return false;
+
+    final rootMessage = root;
+    if (rootMessage != null && (rootMessage.messageId ?? '').trim() == id) {
+      root = rootMessage.copyWith(reactions: _copyReactions(updated.reactions));
+      _root.refresh();
+      return true;
+    }
+
+    final index = _replies.indexWhere((e) => (e.messageId ?? '').trim() == id);
+    if (index == -1) return false;
+    _replies[index] = _replies[index].copyWith(
+      reactions: _copyReactions(updated.reactions),
+    );
+    _replies.refresh();
+    update();
+    return true;
+  }
+
+  /// Applies an add/remove reaction to a row that lives only in the panel
+  /// (thread-only replies are not kept in the local DB message map).
+  bool applyReactionChange({
+    required String messageId,
+    required String emojiKey,
+    required bool added,
+    String? userId,
+  }) {
+    final id = messageId.trim();
+    final key = emojiKey.trim();
+    if (id.isEmpty || key.isEmpty) return false;
+  final uid =
+        (userId ?? IsmChatConfig.communicationConfig.userConfig.userId).trim();
+    if (uid.isEmpty) return false;
+
+    IsmChatMessageModel patchRow(IsmChatMessageModel row) {
+      var reactions = List<MessageReactionModel>.from(row.reactions ?? []);
+      if (added) {
+        var matched = false;
+        for (var i = 0; i < reactions.length; i++) {
+          final entry = reactions[i];
+          if (entry.emojiKey != key) continue;
+          final users = List<String>.from(entry.userIds);
+          if (!users.contains(uid)) {
+            users.add(uid);
+          }
+          reactions[i] = entry.copyWith(userIds: users);
+          matched = true;
+          break;
+        }
+        if (!matched) {
+          reactions.add(MessageReactionModel(emojiKey: key, userIds: [uid]));
+        }
+      } else {
+        for (var i = 0; i < reactions.length; i++) {
+          final entry = reactions[i];
+          if (entry.emojiKey != key) continue;
+          if (entry.userIds.length > 1 && entry.userIds.contains(uid)) {
+            reactions[i] = entry.copyWith(
+              userIds: entry.userIds.where((e) => e != uid).toList(),
+            );
+          } else {
+            reactions.removeAt(i);
+          }
+          break;
+        }
+      }
+      return row.copyWith(reactions: _copyReactions(reactions));
+    }
+
+    final rootMessage = root;
+    if (rootMessage != null && (rootMessage.messageId ?? '').trim() == id) {
+      root = patchRow(rootMessage);
+      _root.refresh();
+      return true;
+    }
+
+    final index = _replies.indexWhere((e) => (e.messageId ?? '').trim() == id);
+    if (index == -1) return false;
+    _replies[index] = patchRow(_replies[index]);
+    _replies.refresh();
+    update();
+    return true;
+  }
+
+  /// Pulls reaction chips from the full conversation cache (not just the
+  /// filtered channel timeline).
+  void syncReactionsFromCache(Iterable<IsmChatMessageModel> cached) {
+    for (final row in cached) {
+      applyMessageUpdate(row);
+    }
+  }
+
+  /// Routes a reaction add/remove to the open panel when the row has no DB
+  /// entry (typical for thread-only replies).
+  static void deliverReactionChange({
+    required String messageId,
+    required String emojiKey,
+    required bool added,
+    String? userId,
+  }) {
+    if (!IsmChatThreadCoordinator.isEnabled) return;
+    final controller = instance;
+    if (controller == null || controller.root == null) return;
+    controller.applyReactionChange(
+      messageId: messageId,
+      emojiKey: emojiKey,
+      added: added,
+      userId: userId,
+    );
+  }
+
+  /// Refreshes reaction chips for the root and also-sent replies that appear
+  /// on [timeline], without overwriting thread badge fields on the root.
+  void syncOpenThreadFromChannel(List<IsmChatMessageModel> timeline) {
+    if (root == null || timeline.isEmpty) return;
+
+    final rootMessage = root!;
+    final rootId = (rootMessage.messageId ?? '').trim();
+    var changed = false;
+
+    if (rootId.isNotEmpty) {
+      for (final row in timeline) {
+        if ((row.messageId ?? '').trim() != rootId) continue;
+        final nextReactions = row.reactions;
+        if (!_reactionListsEqual(nextReactions, rootMessage.reactions)) {
+          root = rootMessage.copyWith(
+            reactions: _copyReactions(nextReactions),
+            replyCount: rootMessage.replyCount ?? row.replyCount,
+            lastThreadReplyAt:
+                rootMessage.lastThreadReplyAt ?? row.lastThreadReplyAt,
+          );
+          _root.refresh();
+          changed = true;
+        }
+        break;
+      }
+    }
+
+    for (var i = 0; i < _replies.length; i++) {
+      final reply = _replies[i];
+      final replyId = (reply.messageId ?? '').trim();
+      if (replyId.isEmpty) continue;
+      for (final row in timeline) {
+        if ((row.messageId ?? '').trim() != replyId) continue;
+        final nextReactions = row.reactions;
+        if (_reactionListsEqual(nextReactions, reply.reactions)) break;
+        _replies[i] = reply.copyWith(reactions: _copyReactions(nextReactions));
+        changed = true;
+        break;
+      }
+    }
+
+    if (changed) {
+      _replies.refresh();
+      update();
+    }
+  }
+
+  /// Routes a reaction (or other) message patch to the open panel, if any.
+  static void deliverMessageUpdate(IsmChatMessageModel updated) {
+    if (!IsmChatThreadCoordinator.isEnabled) return;
+    final controller = instance;
+    if (controller == null || controller.root == null) return;
+    controller.applyMessageUpdate(updated);
+  }
+
+  static bool _reactionListsEqual(
+    List<MessageReactionModel>? a,
+    List<MessageReactionModel>? b,
+  ) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return a == b;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  static List<MessageReactionModel>? _copyReactions(
+    List<MessageReactionModel>? reactions,
+  ) {
+    if (reactions == null) return null;
+    return reactions
+        .map(
+          (e) => MessageReactionModel(
+            emojiKey: e.emojiKey,
+            userIds: List<String>.from(e.userIds),
+          ),
+        )
+        .toList();
+  }
+
   // --------------------------------------------------------------- internals
 
   UserDetails? get _currentUser => IsmChatUtility.conversationControllerRegistered

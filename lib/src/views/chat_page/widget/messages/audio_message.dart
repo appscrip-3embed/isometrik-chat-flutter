@@ -58,13 +58,13 @@ class IsmChatAudioMessage extends StatelessWidget {
         contactPlayIconBgColor: IsmChatColors.blackColor,
       );
     }
-    final primary = IsmChatConfig.chatTheme.primaryColor ??
-        IsmChatColors.primaryColorLight;
+    final primary =
+        IsmChatConfig.chatTheme.primaryColor ?? IsmChatColors.primaryColorLight;
     return (
       meFgColor: IsmChatColors.whiteColor,
       mePlayIconColor: primary,
       contactFgColor: Colors.grey,
-      contactPlayIconColor: Colors.black26,
+      contactPlayIconColor: primary,
       contactPlayIconBgColor: Colors.grey,
     );
   }
@@ -73,8 +73,7 @@ class IsmChatAudioMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = IsmChatProperties.chatPageProperties.isShowMessageBlur
         ?.call(context, message);
-    final voiceBg =
-        voiceBarBackgroundColor(sentByMe: message.sentByMe);
+    final voiceBg = voiceBarBackgroundColor(sentByMe: message.sentByMe);
     final chrome = voiceChromeColors();
     return Material(
       color: Colors.transparent,
@@ -102,8 +101,7 @@ class IsmChatAudioMessage extends StatelessWidget {
               contactFgColor: chrome.contactFgColor,
               contactPlayIconColor: chrome.contactPlayIconColor,
               contactPlayIconBgColor: chrome.contactPlayIconBgColor,
-              meProgressOverlayColor:
-                  voiceProgressOverlayColor(sentByMe: true),
+              meProgressOverlayColor: voiceProgressOverlayColor(sentByMe: true),
               opponentProgressOverlayColor:
                   voiceProgressOverlayColor(sentByMe: false),
               duration: duration,

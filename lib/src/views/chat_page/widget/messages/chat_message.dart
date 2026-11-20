@@ -130,12 +130,17 @@ class IsmChatMessageWrapperWithMetaData extends StatelessWidget {
   IsmChatMessageWrapperWithMetaData(
     this.message, {
     super.key,
+    this.fillReplyBubbleWidth = false,
   }) : replayMessageCustomType =
             message.metaData?.replyMessage?.forMessageType ??
                 IsmChatCustomMessageType.text;
 
   final IsmChatMessageModel message;
   final IsmChatCustomMessageType replayMessageCustomType;
+
+  /// When `true`, the nested text bubble stretches to [IsmChatReplyMessage]
+  /// width instead of re-measuring with its own [IntrinsicWidth].
+  final bool fillReplyBubbleWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +150,10 @@ class IsmChatMessageWrapperWithMetaData extends StatelessWidget {
     switch (replayMessageCustomType) {
       case IsmChatCustomMessageType.text:
       case IsmChatCustomMessageType.bulkAction:
-        return IsmChatTextMessage(message);
+        return IsmChatTextMessage(
+          message,
+          useIntrinsicBubbleWidth: !fillReplyBubbleWidth,
+        );
       case IsmChatCustomMessageType.reply:
         return IsmChatReplyMessage(message);
       case IsmChatCustomMessageType.forward:

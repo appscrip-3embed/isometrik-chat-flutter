@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
+import 'package:isometrik_chat_flutter/src/views/chat_page/widget/messages/message_inner_time_metrics.dart';
 
 class IsmChatReplyMessage extends StatelessWidget {
   const IsmChatReplyMessage(this.message, {super.key});
@@ -14,29 +15,62 @@ class IsmChatReplyMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = IsmChatProperties.chatPageProperties.isShowMessageBlur
         ?.call(context, message);
-    return IntrinsicWidth(
-      child: BlurFilter.widget(
-        isBlured: data?.shouldBlured ?? false,
-        sigmaX: data?.sigmaX ?? 3,
-        sigmaY: data?.sigmaY ?? 3,
+    return BlurFilter.widget(
+      isBlured: data?.shouldBlured ?? false,
+      sigmaX: data?.sigmaX ?? 3,
+      sigmaY: data?.sigmaY ?? 3,
+      // No [Expanded]/[Flexible] in the quote (breaks intrinsic width). Stretch
+      // plus [fillReplyBubbleWidth] aligns the quote strip with the reply body.
+      child: IntrinsicWidth(
         child: Column(
-          mainAxisSize: MainAxisSize.max,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _ReplyMessage(message),
             IsmChatDimens.boxHeight5,
             ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: (IsmChatResponsive.isWeb(context))
-                      ? context.height * .04
-                      : context.height * .05,
-                ),
-                child: IsmChatMessageWrapperWithMetaData(message)),
+              constraints: BoxConstraints(
+                minHeight: (IsmChatResponsive.isWeb(context))
+                    ? context.height * .04
+                    : context.height * .05,
+              ),
+              child: IsmChatMessageWrapperWithMetaData(
+                message,
+                fillReplyBubbleWidth: true,
+              ),
+            ),
+            // Width floor so [MessageBubble]'s inner time/status row is not clipped.
+            SizedBox(
+              width: ismChatInnerTimeStatusMinWidth(context, message),
+              height: 0,
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+double _replyQuoteMaxTextWidth(
+  BuildContext context,
+  IsmChatMessageModel message, {
+  required bool hasThumb,
+}) {
+  final screenWidth = MediaQuery.sizeOf(context).width;
+  final maxByScreen =
+      IsmChatResponsive.isWeb(context) ? screenWidth * .25 : screenWidth * .6;
+  final themeConstraints = IsmChatConfig
+      .chatTheme.chatPageTheme?.messageConstraints?.messageConstraints;
+  final bubbleMax =
+      themeConstraints?.maxWidth != null && themeConstraints!.maxWidth.isFinite
+          ? themeConstraints.maxWidth
+          : maxByScreen;
+  final thumbWidth = hasThumb ? IsmChatDimens.fifty + IsmChatDimens.five : 0.0;
+  final overhead = IsmChatDimens.four +
+      (IsmChatDimens.four * 2) +
+      IsmChatDimens.twenty +
+      IsmChatDimens.four;
+  return (bubbleMax - overhead - thumbWidth).clamp(48.0, bubbleMax);
 }
 
 class _ReplyMessage extends StatelessWidget {
@@ -58,194 +92,206 @@ class _ReplyMessage extends StatelessWidget {
               },
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(IsmChatDimens.eight),
-                child: Container(
-                  constraints: BoxConstraints(
-                    minHeight: (IsmChatResponsive.isWeb(context))
-                        ? context.height * .04
-                        : context.height * .05,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (message.sentByMe
-                            ? IsmChatColors.whiteColor
-                            : IsmChatColors.greyColor)
-                        .applyIsmOpacity(0.2),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      SizedBox(
-                        width: IsmChatDimens.four,
-                        height: IsmChatDimens.fifty,
-                        child: ColoredBox(
-                          color: IsmChatConfig.chatTheme.chatPageTheme
-                                      ?.replyMessageTheme !=
-                                  null
-                              ? replyingMyMessage
-                                  ? IsmChatConfig.chatTheme.chatPageTheme
-                                          ?.replyMessageTheme?.selfMessage ??
-                                      IsmChatColors.yellowColor
-                                  : IsmChatConfig
-                                          .chatTheme
-                                          .chatPageTheme
-                                          ?.replyMessageTheme
-                                          ?.opponentMessage ??
-                                      IsmChatColors.blueColor
-                              : replyingMyMessage
-                                  ? IsmChatColors.yellowColor
-                                  : IsmChatColors.blueColor,
-                        ),
+                child: Builder(
+                  builder: (context) {
+                    final thumb = ReplayParentMessage(
+                      replayData: message.metaData?.replyMessage,
+                    );
+                    final parentType = message
+                        .metaData?.replyMessage?.parentMessageMessageType;
+                    final hasThumb = [
+                      IsmChatCustomMessageType.image,
+                      IsmChatCustomMessageType.video,
+                      IsmChatCustomMessageType.location,
+                    ].contains(parentType);
+                    final maxTextWidth = _replyQuoteMaxTextWidth(
+                      context,
+                      message,
+                      hasThumb: hasThumb,
+                    );
+
+                    return Container(
+                      width: double.infinity,
+                      constraints: BoxConstraints(
+                        minHeight: (IsmChatResponsive.isWeb(context))
+                            ? context.height * .04
+                            : context.height * .05,
                       ),
-                      Expanded(
-                        child: Row(
-                          spacing: IsmChatDimens.five,
-                          children: [
-                            Flexible(
-                              child: Padding(
-                                padding: IsmChatDimens.edgeInsets4,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Builder(builder: (context) {
-                                      var name = '';
+                      decoration: BoxDecoration(
+                        color: (message.sentByMe
+                                ? IsmChatColors.whiteColor
+                                : IsmChatColors.greyColor)
+                            .applyIsmOpacity(0.2),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: IsmChatDimens.four,
+                            height: IsmChatDimens.fifty,
+                            child: ColoredBox(
+                              color: IsmChatConfig.chatTheme.chatPageTheme
+                                          ?.replyMessageTheme !=
+                                      null
+                                  ? replyingMyMessage
+                                      ? IsmChatConfig
+                                              .chatTheme
+                                              .chatPageTheme
+                                              ?.replyMessageTheme
+                                              ?.selfMessage ??
+                                          IsmChatColors.yellowColor
+                                      : IsmChatConfig
+                                              .chatTheme
+                                              .chatPageTheme
+                                              ?.replyMessageTheme
+                                              ?.opponentMessage ??
+                                          IsmChatColors.blueColor
+                                  : replyingMyMessage
+                                      ? IsmChatColors.yellowColor
+                                      : IsmChatColors.blueColor,
+                            ),
+                          ),
+                          Padding(
+                            padding: IsmChatDimens.edgeInsets4,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Builder(builder: (context) {
+                                  var name = '';
 
-                                      if (controller.conversation?.isGroup ??
-                                          false) {
-                                        if (replyingMyMessage) {
-                                          name = IsmChatStrings.you;
-                                        } else {
-                                          name = ((controller.conversation
-                                                                  ?.members ??
-                                                              [])
-                                                          .firstWhereOrNull(
-                                                            (e) =>
-                                                                message
-                                                                    .metaData
-                                                                    ?.replyMessage
-                                                                    ?.parentMessageUserId ==
-                                                                e.userId,
-                                                          )
-                                                          ?.userName ??
-                                                      message
-                                                          .metaData
-                                                          ?.replyMessage
-                                                          ?.parentMessageUserName ??
-                                                      '')
-                                                  .capitalizeFirst ??
-                                              '';
-                                        }
-                                      } else {
-                                        name = replyingMyMessage
-                                            ? IsmChatStrings.you
-                                            : controller.conversation?.replyName
-                                                    .capitalizeFirst ??
-                                                '';
-                                      }
+                                  if (controller.conversation?.isGroup ??
+                                      false) {
+                                    if (replyingMyMessage) {
+                                      name = IsmChatStrings.you;
+                                    } else {
+                                      name = ((controller.conversation
+                                                              ?.members ??
+                                                          [])
+                                                      .firstWhereOrNull(
+                                                        (e) =>
+                                                            message
+                                                                .metaData
+                                                                ?.replyMessage
+                                                                ?.parentMessageUserId ==
+                                                            e.userId,
+                                                      )
+                                                      ?.userName ??
+                                                  message.metaData?.replyMessage
+                                                      ?.parentMessageUserName ??
+                                                  '')
+                                              .capitalizeFirst ??
+                                          '';
+                                    }
+                                  } else {
+                                    name = replyingMyMessage
+                                        ? IsmChatStrings.you
+                                        : controller.conversation?.replyName
+                                                .capitalizeFirst ??
+                                            '';
+                                  }
 
-                                      return Text(
-                                        name,
-                                        style:
-                                            IsmChatStyles.w500Black14.copyWith(
-                                          fontSize: IsmChatConfig
-                                                      .chatTheme
-                                                      .chatPageTheme
-                                                      ?.replyMessageTheme !=
-                                                  null
+                                  return Text(
+                                    name,
+                                    style: IsmChatStyles.w500Black14.copyWith(
+                                      fontSize: IsmChatConfig
+                                                  .chatTheme
+                                                  .chatPageTheme
+                                                  ?.replyMessageTheme !=
+                                              null
+                                          ? IsmChatConfig
+                                              .chatTheme
+                                              .chatPageTheme
+                                              ?.replyMessageTheme
+                                              ?.fontSizeMessage
+                                          : IsmChatDimens.forteen,
+                                      color: IsmChatConfig
+                                                  .chatTheme
+                                                  .chatPageTheme
+                                                  ?.replyMessageTheme !=
+                                              null
+                                          ? replyingMyMessage
                                               ? IsmChatConfig
                                                   .chatTheme
                                                   .chatPageTheme
                                                   ?.replyMessageTheme
-                                                  ?.fontSizeMessage
-                                              : IsmChatDimens.forteen,
-                                          color: IsmChatConfig
-                                                      .chatTheme
-                                                      .chatPageTheme
-                                                      ?.replyMessageTheme !=
-                                                  null
-                                              ? replyingMyMessage
-                                                  ? IsmChatConfig
-                                                      .chatTheme
-                                                      .chatPageTheme
-                                                      ?.replyMessageTheme
-                                                      ?.selfMessage
-                                                  : IsmChatConfig
-                                                      .chatTheme
-                                                      .chatPageTheme
-                                                      ?.replyMessageTheme
-                                                      ?.opponentMessage
-                                              : replyingMyMessage
-                                                  ? IsmChatColors.yellowColor
-                                                  : IsmChatColors.blueColor,
-                                        ),
-                                      );
-                                    }),
-                                    Row(
-                                      children: [
-                                        _replayParentIcon(message),
-                                        IsmChatDimens.boxWidth4,
-                                        Flexible(
-                                          child: Builder(
-                                            builder: (context) {
-                                              final parentBody =
-                                                  IsmChatUtility.decryptMessage(
-                                                message.metaData?.replyMessage
-                                                        ?.parentMessageBody ??
-                                                    '',
-                                                message.conversationId ?? '',
-                                              );
-                                              final parentId =
-                                                  (message.parentMessageId ?? '')
-                                                      .trim();
-                                              final parentMessage = parentId
-                                                      .isEmpty
-                                                  ? null
-                                                  : controller.messages
-                                                      .firstWhereOrNull(
-                                                      (m) =>
-                                                          (m.messageId ?? '')
-                                                              .trim() ==
-                                                          parentId,
-                                                    );
-                                              return IsmChatMentionRichText(
-                                                body: parentBody,
-                                                style: message.style,
-                                                message: parentMessage,
-                                                mentionedUsers:
-                                                    parentMessage?.mentionedUsers,
-                                                maxLines: 3,
-                                                overflow: TextOverflow.ellipsis,
-                                                enableMentionTap:
-                                                    parentMessage != null,
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        if (message.metaData?.replyMessage
-                                                ?.parentMessageMessageType ==
-                                            IsmChatCustomMessageType.audio) ...[
-                                          Flexible(
-                                            child: Text(
-                                              ' (${Duration(seconds: message.metaData?.replyMessage?.parentMessageAttachmentDuration ?? 0).formatDuration})',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: message.style,
-                                            ),
-                                          )
-                                        ]
-                                      ],
+                                                  ?.selfMessage
+                                              : IsmChatConfig
+                                                  .chatTheme
+                                                  .chatPageTheme
+                                                  ?.replyMessageTheme
+                                                  ?.opponentMessage
+                                          : replyingMyMessage
+                                              ? IsmChatColors.yellowColor
+                                              : IsmChatColors.blueColor,
                                     ),
+                                  );
+                                }),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _replayParentIcon(message),
+                                    IsmChatDimens.boxWidth4,
+                                    ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: maxTextWidth,
+                                      ),
+                                      child: Builder(
+                                        builder: (context) {
+                                          final parentBody =
+                                              IsmChatUtility.decryptMessage(
+                                            message.metaData?.replyMessage
+                                                    ?.parentMessageBody ??
+                                                '',
+                                            message.conversationId ?? '',
+                                          );
+                                          final parentId =
+                                              (message.parentMessageId ?? '')
+                                                  .trim();
+                                          final parentMessage = parentId.isEmpty
+                                              ? null
+                                              : controller.messages
+                                                  .firstWhereOrNull(
+                                                  (m) =>
+                                                      (m.messageId ?? '')
+                                                          .trim() ==
+                                                      parentId,
+                                                );
+                                          return IsmChatMentionRichText(
+                                            body: parentBody,
+                                            style: message.style,
+                                            message: parentMessage,
+                                            mentionedUsers:
+                                                parentMessage?.mentionedUsers,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            enableMentionTap:
+                                                parentMessage != null,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    if (message.metaData?.replyMessage
+                                            ?.parentMessageMessageType ==
+                                        IsmChatCustomMessageType.audio)
+                                      Text(
+                                        ' (${Duration(seconds: message.metaData?.replyMessage?.parentMessageAttachmentDuration ?? 0).formatDuration})',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: message.style,
+                                      ),
                                   ],
                                 ),
-                              ),
+                              ],
                             ),
-                            ReplayParentMessage(
-                              replayData: message.metaData?.replyMessage,
-                            ),
-                          ],
-                        ),
+                          ),
+                          if (hasThumb) thumb,
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -357,6 +403,37 @@ class ReplayParentMessage extends StatelessWidget {
     }
     return IsmChatDimens.box0;
   }
+}
+
+/// Dismiss control for the composer reply bar when [ReplayParentMessagePreview]
+/// shows media; the white circle keeps the close icon visible on dark thumbnails.
+class ReplyPreviewDismissButton extends StatelessWidget {
+  const ReplyPreviewDismissButton({
+    super.key,
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => IsmChatTapHandler(
+        onTap: onTap,
+        child: Container(
+          alignment: Alignment.center,
+          width: IsmChatDimens.twentyFour,
+          height: IsmChatDimens.twentyFour,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            color: IsmChatColors.whiteColor,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.close_rounded,
+            size: IsmChatDimens.sixteen,
+            color: IsmChatColors.blackColor,
+          ),
+        ),
+      );
 }
 
 class ReplayParentMessagePreview extends StatelessWidget {

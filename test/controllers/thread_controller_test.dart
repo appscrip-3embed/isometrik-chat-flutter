@@ -882,6 +882,77 @@ void main() {
     });
   });
 
+  group('message reaction sync', () {
+    test('applyMessageUpdate patches root and reply reactions', () async {
+      stubThread([threadReplyJson(messageId: 'r1', sentAt: 2000)]);
+      await controller.openThread(root: threadRoot(replyCount: 1));
+      final reactions = [
+        MessageReactionModel(emojiKey: 'yes', userIds: [kMeId]),
+      ];
+
+      expect(
+        controller.applyMessageUpdate(
+          controller.root!.copyWith(reactions: reactions),
+        ),
+        isTrue,
+      );
+      expect(controller.root?.reactions?.first.emojiKey, 'yes');
+
+      expect(
+        controller.applyMessageUpdate(
+          controller.replies.first.copyWith(reactions: reactions),
+        ),
+        isTrue,
+      );
+      expect(controller.replies.first.reactions?.first.emojiKey, 'yes');
+    });
+
+    test('syncOpenThreadFromChannel merges reactions without clobbering badge',
+        () async {
+      stubThread([]);
+      final panelRoot = threadRoot(replyCount: 5, messageId: 'root-1');
+      await controller.openThread(root: panelRoot);
+      final channelRoot = threadRoot(
+        messageId: 'root-1',
+        replyCount: 2,
+      ).copyWith(
+        reactions: [
+          MessageReactionModel(emojiKey: 'heart', userIds: [kOpponentId]),
+        ],
+      );
+
+      controller.syncOpenThreadFromChannel([channelRoot]);
+
+      expect(controller.root?.replyCount, 5);
+      expect(controller.root?.reactions?.single.emojiKey, 'heart');
+    });
+
+    test('applyReactionChange patches thread-only rows not in the DB', () async {
+      stubThread([threadReplyJson(messageId: 'r-only', sentAt: 2000)]);
+      await controller.openThread(root: threadRoot(replyCount: 1));
+
+      expect(
+        controller.applyReactionChange(
+          messageId: 'r-only',
+          emojiKey: 'yes',
+          added: true,
+        ),
+        isTrue,
+      );
+      expect(controller.replies.first.reactions?.single.emojiKey, 'yes');
+    });
+
+    test('deliverMessageUpdate is inert while threading is off', () {
+      IsmChatConfig.threadsEnabled = false;
+      expect(
+        () => IsmChatThreadController.deliverMessageUpdate(
+          threadRoot(messageId: 'root-1'),
+        ),
+        returnsNormally,
+      );
+    });
+  });
+
   group('buildLocalReply', () {
     test('mirrors what the server will store', () {
       final pending = controller.buildLocalReply(

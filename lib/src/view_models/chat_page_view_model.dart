@@ -598,11 +598,21 @@ class IsmChatPageViewModel {
     if (response.hasError) {
       return response;
     }
+    // Thread-only replies are kept in the panel, not in the DB map — patch live.
+    IsmChatThreadController.deliverReactionChange(
+      messageId: reaction.messageId,
+      emojiKey: reaction.reactionType.value,
+      added: true,
+    );
     var conversation =
         await IsmChatConfig.dbWrapper?.getConversation(reaction.conversationId);
     final allMessages = conversation?.messages;
     if (allMessages == null) {
-      return null;
+      if (IsmChatUtility.chatPageControllerRegistered) {
+        await IsmChatUtility.chatPageController
+            .getMessagesFromDB(reaction.conversationId);
+      }
+      return response;
     }
     var message = allMessages.values.cast<IsmChatMessageModel?>().firstWhere(
           (e) => e?.messageId == reaction.messageId,
@@ -636,6 +646,7 @@ class IsmChatPageViewModel {
       }
       final controller = IsmChatUtility.chatPageController
         ..didReactedLast = true;
+      IsmChatThreadController.deliverMessageUpdate(message);
       await controller.getMessagesFromDB(reaction.conversationId);
     }
 
@@ -648,13 +659,22 @@ class IsmChatPageViewModel {
     if (response == null || response.hasError) {
       return null;
     }
+    IsmChatThreadController.deliverReactionChange(
+      messageId: reaction.messageId,
+      emojiKey: reaction.reactionType.value,
+      added: false,
+    );
 
     var conversation =
         await IsmChatConfig.dbWrapper?.getConversation(reaction.conversationId);
 
     final allMessages = conversation?.messages;
     if (allMessages == null) {
-      return null;
+      if (IsmChatUtility.chatPageControllerRegistered) {
+        await IsmChatUtility.chatPageController
+            .getMessagesFromDB(reaction.conversationId);
+      }
+      return response;
     }
 
     final message = allMessages.values.cast<IsmChatMessageModel?>().firstWhere(
@@ -686,6 +706,7 @@ class IsmChatPageViewModel {
       }
       final controller = IsmChatUtility.chatPageController
         ..didReactedLast = true;
+      IsmChatThreadController.deliverMessageUpdate(message);
       await controller.getMessagesFromDB(reaction.conversationId);
     }
 

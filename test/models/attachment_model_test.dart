@@ -17,6 +17,26 @@ void main() {
       expect(copy.bytes, isNotEmpty);
     });
 
+    test('fromMap uses nameWithExtension when name is absent', () {
+      final parsed = AttachmentModel.fromMap({
+        'nameWithExtension': 'quarterly-report.pdf',
+        'mediaUrl': 'https://cdn.test/q.pdf',
+        'attachmentType': IsmChatMediaType.file.value,
+      });
+      expect(parsed.name, 'quarterly-report.pdf');
+    });
+
+    test('resolvedFileName falls back to message body', () {
+      final file = AttachmentModel(
+        attachmentType: IsmChatMediaType.file,
+        mediaUrl: 'https://cdn.test/x.pdf',
+      );
+      expect(
+        file.resolvedFileName(messageBody: 'invoice.pdf'),
+        'invoice.pdf',
+      );
+    });
+
     test('location attachment keeps coordinates', () {
       final loc = attachment(IsmChatMediaType.location);
       final copy = AttachmentModel.fromMap(loc.toMap());
