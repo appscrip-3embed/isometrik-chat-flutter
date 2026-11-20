@@ -405,6 +405,37 @@ class ReplayParentMessage extends StatelessWidget {
   }
 }
 
+/// Dismiss control for the composer reply bar when [ReplayParentMessagePreview]
+/// shows media; the white circle keeps the close icon visible on dark thumbnails.
+class ReplyPreviewDismissButton extends StatelessWidget {
+  const ReplyPreviewDismissButton({
+    super.key,
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => IsmChatTapHandler(
+        onTap: onTap,
+        child: Container(
+          alignment: Alignment.center,
+          width: IsmChatDimens.twentyFour,
+          height: IsmChatDimens.twentyFour,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            color: IsmChatColors.whiteColor,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.close_rounded,
+            size: IsmChatDimens.sixteen,
+            color: IsmChatColors.blackColor,
+          ),
+        ),
+      );
+}
+
 class ReplayParentMessagePreview extends StatelessWidget {
   const ReplayParentMessagePreview({
     super.key,

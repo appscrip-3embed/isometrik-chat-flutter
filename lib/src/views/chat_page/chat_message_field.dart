@@ -407,15 +407,9 @@ class _ReplyMessage extends StatelessWidget {
               alignment: Alignment.topRight,
               children: [
                 ReplayParentMessagePreview(controller: controller),
-                IsmChatTapHandler(
-                  onTap: () {
-                    controller.isreplying = false;
-                  },
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: IsmChatDimens.twenty,
-                  ),
-                )
+                ReplyPreviewDismissButton(
+                  onTap: () => controller.isreplying = false,
+                ),
               ],
             ),
           ],
