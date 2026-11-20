@@ -20,9 +20,32 @@ mixin IsmChatMqttEventReactionsMixin
           ?.getConversation(actionModel.conversationId ?? '');
       final allMessages = conversation?.messages;
     if (allMessages != null) {
-      final message = allMessages.entries
-          .where((e) => e.value.messageId == actionModel.messageId)
-          .first;
+      MapEntry<String, IsmChatMessageModel>? message;
+      for (final entry in allMessages.entries) {
+        if (entry.value.messageId == actionModel.messageId) {
+          message = entry;
+          break;
+        }
+      }
+      if (message == null) {
+        IsmChatThreadController.deliverReactionChange(
+          messageId: actionModel.messageId ?? '',
+          emojiKey: actionModel.reactionType ?? '',
+          added: actionModel.action == IsmChatActionEvents.reactionAdd,
+          userId: actionModel.userDetails?.userId,
+        );
+        if (IsmChatUtility.chatPageControllerRegistered) {
+          final controller = IsmChatUtility.chatPageController;
+          if (controller.conversation?.conversationId ==
+              actionModel.conversationId) {
+            await controller.getMessagesFromDB(actionModel.conversationId ?? '');
+          }
+        }
+        if (IsmChatUtility.conversationControllerRegistered) {
+          await IsmChatUtility.conversationController.getChatConversations();
+        }
+        return;
+      }
       var isEmoji = false;
 
       if (actionModel.action == IsmChatActionEvents.reactionAdd) {
@@ -64,6 +87,7 @@ mixin IsmChatMqttEventReactionsMixin
         conversation = conversation.copyWith(messages: allMessages);
         await IsmChatConfig.dbWrapper
             ?.saveConversation(conversation: conversation);
+        IsmChatThreadController.deliverMessageUpdate(message.value);
         if (IsmChatUtility.chatPageControllerRegistered) {
           var controller = IsmChatUtility.chatPageController;
           if (controller.conversation?.conversationId ==

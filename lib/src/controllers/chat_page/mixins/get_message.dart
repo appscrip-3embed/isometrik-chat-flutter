@@ -116,6 +116,9 @@ mixin IsmChatPageGetMessageMixin on GetxController {
     );
     _controller.messages = _controller.commonController
         .sortMessages(filterMessages(merged));
+    IsmChatThreadController.instance?.syncReactionsFromCache(safeMessages.values);
+    IsmChatThreadController.instance
+        ?.syncOpenThreadFromChannel(_controller.messages);
     _controller.isMessagesLoading = false;
     _controller._generateIndexedMessageList();
     update();

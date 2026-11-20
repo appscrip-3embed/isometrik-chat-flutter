@@ -10,7 +10,9 @@ mixin IsmChatMqttEventUtilitiesMixin {
   /// Checks if the sender is the current user.
   ///
   /// * `senderId`: The sender's user ID
-  /// * `deviceId`: Optional device ID for multi-device support
+  /// * [deviceId]: When set, only true for this physical device (same user **and**
+  ///   same [projectConfig.deviceId]). Omit to match the logged-in user on **any**
+  ///   device — use that for unread badges and push suppression on multi-device.
   bool isSenderMe(String? senderId, {String? deviceId}) {
     final controller = Get.find<IsmChatMqttController>();
     if (deviceId == null) {

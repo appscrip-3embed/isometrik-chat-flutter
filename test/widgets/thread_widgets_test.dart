@@ -1,3 +1,4 @@
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
@@ -227,6 +228,34 @@ void main() {
         child: IsmChatThreadMessageTile(message: threadReply(messageId: 'r9')),
       );
       expect(find.text('host:r9'), findsOneWidget);
+    });
+
+    testWidgets('shows reaction chips when the chat page is mounted',
+        (tester) async {
+      IsmChatConfig.threadsEnabled = true;
+      final api = FakeChatApi();
+      final page = Get.put(
+        IsmChatPageController(
+          IsmChatPageViewModel(
+            IsmChatPageRepository(apiWrapper: api.wrapper()),
+          ),
+        ),
+        tag: IsmChat.i.chatPageTag,
+      );
+      page.reactions = [const Emoji('👍', 'Thumbs Up')];
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadMessageTile(
+          message: threadRoot().copyWith(
+            reactions: [
+              MessageReactionModel(emojiKey: 'yes', userIds: [kMeId]),
+            ],
+          ),
+          isRoot: true,
+        ),
+      );
+      expect(find.byType(IsmChatThreadReactionRow), findsOneWidget);
+      await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
     });
   });
 

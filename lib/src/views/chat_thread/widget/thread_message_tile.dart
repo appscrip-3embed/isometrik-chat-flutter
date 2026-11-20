@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
@@ -6,6 +9,10 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 /// Deliberately self-contained (it does not reuse the channel [MessageBubble])
 /// so a thread can render without the chat-page controller — the panel is
 /// pushed as its own route and may outlive a chat page rebuild.
+///
+/// Reactions and the focus-menu reaction picker reuse the channel stack
+/// ([ImsChatReaction], [IsmChatFocusMenu]) when [IsmChatUtility.chatPageController]
+/// is registered — same constraint as [IsmChatMessageWrapper] for media rows.
 ///
 /// Text replies render as a plain Slack-style row. Non-text replies (photo,
 /// video, voice note, document, location, contact) render with the SDK's own
@@ -165,11 +172,23 @@ class IsmChatThreadMessageTile extends StatelessWidget {
                   style: theme.timeStyle,
                 ),
               ],
+              if (_showsReactionRow(message)) ...[
+                IsmChatDimens.boxHeight4,
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IsmChatThreadReactionRow(
+                    key: ValueKey(_reactionRowKey(message)),
+                    message: message,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ],
     );
+
+    final wrapped = _wrapWithFocusMenu(context, message, content);
 
     if (!isRoot) {
       return Padding(
@@ -177,7 +196,7 @@ class IsmChatThreadMessageTile extends StatelessWidget {
           horizontal: IsmChatDimens.twelve,
           vertical: IsmChatDimens.eight,
         ),
-        child: content,
+        child: wrapped,
       );
     }
     return Container(
@@ -188,8 +207,77 @@ class IsmChatThreadMessageTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(IsmChatDimens.twelve),
         border: Border.all(color: theme.rootCardBorderColor),
       ),
-      child: content,
+      child: wrapped,
     );
+  }
+
+  static String _reactionRowKey(IsmChatMessageModel message) {
+    final id = message.messageId ?? message.sentAt.toString();
+    final reactions = message.reactions
+        ?.where((e) => e.emojiKey.isNotEmpty && e.userIds.isNotEmpty)
+        .toList();
+    if (reactions == null || reactions.isEmpty) return '$id-r0';
+    final summary = reactions
+        .map((e) => '${e.emojiKey}:${e.userIds.join(',')}')
+        .join('|');
+    return '$id-$summary';
+  }
+
+  static bool _showsReactionRow(IsmChatMessageModel message) {
+    if (!IsmChatProperties.chatPageProperties.features
+        .contains(IsmChatFeature.reaction)) {
+      return false;
+    }
+    if (!IsmChatUtility.chatPageControllerRegistered) return false;
+    final reactions = message.reactions
+        ?.where((e) => e.emojiKey.isNotEmpty && e.userIds.isNotEmpty)
+        .toList();
+    return reactions?.isNotEmpty == true;
+  }
+
+  /// Long-press / secondary-tap opens the same focus menu as the channel
+  /// (including [ReactionGrid] when reactions are enabled).
+  static Widget _wrapWithFocusMenu(
+    BuildContext context,
+    IsmChatMessageModel message,
+    Widget child,
+  ) {
+    if (!IsmChatUtility.chatPageControllerRegistered) return child;
+    if (message.customType == IsmChatCustomMessageType.deletedForEveryone) {
+      return child;
+    }
+    return GestureDetector(
+      onLongPress: () => unawaited(openFocusMenu(context, message)),
+      onSecondaryTap:
+          kIsWeb ? () => unawaited(openFocusMenu(context, message)) : null,
+      behavior: HitTestBehavior.translucent,
+      child: child,
+    );
+  }
+
+  /// Delegates to [IsmChatPageController] focus-menu / reaction flows.
+  static Future<void> openFocusMenu(
+    BuildContext context,
+    IsmChatMessageModel message,
+  ) async {
+    if (!IsmChatUtility.chatPageControllerRegistered) return;
+    final controller = IsmChatUtility.chatPageController;
+    if (!(controller.conversation?.isChattingAllowed ?? false)) {
+      controller.showDialogCheckBlockUnBlock();
+      return;
+    }
+    if (message.customType == IsmChatCustomMessageType.deletedForEveryone) {
+      return;
+    }
+    if (kIsWeb) {
+      await controller.holdController?.forward();
+      final animation = controller.holdAnimation;
+      if (animation != null) {
+        await controller.showOverlayWeb(context, message, animation);
+      }
+      return;
+    }
+    await controller.onMessageLongPress(context, message);
   }
 }
 

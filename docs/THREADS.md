@@ -57,6 +57,7 @@ header, as a bottom sheet.
 | Root message | plain bubble | bubble + tappable **"N replies"** footer |
 | Focus menu (long-press) | Reply, Forward, … | the same, plus **Reply in thread** |
 | Thread composer | n/a | same chrome as the channel field (`textFiledTheme` insets/decoration, emoji prefix, in-field attach, mic/send, full [IsmChatComposerEmojiBoard] with GIF/sticker when configured); hold-to-record when [IsmChatFeature.audioMessage] is on |
+| Message reactions | channel bubbles | same chips and focus-menu picker (long-press; right-click on web) on root and replies; the open panel stays in sync with the channel and local DB |
 | Incoming reply (MQTT) | appended to the channel | routed to the open thread; only the root's badge moves in the channel |
 | Offline send | queued in the pending box, retried on reconnect | identical — a queued thread reply is retried **as a thread reply** |
 | Conversation preview | last message, whatever it is | last **channel** message (thread replies do not replace the snippet) |
@@ -321,12 +322,26 @@ conversation like any message. The channel timeline filters it out by
 preview. Replies **fetched** for the panel are not cached — the panel reads the
 API.
 
+## Reactions in the thread panel
+
+When [IsmChatFeature.reaction] is on and the chat page is mounted,
+[IsmChatThreadMessageTile] shows the same reaction chips as [MessageCard] and
+opens the channel focus menu on long-press (right-click on web), including
+[ReactionGrid]. Row state is kept in sync through
+[IsmChatThreadController.applyMessageUpdate] when you add or remove a reaction,
+when MQTT delivers someone else's reaction, and when `getMessagesFromDB`
+refreshes the channel timeline — so the panel does not need to be reopened.
+
+Media rows and the reaction picker still require [IsmChatPageController] to be
+registered (same as thread attachment previews). Custom rows from
+`replyTileBuilder` / `rootMessageBuilder` must wire reactions themselves.
+
 ## Limitations
 
 - **Message search stays on the main timeline** when threads are on, so a hit
   can always be scrolled to in the channel.
-- Reactions, copy and delete inside the thread panel are not wired to the
-  panel's rows yet — use the channel bubble or your own `replyTileBuilder`.
+- Copy and delete from the thread panel rows still use the channel focus menu or
+  your own `replyTileBuilder` / `rootMessageBuilder` if you replace SDK rows.
 
 ---
 

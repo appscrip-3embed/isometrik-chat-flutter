@@ -19,16 +19,19 @@ mixin IsmChatMqttEventMessageHandlersMixin {
   Future<void> handleMessage(IsmChatMessageModel message) async {
     _trackCallMeetingLiveness(message);
     final self = this;
-    var isOwnMessage = false;
+    var isFromThisDevice = false;
+    var isFromCurrentUser = false;
     if (self is IsmChatMqttEventUtilitiesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
-      isOwnMessage = utils.isSenderMe(message.senderInfo?.userId,
-          deviceId: message.deviceId);
+      final senderId = message.senderInfo?.userId;
+      isFromThisDevice =
+          utils.isSenderMe(senderId, deviceId: message.deviceId);
+      isFromCurrentUser = utils.isSenderMe(senderId);
       // Allow own call bubbles through so the initiator sees "In call" at start.
-      if (isOwnMessage && !message.isSdkCallBubbleMessage) {
+      if (isFromThisDevice && !message.isSdkCallBubbleMessage) {
         return;
       }
-      if (!isOwnMessage) {
+      if (!isFromCurrentUser) {
         utils.handleUnreadMessages(message.senderInfo?.userId ?? '');
       }
     }
@@ -80,7 +83,7 @@ mixin IsmChatMqttEventMessageHandlersMixin {
       }
     }
     if (conversation == null) return;
-    if (!isOwnMessage &&
+    if (!isFromThisDevice &&
         conversation.lastMessageDetails?.messageId == message.messageId) {
       return;
     }
@@ -114,7 +117,7 @@ mixin IsmChatMqttEventMessageHandlersMixin {
         // Thread-only replies still bump the unread badge (product decision,
         // matching the backend) but never replace the conversation preview.
         if (!hideMemberLeave && isThreadOnlyReply) {
-          if (!isOwnMessage) {
+          if (!isFromCurrentUser) {
             next = next.copyWith(
               unreadMessagesCount: IsmChatResponsive.isWeb(
                         IsmChatConfig.kNavigatorKey.currentContext ??
@@ -137,11 +140,11 @@ mixin IsmChatMqttEventMessageHandlersMixin {
           );
         }
         if (!hideMemberLeave) {
-          final alreadyApplied = !isOwnMessage &&
+          final alreadyApplied = !isFromThisDevice &&
               next.lastMessageDetails?.messageId == message.messageId;
           if (!alreadyApplied) {
             next = next.copyWith(
-              unreadMessagesCount: isOwnMessage
+              unreadMessagesCount: isFromCurrentUser
                   ? next.unreadMessagesCount
                   : IsmChatResponsive.isWeb(
                           IsmChatConfig.kNavigatorKey.currentContext ??
@@ -185,7 +188,7 @@ mixin IsmChatMqttEventMessageHandlersMixin {
       },
     );
     unawaited(IsmChatUtility.conversationController.getConversationsFromDB());
-    if (isOwnMessage) {
+    if (isFromThisDevice) {
       if (!IsmChatUtility.chatPageControllerRegistered) {
         return;
       }
@@ -233,8 +236,8 @@ mixin IsmChatMqttEventMessageHandlersMixin {
     final self = this;
     if (self is IsmChatMqttEventUtilitiesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
-      if (utils.isSenderMe(message.senderInfo?.userId,
-          deviceId: message.deviceId)) {
+      // Any device logged into this user — do not show local/foreground banners.
+      if (utils.isSenderMe(message.senderInfo?.userId)) {
         return;
       }
     }

@@ -30,6 +30,8 @@ class IsmChatThreadTheme {
     required this.sendButtonIconColor,
     required this.errorTextStyle,
     required this.emptyTextStyle,
+    required this.reactionChipBorderColor,
+    required this.reactionCountStyle,
   });
 
   factory IsmChatThreadTheme.light() => IsmChatThreadTheme(
@@ -94,6 +96,12 @@ class IsmChatThreadTheme {
         emptyTextStyle: const TextStyle(
           fontSize: 13.5,
           color: IsmChatColors.greyColor,
+        ),
+        reactionChipBorderColor:
+            IsmChatColors.greyColorLight.withValues(alpha: 0.55),
+        reactionCountStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
         ),
       );
 
@@ -171,6 +179,12 @@ class IsmChatThreadTheme {
           fontSize: 13.5,
           color: IsmChatColors.greyColorLight,
         ),
+        reactionChipBorderColor: IsmChatColors.greyColor.withValues(alpha: 0.55),
+        reactionCountStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: IsmChatColors.whiteColor,
+        ),
       );
 
   /// Background of the thread panel. Defaults follow [IsmChatListTheme.backGroundColor].
@@ -212,4 +226,10 @@ class IsmChatThreadTheme {
 
   final TextStyle errorTextStyle;
   final TextStyle emptyTextStyle;
+
+  /// Outline for reaction pills in the thread panel ([IsmChatThreadReactionRow]).
+  final Color reactionChipBorderColor;
+
+  /// Emoji count label inside thread reaction pills.
+  final TextStyle reactionCountStyle;
 }
