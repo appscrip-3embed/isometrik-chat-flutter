@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -255,6 +257,146 @@ void main() {
         ),
       );
       expect(find.byType(IsmChatThreadReactionRow), findsOneWidget);
+      await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
+    });
+
+  /// Media captions use [IsmChatThreadTheme.bodyStyle], not bubble colors.
+    Future<void> putChatPageForThreadTile(FakeChatApi api) async {
+      IsmChatConfig.threadsEnabled = true;
+      Get.put(
+        IsmChatPageController(
+          IsmChatPageViewModel(
+            IsmChatPageRepository(apiWrapper: api.wrapper()),
+          ),
+        ),
+        tag: IsmChat.i.chatPageTag,
+      );
+    }
+
+    /// Local-only attachment row: avoids bogus [AttachmentModel.bytes] in tests.
+    AttachmentModel threadTileImageAttachment() =>
+        attachment(IsmChatMediaType.image).copyWith(
+          mediaUrl: '',
+          thumbnailUrl: '',
+          bytes: Uint8List(0),
+        );
+
+    testWidgets('shows media caption from metadata with thread body style',
+        (tester) async {
+      await putChatPageForThreadTile(api);
+      const caption = 'Sunset at the lake';
+      final imageReply = message(
+        body: caption,
+        customType: IsmChatCustomMessageType.reply,
+        messageType: IsmChatMessageType.reply,
+        sentByMe: true,
+        attachments: [threadTileImageAttachment()],
+        metaData: IsmChatMetaData(caption: caption),
+      );
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadMessageTile(message: imageReply),
+      );
+      await tester.pump();
+      expect(find.text(caption), findsOneWidget);
+      final captionText = tester.widget<Text>(find.text(caption));
+      expect(captionText.style?.color, isNot(IsmChatColors.whiteColor));
+      await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
+    });
+
+    testWidgets('shows media caption from body when metadata is empty',
+        (tester) async {
+      await putChatPageForThreadTile(api);
+      const caption = 'Caption only in body';
+      final imageReply = message(
+        body: caption,
+        customType: IsmChatCustomMessageType.reply,
+        messageType: IsmChatMessageType.reply,
+        attachments: [threadTileImageAttachment()],
+        metaData: IsmChatMetaData(),
+      );
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadMessageTile(message: imageReply),
+      );
+      await tester.pump();
+      expect(find.text(caption), findsOneWidget);
+      await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
+    });
+
+    testWidgets('does not treat attachment placeholder body as a caption',
+        (tester) async {
+      await putChatPageForThreadTile(api);
+      final imageReply = message(
+        body: IsmChatStrings.image,
+        customType: IsmChatCustomMessageType.reply,
+        messageType: IsmChatMessageType.reply,
+        attachments: [threadTileImageAttachment()],
+        metaData: IsmChatMetaData(),
+      );
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadMessageTile(message: imageReply),
+      );
+      await tester.pump();
+      expect(find.byType(IsmChatImageMessage), findsOneWidget);
+      expect(find.text(IsmChatStrings.image), findsNothing);
+      await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
+    });
+
+    testWidgets('short text replies do not show Show more', (tester) async {
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadMessageTile(
+          message: threadReply(body: 'Hello thread'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Hello thread'), findsOneWidget);
+      expect(find.text('Show more'), findsNothing);
+    });
+
+    testWidgets('long text replies can expand and collapse', (tester) async {
+      final longBody = List.generate(20, (i) => 'Thread paragraph line $i.').join('\n');
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadMessageTile(
+          message: threadReply(body: longBody),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Show more'), findsOneWidget);
+      await tester.tap(find.text('Show more'));
+      await tester.pump();
+      expect(find.text('Show less'), findsOneWidget);
+      expect(find.textContaining('Thread paragraph line 19'), findsOneWidget);
+      await tester.tap(find.text('Show less'));
+      await tester.pump();
+      expect(find.text('Show more'), findsOneWidget);
+    });
+
+    testWidgets('long media captions offer Show more', (tester) async {
+      await putChatPageForThreadTile(api);
+      const longCaption =
+          'A very long caption that should wrap across multiple lines in the '
+          'thread panel when the row is only as wide as the message column '
+          'beside the avatar.';
+      final imageReply = message(
+        body: longCaption,
+        customType: IsmChatCustomMessageType.reply,
+        messageType: IsmChatMessageType.reply,
+        attachments: [threadTileImageAttachment()],
+        metaData: IsmChatMetaData(caption: longCaption),
+      );
+      await pumpChatHost(
+        tester,
+        child: SizedBox(
+          width: 320,
+          child: IsmChatThreadMessageTile(message: imageReply),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Show more'), findsOneWidget);
       await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
     });
   });

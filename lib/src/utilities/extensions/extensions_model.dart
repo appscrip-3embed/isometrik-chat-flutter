@@ -1301,9 +1301,32 @@ extension MentionMessage on IsmChatMessageModel {
           attachments!.length > 1 &&
           (body == _multipleBody || customType?.value == _multipleBody));
 
-  /// Caption shown under a multi-attachment bubble ([IsmChatMetaData.caption] only).
-  String get multipleAttachmentCaption =>
-      metaData?.caption?.trim() ?? '';
+  /// Human-readable caption for media / attachment payloads.
+  ///
+  /// Prefers [IsmChatMetaData.caption], then non-sentinel [body]. Reused by the
+  /// thread panel and [IsmChatRestrictedMediaMessage] so captions stay visible
+  /// when metadata is missing or bubble text colors would hide them.
+  String get attachmentDisplayCaption {
+    final fromMeta = metaData?.caption?.trim() ?? '';
+    if (fromMeta.isNotEmpty) return fromMeta;
+    final trimmedBody = body.trim();
+    if (trimmedBody.isEmpty) return '';
+    if (IsmChatUtility.isOutboundAttachmentPlaceholderBody(trimmedBody)) {
+      return '';
+    }
+    if (trimmedBody.startsWith('AttachmentMessage:')) return '';
+    return trimmedBody;
+  }
+
+  /// Caption shown under a multi-attachment bubble (metadata, else host [body]).
+  String get multipleAttachmentCaption {
+    final fromMeta = metaData?.caption?.trim() ?? '';
+    if (fromMeta.isNotEmpty) return fromMeta;
+    final trimmedBody = body.trim();
+    if (trimmedBody.isEmpty || trimmedBody == _multipleBody) return '';
+    if (trimmedBody.startsWith('AttachmentMessage:')) return '';
+    return trimmedBody;
+  }
 
   /// Homogeneous layout for multipleAttachments messages.
   ///

@@ -17,7 +17,7 @@ class IsmChatRestrictedMediaMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final caption = _caption;
+    final caption = message.attachmentDisplayCaption;
     final textColor = message.textColor ?? IsmChatColors.greyColor;
     return Padding(
       padding: IsmChatDimens.edgeInsets4,
@@ -61,15 +61,5 @@ class IsmChatRestrictedMediaMessage extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  /// Caption/text to preserve under the placeholder, if any.
-  String get _caption {
-    final fromMeta = message.metaData?.caption?.trim() ?? '';
-    if (fromMeta.isNotEmpty) return fromMeta;
-    final body = message.body.trim();
-    // Ignore protocol/sentinel bodies that are not human captions.
-    if (body.isEmpty || body.startsWith('AttachmentMessage:')) return '';
-    return body;
   }
 }
