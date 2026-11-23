@@ -566,6 +566,15 @@ bool isCurrentChatUser(String userId) {
   return id == IsmChatConfig.communicationConfig.userConfig.userId.trim();
 }
 
+/// Same as [isCurrentChatUser] when chat config is initialized; otherwise false.
+bool _isCurrentChatUserWhenConfigured(String userId) {
+  try {
+    return isCurrentChatUser(userId);
+  } catch (_) {
+    return false;
+  }
+}
+
 bool _equalsIgnoreCase(String a, String b) =>
     a.toLowerCase() == b.toLowerCase();
 
@@ -686,12 +695,19 @@ List<UserDetails> buildMentionLookupCandidates({
 
 /// Builds mention/link segments for arbitrary chat text.
 ///
-/// Reuse for reply parent snippets via [buildMentionLookupCandidates].
+/// [mentionCandidates] is used for legacy name matching and tap resolution.
+/// When [authoritativeMentionedUsers] is non-empty, only those entries
+/// (by [UserDetails.order] / [UserDetails.wordCount]) drive @ highlight spans.
 List<LocalMentionAndLinkData> ismChatMentionSegmentsForBody(
   String text,
-  List<UserDetails> mentionCandidates,
-) =>
-    _buildMentionAndLinkSegments(text, mentionCandidates);
+  List<UserDetails> mentionCandidates, {
+  List<UserDetails>? authoritativeMentionedUsers,
+}) =>
+    _buildMentionAndLinkSegments(
+      text,
+      mentionCandidates,
+      authoritativeMentionedUsers: authoritativeMentionedUsers,
+    );
 
 /// True when [segmentAfterAt] (text after `@`) starts with [memberName].
 bool mentionSegmentMatchesMemberName(
@@ -704,10 +720,92 @@ bool mentionSegmentMatchesMemberName(
   return _mentionNameEndAfterAt(padded, 0, name) != null;
 }
 
+/// Group member ids already picked in the composer for the current message.
+///
+/// Reuse when filtering [IsmChatPageController.mentionSuggestions] and when
+/// building [IsmChatPageController.userMentionedList] on send.
+Set<String> mentionUserIdsInComposerText(
+  String composerText,
+  List<UserDetails> groupMembers,
+) {
+  final segments = composerText.split('@').toList()
+    ..removeWhere((e) => e.trim().isEmpty);
+  final resolvedIds = <String>{};
+
+  for (final seg in segments) {
+    final trimmed = seg.trimLeft();
+  outer:
+    for (final member in groupMembers) {
+      if (_isCurrentChatUserWhenConfigured(member.userId)) continue;
+      final userName = member.userName.trim();
+      if (userName.isEmpty) continue;
+
+      final label = mentionLabelForUser(member);
+      final displayName = member.displayName.trim();
+      final matches = mentionSegmentMatchesMemberName(trimmed, label) ||
+          (displayName.isNotEmpty &&
+              mentionSegmentMatchesMemberName(trimmed, displayName)) ||
+          mentionSegmentMatchesMemberName(trimmed, userName);
+      if (matches) {
+        final id = member.userId.trim();
+        if (id.isNotEmpty) resolvedIds.add(id);
+        break outer;
+      }
+    }
+  }
+  return resolvedIds;
+}
+
+/// `@` that starts a composer mention (not an email local-part).
+bool _isComposerMentionAt(String text, int index) {
+  if (index < 0 || index >= text.length || text[index] != '@') return false;
+  if (index == 0) return true;
+  final prev = text[index - 1];
+  return prev == ' ' || prev == '\n' || prev == '\t';
+}
+
+List<UserDetails> _orderedMentionUsersByApiOrder(
+  List<UserDetails> users,
+) {
+  final seen = <String>{};
+  final ordered = <UserDetails>[];
+  for (final user in users) {
+    if (_isCurrentChatUserWhenConfigured(user.userId)) continue;
+    final id = user.userId.trim();
+    if (id.isEmpty || !seen.add(id)) continue;
+    ordered.add(user);
+  }
+  ordered.sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+  return ordered;
+}
+
+/// Mention span end for one [user] at `@` in [text], preferring full name match.
+int? _mentionEndForUser(String text, int atIndex, UserDetails user) {
+  if (!_isComposerMentionAt(text, atIndex)) return null;
+  for (final name in _mentionNamesForUser(user)) {
+    final byName = _mentionNameEndAfterAt(text, atIndex, name);
+    if (byName != null) return byName;
+  }
+  final label = mentionLabelForUser(user);
+  final words =
+      label.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  if (words.isEmpty) return null;
+  // Do not consume [wordCount] words unless the inserted label's first token matches.
+  if (_mentionNameEndAfterAt(text, atIndex, words.first) == null) {
+    return null;
+  }
+  final apiWordCount = user.wordCount ?? 0;
+  final wordCount =
+      apiWordCount >= 1 ? apiWordCount : _mentionLabelWordCount(user);
+  if (wordCount < 1) return null;
+  return _mentionWordCountEndAfterAt(text, atIndex, wordCount);
+}
+
 List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
   String text,
-  List<UserDetails> mentionCandidates,
-) {
+  List<UserDetails> mentionCandidates, {
+  List<UserDetails>? authoritativeMentionedUsers,
+}) {
   final nonMentionLink = RegExp(
     r'\bhttps?:\/\/\S+\b|\bwww\.\S+\b|\b\d{9,13}\b|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
     caseSensitive: false,
@@ -717,29 +815,43 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
   bool hasLinkAt(int index) =>
       nonMentionLink.allMatches(text).any((m) => m.start == index);
 
-  final orderedMentionUsers = <UserDetails>[];
-  final orderedSeen = <String>{};
-  for (final user in mentionCandidates) {
-    if ((user.wordCount ?? 0) < 1) continue;
-    final id = user.userId.trim();
-    if (id.isEmpty || !orderedSeen.add(id)) continue;
-    orderedMentionUsers.add(user);
-  }
-  orderedMentionUsers.sort(
-    (a, b) => (a.order ?? 0).compareTo(b.order ?? 0),
+  final authoritative = _orderedMentionUsersByApiOrder(
+    authoritativeMentionedUsers ?? const <UserDetails>[],
   );
+  final useAuthoritativeMentions = authoritative.isNotEmpty;
+
+  final legacyOrderedMentionUsers = <UserDetails>[];
+  if (!useAuthoritativeMentions) {
+    final orderedSeen = <String>{};
+    for (final user in mentionCandidates) {
+      if ((user.wordCount ?? 0) < 1) continue;
+      final id = user.userId.trim();
+      if (id.isEmpty || !orderedSeen.add(id)) continue;
+      legacyOrderedMentionUsers.add(user);
+    }
+    legacyOrderedMentionUsers.sort(
+      (a, b) => (a.order ?? 0).compareTo(b.order ?? 0),
+    );
+  }
 
   int? mentionEndAt(int index) {
+    if (!_isComposerMentionAt(text, index)) return null;
     int? best;
     for (final user in mentionCandidates) {
       for (final name in _mentionNamesForUser(user)) {
         final end = _mentionNameEndAfterAt(text, index, name);
         if (end != null && (best == null || end > best)) best = end;
       }
-      final wordCount = _mentionLabelWordCount(user);
-      if (wordCount >= 1) {
-        final end = _mentionWordCountEndAfterAt(text, index, wordCount);
-        if (end != null && (best == null || end > best)) best = end;
+      final label = mentionLabelForUser(user);
+      final firstWord =
+          label.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).firstOrNull;
+      if (firstWord != null &&
+          _mentionNameEndAfterAt(text, index, firstWord) != null) {
+        final wordCount = _mentionLabelWordCount(user);
+        if (wordCount >= 1) {
+          final end = _mentionWordCountEndAfterAt(text, index, wordCount);
+          if (end != null && (best == null || end > best)) best = end;
+        }
       }
     }
     return best;
@@ -764,22 +876,24 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
 
   final segments = <LocalMentionAndLinkData>[];
   var i = 0;
-  var mentionAtIndex = 0;
+  var mentionSlotIndex = 0;
   while (i < text.length) {
-    if (text[i] == '@') {
-      var end = mentionEndAt(i);
+    if (text[i] == '@' && _isComposerMentionAt(text, i)) {
+      int? end;
 
-      // When name matching fails, use n-th [mentionedUsers] entry (by [order]).
-      if ((end == null || end <= i + 1) &&
-          mentionAtIndex < orderedMentionUsers.length) {
-        final user = orderedMentionUsers[mentionAtIndex];
-        final wc = _mentionLabelWordCount(user);
-        if (wc >= 1) {
-          final byOrder = _mentionWordCountEndAfterAt(text, i, wc);
-          if (byOrder != null) end = byOrder;
+      if (useAuthoritativeMentions &&
+          mentionSlotIndex < authoritative.length) {
+        end = _mentionEndForUser(text, i, authoritative[mentionSlotIndex]);
+      } else if (!useAuthoritativeMentions) {
+        end = mentionEndAt(i);
+
+        // When name matching fails, use n-th legacy mention entry (by [order]).
+        if ((end == null || end <= i + 1) &&
+            mentionSlotIndex < legacyOrderedMentionUsers.length) {
+          final user = legacyOrderedMentionUsers[mentionSlotIndex];
+          end = _mentionEndForUser(text, i, user);
         }
       }
-      mentionAtIndex++;
 
       if (end != null &&
           end > i + 1 &&
@@ -790,20 +904,27 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
             isLink: true,
           ),
         );
+        if (useAuthoritativeMentions ||
+            mentionSlotIndex < legacyOrderedMentionUsers.length) {
+          mentionSlotIndex++;
+        }
         i = end;
         continue;
       }
-      // Last resort: single token after `@` (legacy bodies without wordCount).
-      final fallback = singleWordMention.matchAsPrefix(text, i);
-      if (fallback != null && !isSelfMentionSpan(i, fallback.end)) {
-        segments.add(
-          LocalMentionAndLinkData(
-            text: fallback.group(0)!,
-            isLink: true,
-          ),
-        );
-        i = fallback.end;
-        continue;
+
+      if (!useAuthoritativeMentions) {
+        // Last resort: single token after `@` (legacy bodies without wordCount).
+        final fallback = singleWordMention.matchAsPrefix(text, i);
+        if (fallback != null && !isSelfMentionSpan(i, fallback.end)) {
+          segments.add(
+            LocalMentionAndLinkData(
+              text: fallback.group(0)!,
+              isLink: true,
+            ),
+          );
+          i = fallback.end;
+          continue;
+        }
       }
     }
 
@@ -853,6 +974,7 @@ extension MentionMessage on IsmChatMessageModel {
       return ismChatMentionSegmentsForBody(
         bodyText,
         _mentionLookupCandidates(),
+        authoritativeMentionedUsers: mentionedUsers,
       );
     } catch (e, st) {
       IsmChatLog.error(e, st);
@@ -870,6 +992,7 @@ extension MentionMessage on IsmChatMessageModel {
       return ismChatMentionSegmentsForBody(
         bodyText,
         buildMentionLookupCandidates(mentionedUsers: mentionedUsers),
+        authoritativeMentionedUsers: mentionedUsers,
       );
     } catch (e, st) {
       IsmChatLog.error(e, st);
@@ -881,7 +1004,11 @@ extension MentionMessage on IsmChatMessageModel {
   List<LocalMentionAndLinkData> get mentionList {
     try {
       if (body.isEmpty) return [];
-      return _buildMentionAndLinkSegments(body, _mentionLookupCandidates());
+      return _buildMentionAndLinkSegments(
+        body,
+        _mentionLookupCandidates(),
+        authoritativeMentionedUsers: mentionedUsers,
+      );
     } catch (e, st) {
       IsmChatLog.error(e, st);
       return [];

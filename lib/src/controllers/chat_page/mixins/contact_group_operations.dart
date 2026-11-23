@@ -136,9 +136,18 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
     var query = value.split('@').last;
     final currentUserId =
         IsmChatConfig.communicationConfig.userConfig.userId.trim();
+    final alreadyMentioned = mentionUserIdsInComposerText(
+      value,
+      _controller.groupMembers,
+    );
     _controller.mentionSuggestions = _controller.groupMembers
         .where((e) => e.userId.trim() != currentUserId)
-        .where((e) => e.userName.toLowerCase().contains(query.toLowerCase()))
+        .where((e) => !alreadyMentioned.contains(e.userId.trim()))
+        .where((e) {
+          final q = query.toLowerCase();
+          final label = mentionLabelForUser(e).toLowerCase();
+          return e.userName.toLowerCase().contains(q) || label.contains(q);
+        })
         .toList();
   }
 
@@ -179,8 +188,6 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
     final mentionedList = (data.split('@').toList())
       ..removeWhere((e) => e.trim().isEmpty);
 
-    final currentUserId =
-        IsmChatConfig.communicationConfig.userConfig.userId.trim();
     final seenUserIds = <String>{};
 
     for (var mentionIndex = 0; mentionIndex < mentionedList.length;
@@ -189,7 +196,7 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
       UserDetails? matchedMember;
 
       for (final member in _controller.groupMembers) {
-        if (member.userId.trim() == currentUserId) continue;
+        if (isCurrentChatUser(member.userId)) continue;
         final userName = member.userName.trim();
         if (userName.isEmpty) continue;
 
