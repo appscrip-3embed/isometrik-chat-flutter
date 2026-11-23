@@ -115,10 +115,39 @@ class IsmChatThreadController extends GetxController {
   /// Clears the nested-reply target.
   void clearReplyTo() => replyTo = null;
 
+  /// Panel counterpart to [IsmChatPageController.onReplyTap]: targets the
+  /// thread composer for a nested reply instead of the channel quote bar.
+  ///
+  /// Reuse from tap-to-reply on thread rows
+  /// ([IsmChatThreadCoordinator.isMessageInOpenThreadPanel]).
+  void beginReplyTo(IsmChatMessageModel message) {
+    if (showEmojiBoard) {
+      closeEmojiBoard();
+    }
+    replyTo = message;
+    replyFocusNode.requestFocus();
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      final page = IsmChatUtility.chatPageController;
+      page
+        ..isreplying = false
+        ..replayMessage = null;
+    }
+  }
+
   final _isSending = false.obs;
 
   /// Whether a reply send is in flight (composer shows a spinner).
   bool get isSending => _isSending.value;
+
+  /// Wired by [IsmChatThreadView] so sends can scroll the reply list to the end.
+  VoidCallback? onScrollRepliesToBottom;
+
+  /// Schedules [onScrollRepliesToBottom] after the next frame once new rows lay out.
+  void requestScrollRepliesToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      onScrollRepliesToBottom?.call();
+    });
+  }
 
   // ----------------------------------------- composer (voice / send affordance)
 
@@ -467,6 +496,7 @@ class IsmChatThreadController extends GetxController {
     replyController.clear();
     _replyTo.value = null;
     _replies.add(pending);
+    requestScrollRepliesToBottom();
     if (sendToChannel) {
       _mirrorAlsoSendOnChannel(pending);
     }
@@ -652,6 +682,9 @@ class IsmChatThreadController extends GetxController {
     if (rootId.isEmpty) return false;
     if ((reply.threadRootId ?? '').trim() != rootId) return false;
     _mergeReply(reply);
+    if (reply.sentByMe) {
+      requestScrollRepliesToBottom();
+    }
     return true;
   }
 

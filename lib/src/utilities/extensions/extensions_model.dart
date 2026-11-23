@@ -1067,12 +1067,12 @@ extension MentionMessage on IsmChatMessageModel {
       menu.remove(IsmChatFocusMenuType.reply);
     }
 
-    // Slack-style threads: hidden unless the feature is on for this app and
-    // this row can actually root a thread. With threads off the menu is
-    // byte-for-byte what it has always been.
-    if (!IsmChatThreadCoordinator.isUiEnabled ||
-        !IsmChatThreadCoordinator.canOpenThread(this)) {
+    // Slack-style threads: channel timeline only — not inside [IsmChatThreadView].
+    if (!IsmChatThreadCoordinator.shouldShowReplyInThreadFocusMenu(this)) {
       menu.remove(IsmChatFocusMenuType.replyInThread);
+    }
+    if (!IsmChatThreadCoordinator.shouldShowReplyFocusMenu(this)) {
+      menu.remove(IsmChatFocusMenuType.reply);
     }
 
     return menu;

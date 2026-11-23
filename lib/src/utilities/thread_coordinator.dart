@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 /// Single source of truth for Slack-style threading rules.
@@ -285,6 +286,34 @@ class IsmChatThreadCoordinator {
       IsmChatCustomMessageType.unblock,
     ].contains(message.customType);
   }
+
+  /// Whether [message] is a row in the thread panel currently on screen
+  /// (root or reply in the open thread — not the channel timeline).
+  ///
+  /// Used to hide **Reply**, **Reply in thread**, and **View thread** on
+  /// long-press inside [IsmChatThreadView]; users answer via the composer or
+  /// tap-to-reply on thread rows.
+  static bool isMessageInOpenThreadPanel(IsmChatMessageModel? message) {
+    if (message == null) return false;
+    if (!Get.isRegistered<IsmChatThreadController>()) return false;
+    final controller = Get.find<IsmChatThreadController>();
+    if (controller.root == null) return false;
+    final openRootId = controller.threadRootId.trim();
+    if (openRootId.isEmpty) return false;
+    return threadIdOf(message) == openRootId;
+  }
+
+  /// Whether the focus menu should offer **Reply in thread** (channel) or
+  /// **View thread** (also-sent row). Never shown for rows inside the open panel.
+  static bool shouldShowReplyInThreadFocusMenu(IsmChatMessageModel? message) =>
+      isUiEnabled &&
+      canOpenThread(message) &&
+      !isMessageInOpenThreadPanel(message);
+
+  /// Whether the focus menu should offer **Reply** (channel inline quote or
+  /// nested thread reply). Never shown for rows inside the open panel.
+  static bool shouldShowReplyFocusMenu(IsmChatMessageModel? message) =>
+      !isMessageInOpenThreadPanel(message);
 
   // ------------------------------------------------------------ reply count
 

@@ -44,7 +44,6 @@ class IsmChatThreadComposer extends StatelessWidget {
                 style: threadTheme.errorTextStyle),
             IsmChatDimens.boxHeight4,
           ],
-          if (controller.replyTo != null) _replyToChip(threadTheme),
           Row(
             mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -98,8 +97,21 @@ class IsmChatThreadComposer extends StatelessWidget {
                       color: _textFiledTheme?.backgroundColor ??
                           IsmChatConfig.chatTheme.backgroundColor,
                     ),
-                    child: Row(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (controller.replyTo != null)
+                          IsmChatComposerReplyBar(
+                            key: const Key('ism-thread-reply-to-chip'),
+                            parentMessage: controller.replyTo!,
+                            messageBody: IsmChatComposerReplyBar.displayBodyFor(
+                              controller.replyTo,
+                            ),
+                            conversation: controller.conversation,
+                            onDismiss: controller.clearReplyTo,
+                          ),
+                        Row(
+                          children: [
                         Expanded(
                           child: TextField(
                             key: const Key('ism-thread-composer-field'),
@@ -152,16 +164,18 @@ class IsmChatThreadComposer extends StatelessWidget {
                         if (_props.showAttachments &&
                             !IsmChatResponsive.isWeb(context))
                           const _ThreadAttachmentIcon(),
+                          ],
+                        ),
                       ],
                     ),
                   ),
                 ),
+                _ThreadMicOrSendButton(
+                  controller: controller,
+                  audioEnabled: _props.isAudioMessageEnabled,
+                ),
+                IsmChatDimens.boxWidth4,
               ],
-              _ThreadMicOrSendButton(
-                controller: controller,
-                audioEnabled: _props.isAudioMessageEnabled,
-              ),
-              IsmChatDimens.boxWidth4,
             ],
           ),
           if (_props.showAlsoSendToChannel) ...[
@@ -250,46 +264,6 @@ class IsmChatThreadComposer extends StatelessWidget {
         ),
       );
 
-  Widget _replyToChip(IsmChatThreadTheme theme) {
-    final target = controller.replyTo!;
-    final name = target.sentByMe
-        ? IsmChatStrings.you
-        : (target.senderInfo?.userName ?? '');
-    return Container(
-      key: const Key('ism-thread-reply-to-chip'),
-      margin: EdgeInsets.only(bottom: IsmChatDimens.four),
-      padding: EdgeInsets.symmetric(
-        horizontal: IsmChatDimens.eight,
-        vertical: IsmChatDimens.four,
-      ),
-      decoration: BoxDecoration(
-        color: theme.rootCardBackgroundColor,
-        borderRadius: BorderRadius.circular(IsmChatDimens.eight),
-        border: Border.all(color: theme.rootCardBorderColor),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '${IsmChatStrings.focusMenuReply} · $name: ${target.body}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.timeStyle,
-            ),
-          ),
-          IsmChatTapHandler(
-            key: const Key('ism-thread-reply-to-clear'),
-            onTap: controller.clearReplyTo,
-            child: Icon(
-              Icons.close_rounded,
-              size: IsmChatDimens.forteen,
-              color: theme.footerIconColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _ThreadEmojiButton extends StatelessWidget {

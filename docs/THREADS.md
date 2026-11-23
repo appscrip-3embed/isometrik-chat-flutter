@@ -111,6 +111,13 @@ to; subject truncated to 10 characters). The long-press
 menu says **View thread** instead of **Reply in thread**; it still opens the
 same thread panel.
 
+Inside [IsmChatThreadView], long-press on the root or any reply does **not**
+include **Reply**, **Reply in thread**, or **View thread** — answer with the
+composer (or tap a text reply to set a reply-to target; that stays in the same
+thread). The reply strip above the thread
+field reuses [IsmChatComposerReplyBar] from the channel composer (sender,
+caption, image/video thumb).
+
 ---
 
 ## Public API (`IsmChat.i`)

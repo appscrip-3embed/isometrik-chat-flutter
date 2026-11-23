@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
@@ -17,6 +20,10 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 /// Customize copy / rows with [IsmChatProperties.threadProperties] and styling
 /// with [IsmChatThemeData.threadTheme]. Requires
 /// [IsmChatConfig.threadsEnabled]; with threads off this view is never shown.
+///
+/// Long-press on root or reply rows does not offer **Reply**, **Reply in thread**,
+/// or **View thread** ([IsmChatThreadCoordinator.shouldShowReplyFocusMenu],
+/// [IsmChatThreadCoordinator.shouldShowReplyInThreadFocusMenu]).
 class IsmChatThreadView extends StatefulWidget {
   const IsmChatThreadView({
     required this.rootMessage,
@@ -54,6 +61,7 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
     IsmChatThreadBinding().dependencies();
     _controller = Get.find<IsmChatThreadController>();
     _scrollController.addListener(_onScroll);
+    _controller.onScrollRepliesToBottom = _scrollRepliesToBottom;
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncPanelIfNeeded());
   }
 
@@ -81,11 +89,28 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
 
   @override
   void dispose() {
+    _controller.onScrollRepliesToBottom = null;
     _scrollController
       ..removeListener(_onScroll)
       ..dispose();
     _controller.closeThread();
     super.dispose();
+  }
+
+  /// After the user sends text or an attachment, reveal the newest reply.
+  void _scrollRepliesToBottom() {
+    unawaited(_animateRepliesScrollToEnd());
+  }
+
+  Future<void> _animateRepliesScrollToEnd() async {
+    if (!mounted || !_scrollController.hasClients) return;
+    await SchedulerBinding.instance.endOfFrame;
+    if (!mounted || !_scrollController.hasClients) return;
+    await _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: IsmChatConfig.animationDuration,
+      curve: Curves.fastOutSlowIn,
+    );
   }
 
   void _onScroll() {
@@ -297,7 +322,7 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
               return IsmChatTapHandler(
                 onTap: () {
                   IsmChatUtility.hideKeyboard();
-                  _controller.replyTo = reply;
+                  _controller.beginReplyTo(reply);
                 },
                 child: tile,
               );

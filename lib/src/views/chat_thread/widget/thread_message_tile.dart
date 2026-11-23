@@ -110,7 +110,8 @@ class IsmChatThreadMessageTile extends StatelessWidget {
         IsmChatUtility.chatPageControllerRegistered;
     final showBodyText = body.isNotEmpty &&
         !(asBubble && IsmChatUtility.isOutboundAttachmentPlaceholderBody(body));
-    final attachmentCaption = message.attachmentDisplayCaption;
+    final attachmentCaption =
+        _threadBubbleAttachmentCaption(message, bubbleType);
     final bubbleMessage = asBubble
         ? _threadPanelBubbleMessageForWrapper(message, bubbleType!)
         : message;
@@ -299,6 +300,20 @@ class IsmChatThreadMessageTile extends StatelessWidget {
     }
     await controller.onMessageLongPress(context, message);
   }
+}
+
+/// Caption under the bubble in the thread panel.
+///
+/// File messages already show the name on [IsmChatFileMessage]; only show
+/// text here when the user added a [IsmChatMetaData.caption].
+String _threadBubbleAttachmentCaption(
+  IsmChatMessageModel message,
+  IsmChatCustomMessageType? bubbleType,
+) {
+  if (bubbleType == IsmChatCustomMessageType.file) {
+    return message.metaData?.caption?.trim() ?? '';
+  }
+  return message.attachmentDisplayCaption;
 }
 
 /// Show more / Show less accent on the thread panel (readable on any background).

@@ -471,6 +471,29 @@ void main() {
       expect(controller.replyTo, isNull);
     });
 
+    test('beginReplyTo sets nested target and clears channel quote state',
+        () async {
+      // Page controller only — avoids conversations onInit scroll listeners
+      // that tearDown disposes while still subscribed.
+      final page = Get.put(
+        IsmChatPageController(
+          IsmChatPageViewModel(
+            IsmChatPageRepository(apiWrapper: api.wrapper()),
+          ),
+        ),
+        tag: IsmChat.i.chatPageTag,
+      );
+      await controller.openThread(root: threadRoot());
+      final target = threadReply(messageId: 'r1', threadRootId: 'root-1');
+      page
+        ..isreplying = true
+        ..replayMessage = message(messageId: 'chan');
+      controller.beginReplyTo(target);
+      expect(controller.replyTo?.messageId, 'r1');
+      expect(page.isreplying, isFalse);
+      expect(page.replayMessage, isNull);
+    });
+
     test('ignores empty text and a missing root', () async {
       await controller.openThread(root: threadRoot());
       controller.replyController.text = '   ';
@@ -968,6 +991,71 @@ void main() {
       expect(pending.showInConversation, isTrue);
       expect(pending.sentByMe, isTrue);
       expect(pending.customType, IsmChatCustomMessageType.text);
+    });
+  });
+
+  group('focus menu in open panel', () {
+    test('Reply and Reply in thread are hidden on panel rows while open',
+        () async {
+      registerChatControllers(api);
+      stubThread([]);
+      final root = threadRoot(replyCount: 1);
+      final panelReply = threadReply(messageId: 'r1', threadRootId: 'root-1');
+      final alsoSent = threadReply(
+        messageId: 'r2',
+        threadRootId: 'root-1',
+        alsoSentToChannel: true,
+      );
+
+      expect(
+        root.focusMenuList,
+        contains(IsmChatFocusMenuType.replyInThread),
+      );
+      expect(root.focusMenuList, contains(IsmChatFocusMenuType.reply));
+
+      await controller.openThread(
+        root: root,
+        conversation: directConversation(),
+      );
+
+      expect(
+        IsmChatThreadCoordinator.isMessageInOpenThreadPanel(root),
+        isTrue,
+      );
+      expect(root.focusMenuList, isNot(contains(IsmChatFocusMenuType.replyInThread)));
+      expect(root.focusMenuList, isNot(contains(IsmChatFocusMenuType.reply)));
+      expect(
+        panelReply.focusMenuList,
+        isNot(contains(IsmChatFocusMenuType.replyInThread)),
+      );
+      expect(
+        panelReply.focusMenuList,
+        isNot(contains(IsmChatFocusMenuType.reply)),
+      );
+      expect(
+        alsoSent.focusMenuList,
+        isNot(contains(IsmChatFocusMenuType.replyInThread)),
+      );
+      expect(
+        alsoSent.focusMenuList,
+        isNot(contains(IsmChatFocusMenuType.reply)),
+      );
+
+      controller.closeThread();
+
+      expect(
+        root.focusMenuList,
+        contains(IsmChatFocusMenuType.replyInThread),
+      );
+      expect(root.focusMenuList, contains(IsmChatFocusMenuType.reply));
+      expect(
+        IsmChatThreadCoordinator.shouldShowReplyInThreadFocusMenu(root),
+        isTrue,
+      );
+      expect(
+        IsmChatThreadCoordinator.shouldShowReplyFocusMenu(root),
+        isTrue,
+      );
     });
   });
 }
