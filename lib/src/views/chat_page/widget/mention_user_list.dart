@@ -11,8 +11,13 @@ class MentionUserList extends StatelessWidget {
         builder: (controller) {
           final currentUserId =
               IsmChatConfig.communicationConfig.userConfig.userId.trim();
+          final alreadyMentioned = mentionUserIdsInComposerText(
+            controller.chatInputController.text,
+            controller.groupMembers,
+          );
           final suggestions = controller.mentionSuggestions
               .where((m) => m.userId.trim() != currentUserId)
+              .where((m) => !alreadyMentioned.contains(m.userId.trim()))
               .toList();
           return AnimatedContainer(
           curve: Curves.easeInOut,

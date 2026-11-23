@@ -405,6 +405,157 @@ class ReplayParentMessage extends StatelessWidget {
   }
 }
 
+/// Channel-style reply strip above a composer (sender, body, media thumb).
+///
+/// Reuse in [IsmChatMessageField] and [IsmChatThreadComposer] so thread
+/// nested-reply targets show the same preview as inline channel replies.
+class IsmChatComposerReplyBar extends StatelessWidget {
+  const IsmChatComposerReplyBar({
+    required this.parentMessage,
+    required this.messageBody,
+    required this.onDismiss,
+    this.conversation,
+    super.key,
+  });
+
+  final IsmChatMessageModel parentMessage;
+  final String messageBody;
+  final VoidCallback onDismiss;
+  final IsmChatConversationModel? conversation;
+
+  /// Display label for the quoted parent (GIF, Photo, … or body text).
+  ///
+  /// Delegates to [IsmChatPageController.getMessageBody] when the chat page is
+  /// mounted; otherwise falls back to [IsmChatThreadCoordinator] labels so the
+  /// thread panel still works in isolation.
+  static String displayBodyFor(IsmChatMessageModel? message) {
+    if (message == null) return '';
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      return IsmChatUtility.chatPageController.getMessageBody(message);
+    }
+    final label = IsmChatThreadCoordinator.threadContentTypeLabel(message);
+    if (label != null) return label;
+    return message.body.trim();
+  }
+
+  /// Thumbnail / type payload for [ReplayParentMessage].
+  ///
+  /// Uses [IsmChatMessageModel.threadPanelBubbleType] so image and video
+  /// replies in the thread panel resolve attachments like the channel.
+  static IsmChatReplyMessageModel replayDataFor(
+    IsmChatMessageModel? replayMessage,
+  ) {
+    final customType =
+        replayMessage?.threadPanelBubbleType ?? replayMessage?.customType;
+    final attachment = replayMessage?.attachments?.isNotEmpty == true
+        ? replayMessage?.attachments?.first
+        : null;
+    final contact = replayMessage?.metaData?.contacts?.isNotEmpty == true
+        ? replayMessage?.metaData?.contacts?.first
+        : null;
+    final attachmentUrl = switch (customType) {
+      IsmChatCustomMessageType.audio ||
+      IsmChatCustomMessageType.file ||
+      IsmChatCustomMessageType.multipleAttachments =>
+        attachment?.name,
+      IsmChatCustomMessageType.contact => contact?.contactIdentifier,
+      IsmChatCustomMessageType.location ||
+      IsmChatCustomMessageType.image =>
+        attachment?.mediaUrl,
+      IsmChatCustomMessageType.video => attachment?.thumbnailUrl,
+      _ => replayMessage?.body,
+    };
+    return IsmChatReplyMessageModel(
+      parentMessageAttachmentUrl: attachmentUrl,
+      parentMessageAttachmentDuration:
+          replayMessage?.metaData?.duration?.inSeconds,
+      parentMessageMessageType: customType,
+      parentMessageInitiator: replayMessage?.sentByMe,
+      parentMessageBody: replayMessage?.body,
+      parentMessageUserId: replayMessage?.senderInfo?.userId,
+    );
+  }
+
+  String _senderName(BuildContext context) {
+    if (parentMessage.sentByMe) return IsmChatStrings.you;
+    if (conversation?.isGroup ?? false) {
+      final fromSender = parentMessage.senderInfo?.userName ?? '';
+      if (fromSender.isNotEmpty) return fromSender.capitalizeFirst ?? '';
+      final memberName = conversation?.members
+          ?.firstWhereOrNull(
+            (e) => e.userId == parentMessage.senderInfo?.userId,
+          )
+          ?.userName;
+      if (memberName?.isNotEmpty == true) {
+        return memberName!.capitalizeFirst ?? '';
+      }
+    }
+    return IsmChatProperties.chatPageProperties.header?.title?.call(
+          context,
+          conversation,
+          conversation?.chatName ?? '',
+        ) ??
+        conversation?.chatName.capitalizeFirst ??
+        (parentMessage.senderInfo?.userName ?? '');
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: IsmChatDimens.edgeInsets4.copyWith(
+          bottom: IsmChatDimens.zero,
+        ),
+        width: IsmChatDimens.percentWidth(1),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(IsmChatDimens.sixteen),
+          color: IsmChatConfig.chatTheme.primaryColor?.applyIsmOpacity(.3),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Padding(
+                padding: IsmChatDimens.edgeInsets8,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_senderName(context)),
+                    IsmChatMentionRichText(
+                      body: messageBody,
+                      style: IsmChatConfig
+                              .chatTheme.chatPageTheme?.textFiledTheme
+                              ?.inputTextStyle ??
+                          parentMessage.style ??
+                          const TextStyle(),
+                      message: parentMessage,
+                      mentionedUsers: parentMessage.mentionedUsers,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(IsmChatDimens.eight),
+                  child: ReplayParentMessage(
+                    replayData: replayDataFor(parentMessage),
+                    height: IsmChatDimens.fiftyFive,
+                    width: IsmChatDimens.hundred,
+                  ),
+                ),
+                ReplyPreviewDismissButton(onTap: onDismiss),
+              ],
+            ),
+          ],
+        ),
+      );
+}
+
 /// Dismiss control for the composer reply bar when [ReplayParentMessagePreview]
 /// shows media; the white circle keeps the close icon visible on dark thumbnails.
 class ReplyPreviewDismissButton extends StatelessWidget {
@@ -445,45 +596,13 @@ class ReplayParentMessagePreview extends StatelessWidget {
   final IsmChatPageController controller;
 
   @override
-  Widget build(BuildContext context) => Builder(
-        builder: (context) {
-          final replayMessage = controller.replayMessage;
-          final customType = replayMessage?.customType;
-          final attachment = replayMessage?.attachments?.isNotEmpty == true
-              ? replayMessage?.attachments?.first
-              : null;
-          final contact = replayMessage?.metaData?.contacts?.isNotEmpty == true
-              ? replayMessage?.metaData?.contacts?.first
-              : null;
-          final attachmentUrl = switch (customType) {
-            IsmChatCustomMessageType.audio ||
-            IsmChatCustomMessageType.file ||
-            IsmChatCustomMessageType.multipleAttachments =>
-              attachment?.name,
-            IsmChatCustomMessageType.contact => contact?.contactIdentifier,
-            IsmChatCustomMessageType.location ||
-            IsmChatCustomMessageType.image =>
-              attachment?.mediaUrl,
-            IsmChatCustomMessageType.video => attachment?.thumbnailUrl,
-            _ => replayMessage?.body,
-          };
-          final replayData = IsmChatReplyMessageModel(
-            parentMessageAttachmentUrl: attachmentUrl,
-            parentMessageAttachmentDuration:
-                replayMessage?.metaData?.duration?.inSeconds,
-            parentMessageMessageType: customType,
-            parentMessageInitiator: replayMessage?.sentByMe,
-            parentMessageBody: replayMessage?.body,
-            parentMessageUserId: replayMessage?.senderInfo?.userId,
-          );
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(IsmChatDimens.eight),
-            child: ReplayParentMessage(
-              replayData: replayData,
-              height: IsmChatDimens.fiftyFive,
-              width: IsmChatDimens.hundred,
-            ),
-          );
-        },
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(IsmChatDimens.eight),
+        child: ReplayParentMessage(
+          replayData:
+              IsmChatComposerReplyBar.replayDataFor(controller.replayMessage),
+          height: IsmChatDimens.fiftyFive,
+          width: IsmChatDimens.hundred,
+        ),
       );
 }

@@ -182,50 +182,57 @@ class _MediaPreviewState extends State<IsmMediaPreview> {
           ),
         ],
       ),
-      body: SizedBox(
-        height: IsmChatDimens.percentHeight(1),
-        width: IsmChatDimens.percentWidth(1),
-        child: ColoredBox(
-          color: mediaTheme.previewBackgroundColor,
-          child: PageView.builder(
-            controller: pageController,
-            itemBuilder: (BuildContext context, int index) {
-              final media = widget.messageData[index];
-              var url = media.attachments?.first.mediaUrl ?? '';
-              final customType = media.mediaPreviewContentType;
-              return customType == IsmChatCustomMessageType.image
-                  ? PhotoView(
-                      backgroundDecoration: BoxDecoration(
-                        color: mediaTheme.previewBackgroundColor,
-                      ),
-                      imageProvider: url.isValidUrl
-                          ? NetworkImage(url) as ImageProvider
-                          : kIsWeb
-                              ? MemoryImage(url.strigToUnit8List)
-                                  as ImageProvider
-                              : FileImage(File(url)) as ImageProvider,
-                      loadingBuilder: (context, event) =>
-                          const IsmChatLoadingDialog(),
-                      wantKeepAlive: true,
-                    )
-                  : SizedBox.expand(
-                      child: VideoViewPage(path: url),
-                    );
-            },
-            onPageChanged: (index) {
-              final timeStamp = DateTime.fromMillisecondsSinceEpoch(
-                  widget.messageData[index].sentAt);
-              final time = DateFormat.jm().format(timeStamp);
-              final monthDay = DateFormat.MMMd().format(timeStamp);
-              setState(
-                () {
-                  mediaIndex = index;
-                  initiated = widget.messageData[index].sentByMe;
-                  mediaTime = '$monthDay, $time';
-                },
-              );
-            },
-            itemCount: widget.messageData.length,
+      body: SafeArea(
+        // Android gesture/nav bar inset only; iOS and web keep existing layout.
+        top: false,
+        left: false,
+        right: false,
+        bottom: !kIsWeb && Platform.isAndroid,
+        child: SizedBox(
+          height: IsmChatDimens.percentHeight(1),
+          width: IsmChatDimens.percentWidth(1),
+          child: ColoredBox(
+            color: mediaTheme.previewBackgroundColor,
+            child: PageView.builder(
+              controller: pageController,
+              itemBuilder: (BuildContext context, int index) {
+                final media = widget.messageData[index];
+                var url = media.attachments?.first.mediaUrl ?? '';
+                final customType = media.mediaPreviewContentType;
+                return customType == IsmChatCustomMessageType.image
+                    ? PhotoView(
+                        backgroundDecoration: BoxDecoration(
+                          color: mediaTheme.previewBackgroundColor,
+                        ),
+                        imageProvider: url.isValidUrl
+                            ? NetworkImage(url) as ImageProvider
+                            : kIsWeb
+                                ? MemoryImage(url.strigToUnit8List)
+                                    as ImageProvider
+                                : FileImage(File(url)) as ImageProvider,
+                        loadingBuilder: (context, event) =>
+                            const IsmChatLoadingDialog(),
+                        wantKeepAlive: true,
+                      )
+                    : SizedBox.expand(
+                        child: VideoViewPage(path: url),
+                      );
+              },
+              onPageChanged: (index) {
+                final timeStamp = DateTime.fromMillisecondsSinceEpoch(
+                    widget.messageData[index].sentAt);
+                final time = DateFormat.jm().format(timeStamp);
+                final monthDay = DateFormat.MMMd().format(timeStamp);
+                setState(
+                  () {
+                    mediaIndex = index;
+                    initiated = widget.messageData[index].sentByMe;
+                    mediaTime = '$monthDay, $time';
+                  },
+                );
+              },
+              itemCount: widget.messageData.length,
+            ),
           ),
         ),
       ),

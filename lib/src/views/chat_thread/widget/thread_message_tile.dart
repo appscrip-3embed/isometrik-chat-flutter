@@ -110,8 +110,11 @@ class IsmChatThreadMessageTile extends StatelessWidget {
         IsmChatUtility.chatPageControllerRegistered;
     final showBodyText = body.isNotEmpty &&
         !(asBubble && IsmChatUtility.isOutboundAttachmentPlaceholderBody(body));
-    final bubbleMessage =
-        asBubble ? message.copyWith(customType: bubbleType) : message;
+    final attachmentCaption =
+        _threadBubbleAttachmentCaption(message, bubbleType);
+    final bubbleMessage = asBubble
+        ? _threadPanelBubbleMessageForWrapper(message, bubbleType!)
+        : message;
 
     final content = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,7 +147,7 @@ class IsmChatThreadMessageTile extends StatelessWidget {
                 ],
               ),
               IsmChatDimens.boxHeight2,
-              if (asBubble)
+              if (asBubble) ...[
                 _threadPanelBubbleTapTarget(
                   bubbleType: bubbleType,
                   message: bubbleMessage,
@@ -154,15 +157,33 @@ class IsmChatThreadMessageTile extends StatelessWidget {
                     theme: theme,
                     child: IsmChatMessageWrapper(bubbleMessage),
                   ),
-                )
-              else if (label != null && body.isEmpty)
+                ),
+                if (attachmentCaption.isNotEmpty) ...[
+                  IsmChatDimens.boxHeight2,
+                  IsmChatExpandableTextBlock(
+                    text: attachmentCaption,
+                    textStyle: theme.bodyStyle,
+                    toggleStyle: _threadExpandToggleStyle(theme),
+                    collapsedMaxLines: 3,
+                  ),
+                ],
+              ] else if (label != null && body.isEmpty)
                 Text(label, style: theme.attachmentLabelStyle)
               else ...[
                 if (label != null) ...[
                   Text(label, style: theme.attachmentLabelStyle),
                   IsmChatDimens.boxHeight2,
                 ],
-                if (showBodyText) Text(body, style: theme.bodyStyle),
+                if (showBodyText)
+                  IsmChatExpandableTextBlock(
+                    text: body,
+                    textStyle: theme.bodyStyle,
+                    toggleStyle: _threadExpandToggleStyle(theme),
+                    collapsedMaxLines: 15,
+                    message: _threadBodyUsesMentionRichText(message, body)
+                        ? message
+                        : null,
+                  ),
               ],
               // "Also sent to channel" replies carry showInConversation: true.
               if (!isRoot && message.showInConversation == true) ...[
@@ -279,6 +300,48 @@ class IsmChatThreadMessageTile extends StatelessWidget {
     }
     await controller.onMessageLongPress(context, message);
   }
+}
+
+/// Caption under the bubble in the thread panel.
+///
+/// File messages already show the name on [IsmChatFileMessage]; only show
+/// text here when the user added a [IsmChatMetaData.caption].
+String _threadBubbleAttachmentCaption(
+  IsmChatMessageModel message,
+  IsmChatCustomMessageType? bubbleType,
+) {
+  if (bubbleType == IsmChatCustomMessageType.file) {
+    return message.metaData?.caption?.trim() ?? '';
+  }
+  return message.attachmentDisplayCaption;
+}
+
+/// Show more / Show less accent on the thread panel (readable on any background).
+TextStyle _threadExpandToggleStyle(IsmChatThreadTheme theme) =>
+    theme.footerLabelStyle;
+
+/// @mentions / autolinks need [IsmChatMentionRichText]; plain text uses [Text].
+bool _threadBodyUsesMentionRichText(
+  IsmChatMessageModel message,
+  String body,
+) =>
+    message.mentionListForBody(body).any((s) => s.isLink);
+
+/// Channel bubble widgets paint captions with [IsmChatMessageModel.style] (white
+/// on self bubbles). Thread rows strip metadata captions for the wrapper and
+/// render [IsmChatMessageModel.attachmentDisplayCaption] with [IsmChatThreadTheme.bodyStyle].
+IsmChatMessageModel _threadPanelBubbleMessageForWrapper(
+  IsmChatMessageModel message,
+  IsmChatCustomMessageType bubbleType,
+) {
+  final meta = message.metaData;
+  final strippedMeta = meta != null && (meta.caption?.trim().isNotEmpty == true)
+      ? meta.copyWith(captionMessage: '')
+      : meta;
+  return message.copyWith(
+    customType: bubbleType,
+    metaData: strippedMeta,
+  );
 }
 
 /// Adds channel-style tap handling when the bubble does not handle taps itself.

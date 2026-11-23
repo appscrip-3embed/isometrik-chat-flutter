@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
@@ -45,6 +46,25 @@ void main() {
     expect(ctx.page.selectedMessage, contains(msg));
     ctx.page.onMessageSelect(msg);
     expect(ctx.page.selectedMessage, isEmpty);
+  }, setUpApi: (api) => api.registerSendDefaults());
+
+  chatTestWidgets(
+      'onMenuItemSelected Reply on channel uses channel composer',
+      (tester, ctx) async {
+    ctx.page.conversation = directConversation();
+    final msg = message();
+    await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+    final context = tester.element(find.byType(Scaffold));
+    await drive(
+      tester,
+      () => ctx.page.onMenuItemSelected(
+        IsmChatFocusMenuType.reply,
+        msg,
+        context,
+      ),
+    );
+    expect(ctx.page.isreplying, isTrue);
+    expect(ctx.page.replayMessage?.messageId, msg.messageId);
   }, setUpApi: (api) => api.registerSendDefaults());
 
   chatTestWidgets('getMessageBody covers location, contact, text',

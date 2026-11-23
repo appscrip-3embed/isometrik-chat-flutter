@@ -7,6 +7,7 @@ export 'bottom_sheet_option.dart';
 export 'chat_image.dart';
 export 'conversation_card_profile_image.dart';
 export 'custom_snackbar.dart';
+export 'expandable_text_block.dart';
 export 'file_widget.dart';
 export 'icon_and_text.dart';
 export 'input_field.dart';

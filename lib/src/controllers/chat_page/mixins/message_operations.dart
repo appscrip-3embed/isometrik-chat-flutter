@@ -29,6 +29,11 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
 
         break;
       case IsmChatFocusMenuType.reply:
+        if (IsmChatThreadCoordinator.isMessageInOpenThreadPanel(message) &&
+            Get.isRegistered<IsmChatThreadController>()) {
+          Get.find<IsmChatThreadController>().beginReplyTo(message);
+          break;
+        }
         _controller.onReplyTap(message);
         break;
       case IsmChatFocusMenuType.replyInThread:

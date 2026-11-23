@@ -153,9 +153,13 @@ class IsmChatMessageField extends StatelessWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (controller.isreplying)
-                                _ReplyMessage(
+                              if (controller.isreplying &&
+                                  controller.replayMessage != null)
+                                IsmChatComposerReplyBar(
+                                  parentMessage: controller.replayMessage!,
                                   messageBody: messageBody,
+                                  conversation: controller.conversation,
+                                  onDismiss: () => controller.isreplying = false,
                                 ),
                               Row(
                                 children: [
@@ -322,98 +326,6 @@ class IsmChatMessageField extends StatelessWidget {
             ],
           );
         },
-      );
-}
-
-class _ReplyMessage extends StatelessWidget {
-  _ReplyMessage({
-    required this.messageBody,
-  }) : controller = IsmChatUtility.chatPageController;
-
-  final String messageBody;
-  final IsmChatPageController controller;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: IsmChatDimens.edgeInsets4.copyWith(
-          bottom: IsmChatDimens.zero,
-        ),
-        width: IsmChatDimens.percentWidth(1),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(
-            IsmChatDimens.sixteen,
-          ),
-          color: IsmChatConfig.chatTheme.primaryColor?.applyIsmOpacity(.3),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Padding(
-                padding: IsmChatDimens.edgeInsets8,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      controller.replayMessage?.sentByMe ?? false
-                          ? IsmChatStrings.you
-                          : (controller.conversation?.isGroup ?? false)
-                              ? (controller.replayMessage?.senderInfo
-                                              ?.userName ??
-                                          (controller.conversation?.members
-                                                  ?.firstWhereOrNull(
-                                                    (e) =>
-                                                        e.userId ==
-                                                        controller
-                                                            .replayMessage
-                                                            ?.senderInfo
-                                                            ?.userId,
-                                                  )
-                                                  ?.userName ??
-                                              ''))
-                                      .capitalizeFirst ??
-                                  ''
-                              : IsmChatProperties
-                                      .chatPageProperties.header?.title
-                                      ?.call(
-                                          context,
-                                          controller.conversation,
-                                          controller.conversation?.chatName ??
-                                              '') ??
-                                  controller
-                                      .conversation?.chatName.capitalizeFirst ??
-                                  '',
-                    ),
-                    IsmChatMentionRichText(
-                      body: messageBody,
-                      style: IsmChatConfig
-                              .chatTheme.chatPageTheme?.textFiledTheme
-                              ?.inputTextStyle ??
-                          controller.replayMessage?.style ??
-                          const TextStyle(),
-                      message: controller.replayMessage,
-                      mentionedUsers:
-                          controller.replayMessage?.mentionedUsers,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Stack(
-              alignment: Alignment.topRight,
-              children: [
-                ReplayParentMessagePreview(controller: controller),
-                ReplyPreviewDismissButton(
-                  onTap: () => controller.isreplying = false,
-                ),
-              ],
-            ),
-          ],
-        ),
       );
 }
 

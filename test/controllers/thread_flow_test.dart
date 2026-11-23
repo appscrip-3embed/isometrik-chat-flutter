@@ -695,6 +695,38 @@ void main() {
         IsmChatStrings.replyInThread,
       );
     }, setUpApi: (api) => api.registerSendDefaults());
+
+    chatTestWidgets(
+        'Reply from focus menu targets the thread panel, not the channel',
+        (tester, ctx) async {
+      IsmChatConfig.threadsEnabled = true;
+      addTearDown(() => IsmChatConfig.threadsEnabled = false);
+      await tester.runAsync(() => seedConversation(ctx));
+      final root = threadRoot(messageId: 'root-1');
+      ctx.page.messages = [root];
+      final thread = putThreadController(ctx);
+      await drive(
+        tester,
+        () => thread.openThread(root: root, conversation: ctx.page.conversation),
+      );
+      final panelReply = threadReply(messageId: 'r1', threadRootId: 'root-1');
+      ctx.page.onReplyTap(root);
+      expect(ctx.page.isreplying, isTrue);
+
+      await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+      final menuContext = tester.element(find.byType(Scaffold));
+      await drive(
+        tester,
+        () => ctx.page.onMenuItemSelected(
+          IsmChatFocusMenuType.reply,
+          panelReply,
+          menuContext,
+        ),
+      );
+      expect(thread.replyTo?.messageId, 'r1');
+      expect(ctx.page.isreplying, isFalse);
+      expect(ctx.page.replayMessage, isNull);
+    }, setUpApi: (api) => api.registerSendDefaults());
   });
 
   group('IsmChat.i threads surface', () {
