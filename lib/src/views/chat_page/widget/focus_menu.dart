@@ -66,9 +66,14 @@ _FocusMenuItemStyle _focusMenuItemStyle(
 }
 
 class IsmChatFocusMenu extends StatelessWidget {
+  /// [pageController] must be supplied by [IsmChatPageController.showOverlay] /
+  /// `showOverlayWeb` — do not resolve via [IsmChatUtility.chatPageController]
+  /// in the constructor; GetX may unregister the controller while this route
+  /// or overlay is still building (e.g. app [MaterialApp] rebuild).
   IsmChatFocusMenu(
     this.message, {
     super.key,
+    required this.pageController,
     required this.animation,
     this.blur,
     this.blurBackgroundColor,
@@ -80,11 +85,10 @@ class IsmChatFocusMenu extends StatelessWidget {
   final IsmChatMessageModel message;
   final Animation<double> animation;
   final bool canReact;
-
-  final controller = IsmChatUtility.chatPageController;
+  final IsmChatPageController pageController;
 
   int? _messageReversedIndexForGridPreview() {
-    final allMessages = controller.messages
+    final allMessages = pageController.messages
         .where((msg) => msg.customType != IsmChatCustomMessageType.date)
         .toList();
     if (allMessages.isEmpty) return null;
@@ -101,7 +105,7 @@ class IsmChatFocusMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) => IsmChatResponsive.isWeb(context)
       ? IsmChatTapHandler(
-          onTap: controller.closeOverlay,
+          onTap: pageController.closeOverlay,
           child: Padding(
             padding: IsmChatDimens.edgeInsets8,
             child: Column(
@@ -111,7 +115,7 @@ class IsmChatFocusMenu extends StatelessWidget {
                   ? CrossAxisAlignment.end
                   : CrossAxisAlignment.start,
               children: [
-                if (canReact && !controller.isBroadcast)
+                if (canReact && !pageController.isBroadcast)
                   _FocusAnimationBuilder(
                     animation: animation,
                     child: ReactionGrid(message),
@@ -233,7 +237,7 @@ class IsmChatFocusMenu extends StatelessWidget {
       : IsmChatTapHandler(
           onTap: () {
             if (IsmChatResponsive.isWeb(context)) {
-              IsmChatUtility.chatPageController.closeOverlay();
+              pageController.closeOverlay();
             } else {
               Navigator.pop(context);
             }
@@ -283,7 +287,7 @@ class IsmChatFocusMenu extends StatelessWidget {
                                   ? CrossAxisAlignment.end
                                   : CrossAxisAlignment.start,
                               children: [
-                                if (canReact && !controller.isBroadcast)
+                                if (canReact && !pageController.isBroadcast)
                                   _FocusAnimationBuilder(
                                     animation: animation,
                                     child: ReactionGrid(message),

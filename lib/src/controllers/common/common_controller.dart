@@ -309,6 +309,59 @@ class IsmChatCommonController extends GetxController {
     return null;
   }
 
+  /// Creates or reopens the signed-in user's private self chat (`selfChat: true`).
+  ///
+  /// One self chat per user per project — the API returns the same
+  /// [conversationId] when called again. Requires
+  /// [IsmChatConversationProperties.enableSelfChat] on the host app.
+  Future<IsmChatConversationModel?> createSelfChat({
+    bool isLoading = false,
+  }) async {
+    final response = await viewModel.createConversation(
+      isLoading: isLoading,
+      typingEvents: true,
+      readEvents: true,
+      pushNotifications: true,
+      members: const [],
+      isGroup: false,
+      conversationType: IsmChatConversationType.private.value,
+      metaData: const {},
+      searchableTags: const [' '],
+      selfChat: true,
+    );
+
+    if (response == null) return null;
+
+    final data = jsonDecode(response.data) as Map<String, dynamic>;
+    final conversationId = data['conversationId'] as String? ?? '';
+    if (conversationId.isEmpty) return null;
+
+    final model = IsmChatConversationModel(
+      conversationId: conversationId,
+      isGroup: false,
+      privateOneToOne: true,
+      selfChat: true,
+      conversationType: IsmChatConversationType.private,
+      messages: {},
+      config: ConversationConfigModel(
+        typingEvents: true,
+        readEvents: true,
+        pushNotifications: true,
+      ),
+      membersCount: 1,
+    );
+    await IsmChatConfig.dbWrapper?.createAndUpdateConversation(model);
+    unawaited(IsmChatUtility.conversationController.getChatConversations());
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      final chatPage = IsmChatUtility.chatPageController;
+      if (chatPage.conversation?.isSelfChat == true) {
+        chatPage.conversation = model;
+      }
+      unawaited(chatPage.getMessagesFromDB(conversationId));
+    }
+    return model;
+  }
+
   /// Retrieves chat messages.
   ///
   /// * `conversationId`: The conversation ID.

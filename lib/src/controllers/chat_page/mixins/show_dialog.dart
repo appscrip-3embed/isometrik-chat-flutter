@@ -239,6 +239,9 @@ mixin IsmChatShowDialogMixin on GetxController {
   }
 
   void showDialogCheckBlockUnBlock() async {
+    if (_controller.conversation?.isSelfChat == true) {
+      return;
+    }
     if (_controller.conversation?.isBlockedByMe ?? false) {
       await _presentChatConfirmation(
         IsmChatConfirmationRequest(
@@ -467,6 +470,9 @@ mixin IsmChatShowDialogMixin on GetxController {
   }
 
   Future<void> handleBlockUnblock([bool includeMembers = false]) async {
+    if (_controller.conversation?.isSelfChat == true) {
+      return;
+    }
     if (_controller.conversation?.isBlockedByMe ?? false) {
       // This means chatting is not allowed and user has blocked the opponent
       showDialogForBlockUnBlockUser(true, includeMembers);

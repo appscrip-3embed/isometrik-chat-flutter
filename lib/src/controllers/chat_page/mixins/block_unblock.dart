@@ -19,6 +19,9 @@ mixin IsmChatPageBlockUnblockMixin on GetxController {
     bool fromUser = false,
     required bool userBlockOrNot,
   }) async {
+    if (_controller.conversation?.isSelfChat == true) {
+      return;
+    }
     if ((_controller.conversation?.isChattingAllowed == false) &&
         (_controller.conversation?.isBlockedByMe == false)) {
       await IsmChatUtility.showErrorDialog(
@@ -89,6 +92,9 @@ mixin IsmChatPageBlockUnblockMixin on GetxController {
     bool fromUser = false,
     required bool userBlockOrNot,
   }) async {
+    if (_controller.conversation?.isSelfChat == true) {
+      return;
+    }
     final isUnblockUser = await _controller.conversationController.unblockUser(
       opponentId: opponentId,
       isLoading: isLoading,

@@ -171,4 +171,18 @@ mixin IsmChatDelegateConversationMixin {
     }
     return conversation;
   }
+
+  /// Opens or creates the signed-in user's self chat when
+  /// [IsmChatConversationProperties.enableSelfChat] is on.
+  Future<void> openSelfChat({bool isLoading = true}) async {
+    if (!IsmChatUtility.conversationControllerRegistered) {
+      IsmChatCommonBinding().dependencies();
+      IsmChatConversationsBinding().dependencies();
+    }
+    if (IsmChatUtility.conversationControllerRegistered) {
+      await IsmChatUtility.conversationController.openSelfChat(
+        isLoading: isLoading,
+      );
+    }
+  }
 }

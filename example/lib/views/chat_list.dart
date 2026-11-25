@@ -209,6 +209,7 @@ class ChatList extends StatelessWidget {
                 ],
                 showCreateChatIcon: true,
                 enableGroupChat: true,
+                enableSelfChat: true,
                 allowDelete: true,
                 onCreateTap: () {},
                 shouldShowAppBar:

@@ -11,6 +11,17 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
   IsmChatConversationsController get _controller =>
       this as IsmChatConversationsController;
 
+  /// Hides self-chat rows when [IsmChatConversationProperties.enableSelfChat] is off.
+  List<IsmChatConversationModel> _visibleConversations(
+    Iterable<IsmChatConversationModel> source,
+  ) {
+    final list = source.toList();
+    if (IsmChatProperties.conversationProperties.enableSelfChat) {
+      return list;
+    }
+    return list.where((c) => !c.isSelfChat).toList();
+  }
+
   /// Retrieves conversations from the local database and updates the observable list.
   ///
   /// `searchTag`: Optional search term for filtering conversations.
@@ -148,9 +159,10 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
       await IsmChatConfig.dbWrapper?.saveConversation(conversation: patched);
     }
 
-    _controller.conversations = updatedConversations
-        .map((conversation) => conversation.normalizeOpponentDetails())
-        .toList();
+    _controller.conversations = _visibleConversations(
+      updatedConversations
+          .map((conversation) => conversation.normalizeOpponentDetails()),
+    );
     _controller.isConversationsLoading = false;
 
     if (_controller.conversations.length > 1) {
@@ -160,7 +172,9 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
       final opponentEmptyData = <IsmChatConversationModel>[];
       final opponentData = <IsmChatConversationModel>[];
       for (var x in _controller.conversations) {
-        if (x.isGroup == false && x.opponentDetails?.userId.isEmpty == true) {
+        if (x.isGroup == false &&
+            !x.isSelfChat &&
+            x.opponentDetails?.userId.isEmpty == true) {
           opponentEmptyData.add(x);
         } else {
           opponentData.add(x);
@@ -185,6 +199,13 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
                         (x) => x.toLowerCase().contains(normalizedSearchText),
                       ) ??
                   false);
+        }
+        if (e.isSelfChat) {
+          final label = e.selfChatDisplayName.toLowerCase();
+          final yourself = IsmChatStrings.messageYourself.toLowerCase();
+          return label.contains(normalizedSearchText) ||
+              yourself.contains(normalizedSearchText) ||
+              normalizedSearchText.contains(yourself);
         }
         final userName = (e.opponentDetails?.userName ?? '').toLowerCase();
         final firstName =
@@ -768,9 +789,66 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
           .where(
             (e) =>
                 e.chatName.didMatch(query) ||
+                (e.isSelfChat &&
+                    IsmChatStrings.messageYourself.didMatch(query)) ||
                 e.lastMessageDetails!.body.didMatch(query),
           )
           .toList();
     }
+  }
+
+  IsmChatConversationModel? _findSelfChatInList(
+    Iterable<IsmChatConversationModel> list,
+  ) {
+    for (final c in list) {
+      if (c.isSelfChat && (c.conversationId ?? '').isNotEmpty) {
+        return c;
+      }
+    }
+    return null;
+  }
+
+  /// Calls `POST /chat/conversation` with `selfChat: true`. No-op when the
+  /// feature flag is off.
+  Future<IsmChatConversationModel?> createSelfChat({
+    bool isLoading = true,
+  }) async {
+    if (!IsmChatProperties.conversationProperties.enableSelfChat) {
+      return null;
+    }
+    return _controller.commonController.createSelfChat(isLoading: isLoading);
+  }
+
+  /// Opens the user's self chat. Reuses an existing row when present;
+  /// otherwise navigates with [IsmChatConversationModel.selfChatPlaceholder]
+  /// and creates on the API at first send (see send path `createConversation`).
+  Future<void> openSelfChat({bool isLoading = true}) async {
+    if (!IsmChatProperties.conversationProperties.enableSelfChat) {
+      return;
+    }
+
+    var conversation =
+        _findSelfChatInList(_controller.conversations) ??
+            _findSelfChatInList(
+              await IsmChatConfig.dbWrapper?.getAllConversations() ??
+                  const [],
+            );
+
+    if (conversation == null) {
+      final cached = _controller.userDetails;
+      final configName =
+          IsmChatConfig.communicationConfig.userConfig.userName?.trim() ?? '';
+      final hasDisplayName = cached != null &&
+          (cached.displayName.trim().isNotEmpty || cached.profileUrl.isNotEmpty);
+      if (!hasDisplayName && configName.isEmpty) {
+        await _controller.getUserData();
+      }
+      conversation = IsmChatConversationModel.selfChatPlaceholder();
+    }
+
+    await _controller.updateLocalConversation(
+      conversation.normalizeOpponentDetails(),
+    );
+    await _controller.goToChatPage();
   }
 }

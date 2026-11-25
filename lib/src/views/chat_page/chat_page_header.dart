@@ -235,6 +235,10 @@ class _TitleSubTitleWidget extends StatelessWidget {
       return conversation.chatName;
     }
 
+    if (conversation.isSelfChat) {
+      return conversation.chatName;
+    }
+
     final firstName = conversation.opponentDetails?.metaData?.firstName ?? '';
     final lastName = conversation.opponentDetails?.metaData?.lastName ?? '';
     final fullName = '$firstName $lastName'.trim();
@@ -320,6 +324,22 @@ class _TitleSubTitleWidget extends StatelessWidget {
                       )
                     : Obx(
                         () {
+                          if (controller.conversation?.isSelfChat == true) {
+                            return Text(
+                              IsmChatProperties.chatPageProperties.header
+                                      ?.subtitle
+                                      ?.call(
+                                    context,
+                                    controller.conversation,
+                                  ) ??
+                                  IsmChatStrings.messageYourself,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: IsmChatConfig.chatTheme.chatPageHeaderTheme
+                                      ?.subtileStyle ??
+                                  IsmChatStyles.w400White12,
+                            );
+                          }
                           // Priority order: Typing > Online > Last Seen
                           // Check if someone is typing first (highest priority)
                           if (controller.conversation?.isSomeoneTyping ==
@@ -482,6 +502,7 @@ class _PopupMenuWidget extends StatelessWidget {
             )
           ],
           if ((!(controller.conversation?.isGroup ?? false)) &&
+              controller.conversation?.isSelfChat != true &&
               controller.conversation?.isOpponentDetailsEmpty == false &&
               (controller.conversation?.conversationId?.isNotEmpty ?? false))
             PopupMenuItem(

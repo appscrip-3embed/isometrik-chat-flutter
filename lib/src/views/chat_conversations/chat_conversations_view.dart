@@ -349,17 +349,24 @@ class _IsmChatConversationsState extends State<IsmChatConversations>
                 icon:
                     IsmChatProperties.conversationProperties.createChatIcon,
                 onTap: () {
-                  if (IsmChatProperties
-                      .conversationProperties.enableGroupChat) {
+                  final conversationProps =
+                      IsmChatProperties.conversationProperties;
+                  if (conversationProps.enableGroupChat) {
                     IsmChatContextWidget.showBottomsheetContext(
                       content: const _CreateChatBottomSheet(),
                       backgroundColor: IsmChatColors.transparent,
                       isDismissible: true,
                       elevation: 0,
                     );
+                  } else if (conversationProps.enableSelfChat) {
+                    IsmChatContextWidget.showBottomsheetContext(
+                      content: const _DirectOrSelfChatBottomSheet(),
+                      backgroundColor: IsmChatColors.transparent,
+                      isDismissible: true,
+                      elevation: 0,
+                    );
                   } else {
-                    IsmChatProperties.conversationProperties.onCreateTap
-                        ?.call();
+                    conversationProps.onCreateTap?.call();
                     IsmChatRoute.goToRoute(IsmChatCreateConversationView(
                       isGroupConversation: false,
                       conversationType: IsmChatConversationType.private,
@@ -492,8 +499,96 @@ class _IsmChatTabView extends StatelessWidget {
       );
 }
 
+class _DirectOrSelfChatBottomSheet extends StatelessWidget {
+  const _DirectOrSelfChatBottomSheet();
+
+  Future<void> _startDirectConversation() async {
+    IsmChatRoute.goBack();
+    await Future.delayed(const Duration(milliseconds: 300));
+    IsmChatProperties.conversationProperties.onCreateTap?.call();
+    unawaited(IsmChatRoute.goToRoute(IsmChatCreateConversationView(
+      isGroupConversation: false,
+      conversationType: IsmChatConversationType.private,
+    )));
+  }
+
+  Future<void> _openSelfChat() async {
+    IsmChatRoute.goBack();
+    await Future.delayed(const Duration(milliseconds: 300));
+    await IsmChat.i.openSelfChat();
+  }
+
+  @override
+  Widget build(BuildContext context) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: _startDirectConversation,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: IsmChatDimens.fifty,
+                  child: Icon(
+                    Icons.people_rounded,
+                    color: IsmChatConfig.chatTheme.primaryColor,
+                  ),
+                ),
+                IsmChatDimens.boxWidth8,
+                Text(
+                  '1 to 1 ${IsmChatStrings.conversation}',
+                  style: IsmChatStyles.w400White18.copyWith(
+                    color: IsmChatConfig.chatTheme.primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: _openSelfChat,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: IsmChatDimens.fifty,
+                  child: Icon(
+                    Icons.bookmark_border_rounded,
+                    color: IsmChatConfig.chatTheme.primaryColor,
+                  ),
+                ),
+                IsmChatDimens.boxWidth8,
+                Text(
+                  IsmChatStrings.messageYourselfAction,
+                  style: IsmChatStyles.w400White18.copyWith(
+                    color: IsmChatConfig.chatTheme.primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: IsmChatRoute.goBack,
+          child: Text(
+            IsmChatStrings.cancel,
+            style: IsmChatStyles.w400White18.copyWith(
+              color: IsmChatConfig.chatTheme.primaryColor,
+            ),
+          ),
+        ),
+      );
+}
+
 class _CreateChatBottomSheet extends StatelessWidget {
   const _CreateChatBottomSheet();
+
+  Future<void> _openSelfChat() async {
+    IsmChatRoute.goBack();
+    await Future.delayed(const Duration(milliseconds: 300));
+    await IsmChat.i.openSelfChat();
+  }
 
   Future<void> _startConversation(
       [bool isGroup = false,
@@ -511,6 +606,30 @@ class _CreateChatBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CupertinoActionSheet(
         actions: [
+          if (IsmChatProperties.conversationProperties.enableSelfChat)
+            CupertinoActionSheetAction(
+              onPressed: _openSelfChat,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: IsmChatDimens.fifty,
+                    child: Icon(
+                      Icons.bookmark_border_rounded,
+                      color: IsmChatConfig.chatTheme.primaryColor,
+                    ),
+                  ),
+                  IsmChatDimens.boxWidth8,
+                  Text(
+                    IsmChatStrings.messageYourselfAction,
+                    style: IsmChatStyles.w400White18.copyWith(
+                      color: IsmChatConfig.chatTheme.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           CupertinoActionSheetAction(
             onPressed: _startConversation,
             child: Row(

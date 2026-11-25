@@ -515,6 +515,7 @@ class IsmChatCommonViewModel {
     String? conversationTitle,
     String? conversationImageUrl,
     String? customType,
+    bool selfChat = false,
     bool isLoading = false,
   }) async =>
       await _repository.createConversation(
@@ -530,6 +531,7 @@ class IsmChatCommonViewModel {
         isLoading: isLoading,
         customType: customType,
         searchableTags: searchableTags,
+        selfChat: selfChat,
       );
 
   Future<List<IsmChatMessageModel>> getChatMessages({

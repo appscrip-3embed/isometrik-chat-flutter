@@ -77,6 +77,7 @@ class ChatListController extends GetxController {
         userConfig: IsmChatUserConfig(
           userToken: AppConfig.userDetail?.userToken ?? '',
           userId: AppConfig.userDetail?.userId ?? '',
+          userName: AppConfig.userDetail?.userName ?? '',
           userEmail: AppConfig.userDetail?.email ?? '',
           userProfile: '',
         ),

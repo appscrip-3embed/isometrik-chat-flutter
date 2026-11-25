@@ -13,6 +13,126 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
+/// Shared labels for private self chats (`selfChat: true` on the API).
+///
+/// Reuse from list rows, headers, and search — do not read [IsmChatConversationModel
+/// .opponentDetails] or [IsmChatConversationModel.conversationTitle] for these rows.
+class IsmChatSelfChatLabels {
+  IsmChatSelfChatLabels._();
+
+  static String _labelFromUserDetails(UserDetails? user) {
+    if (user == null) return '';
+    final display = user.displayName.trim();
+    if (display.isNotEmpty) return display;
+    final identifier = user.userIdentifier.trim();
+    if (identifier.isNotEmpty && !identifier.contains('@')) return identifier;
+    return user.userId.trim();
+  }
+
+  /// Signed-in user for self-chat UI before the API returns [members].
+  ///
+  /// Prefers [IsmChatConversationsController.userDetails] (profile/name from
+  /// user API) over bare [IsmChatUserConfig] so placeholders match the header
+  /// after conversation details load.
+  static UserDetails signedInUserMember() {
+    final config = IsmChatConfig.communicationConfig.userConfig;
+    final currentUserId = config.userId.trim();
+
+    if (IsmChatUtility.conversationControllerRegistered) {
+      final details = IsmChatUtility.conversationController.userDetails;
+      if (details != null && details.userId.trim() == currentUserId) {
+        final hasLabel = _labelFromUserDetails(details).isNotEmpty;
+        final hasAvatar = details.profileUrl.trim().isNotEmpty;
+        if (hasLabel || hasAvatar) {
+          return details;
+        }
+      }
+    }
+
+    return UserDetails(
+      userProfileImageUrl: config.userProfile?.trim() ?? '',
+      userName: config.userName?.trim() ?? '',
+      userIdentifier: config.userEmail?.trim() ?? '',
+      userId: currentUserId,
+      online: false,
+      lastSeen: 0,
+    );
+  }
+
+  static String get currentUserBaseName {
+    final fromProfile = _labelFromUserDetails(signedInUserMember());
+    if (fromProfile.isNotEmpty && !fromProfile.contains('@')) {
+      return fromProfile;
+    }
+    final user = IsmChatConfig.communicationConfig.userConfig;
+    final userName = user.userName?.trim() ?? '';
+    if (userName.isNotEmpty) return userName;
+    if (fromProfile.isNotEmpty) return fromProfile;
+    final email = user.userEmail?.trim() ?? '';
+    if (email.isNotEmpty) return email;
+    return user.userId;
+  }
+
+  static String get displayName =>
+      '${currentUserBaseName} ${IsmChatStrings.selfChatYouSuffix}'.trim();
+
+  /// Prefer [conversation] `members` / API name before init [IsmChatUserConfig].
+  static String displayNameFor(IsmChatConversationModel? conversation) {
+    if (conversation != null) {
+      final currentUserId =
+          IsmChatConfig.communicationConfig.userConfig.userId.trim();
+      UserDetails? selfMember;
+      for (final member in conversation.members ?? const <UserDetails>[]) {
+        if (member.userId.trim() == currentUserId) {
+          selfMember = member;
+          break;
+        }
+      }
+      final fromMember = _labelFromUserDetails(selfMember);
+      if (fromMember.isNotEmpty) {
+        return '$fromMember ${IsmChatStrings.selfChatYouSuffix}'.trim();
+      }
+      final createdBy = (conversation.createdBy ?? '').trim();
+      final createdByName = (conversation.createdByUserName ?? '').trim();
+      if (createdBy.isNotEmpty &&
+          createdBy == currentUserId &&
+          createdByName.isNotEmpty) {
+        return '$createdByName ${IsmChatStrings.selfChatYouSuffix}'.trim();
+      }
+    }
+    return displayName;
+  }
+
+  static String get profileUrl {
+    final fromMember = signedInUserMember().profileUrl.trim();
+    if (fromMember.isNotEmpty) return fromMember;
+    return IsmChatConfig.communicationConfig.userConfig.userProfile?.trim() ??
+        '';
+  }
+
+  static String profileUrlFor(IsmChatConversationModel? conversation) {
+    if (conversation != null) {
+      final currentUserId =
+          IsmChatConfig.communicationConfig.userConfig.userId.trim();
+      for (final member in conversation.members ?? const <UserDetails>[]) {
+        if (member.userId.trim() == currentUserId) {
+          final url = member.profileUrl.trim();
+          if (url.isNotEmpty) return url;
+          break;
+        }
+      }
+    }
+    return profileUrl;
+  }
+}
+
+/// Self-chat helpers on [IsmChatConversationModel].
+extension SelfChatConversation on IsmChatConversationModel {
+  String get selfChatDisplayName => IsmChatSelfChatLabels.displayNameFor(this);
+
+  String get selfChatProfileUrl => IsmChatSelfChatLabels.profileUrlFor(this);
+}
+
 /// Extension for IsmChatConversationModel to check block status.
 extension BlockStatus on IsmChatConversationModel {
   /// True when the signed-in user is a group admin.
@@ -86,6 +206,7 @@ extension BlockStatus on IsmChatConversationModel {
   ///
   /// Call after conversation-details / list API responses before persisting.
   IsmChatConversationModel normalizeOpponentDetails() {
+    if (isSelfChat) return this;
     if (isGroup == true) return this;
     final resolved = resolvedOpponentDetails;
     if (resolved == null) return this;

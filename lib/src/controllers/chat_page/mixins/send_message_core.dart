@@ -642,6 +642,31 @@ mixin IsmChatPageSendMessageCoreMixin {
         );
         return '';
       }
+      if (existingConversation.isSelfChat) {
+        if (!IsmChatProperties.conversationProperties.enableSelfChat) {
+          return '';
+        }
+        final created = await _controller.commonController.createSelfChat(
+          isLoading: false,
+        );
+        final createdId = created?.conversationId ?? '';
+        if (created == null || createdId.isEmpty) {
+          IsmChatLog.error(
+            'createConversation failed: self chat API returned no conversation id',
+          );
+          return '';
+        }
+        _controller.conversation = created;
+        conversationId = createdId;
+        IsmChatConfig.onConversationCreated?.call(
+          IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context,
+          _controller.conversation,
+        );
+        unawaited(
+          _controller.getConverstaionDetails(),
+        );
+        return conversationId;
+      }
       final created = await _controller.commonController.createConversation(
         conversation: existingConversation,
         isGroup: existingConversation.isGroup ?? false,

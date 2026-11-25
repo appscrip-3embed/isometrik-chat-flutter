@@ -458,5 +458,12 @@ mixin IsmChatConversationOperationsMixin {
     String? searchTag,
   }) async =>
       await _delegate.getChatConversationFromLocal(searchTag: searchTag);
+
+  /// Opens or creates the private self chat (`selfChat: true`).
+  ///
+  /// No-op when [IsmChatConversationProperties.enableSelfChat] is `false`.
+  /// See `docs/SELF_CHAT.md`.
+  Future<void> openSelfChat({bool isLoading = true}) async =>
+      await _delegate.openSelfChat(isLoading: isLoading);
 }
 

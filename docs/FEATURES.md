@@ -504,6 +504,13 @@ enum IsmChatFeature {
 }
 ```
 
+### Self chat ✅
+
+**Status:** ✅ Fully Supported (optional)  
+**Gate:** `IsmChatConversationProperties.enableSelfChat` (default `false`)  
+**API:** `selfChat: true` on `POST /chat/conversation`  
+**Docs:** [SELF_CHAT.md](./SELF_CHAT.md)
+
 ---
 
 ## Known Limitations

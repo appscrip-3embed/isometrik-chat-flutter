@@ -56,6 +56,7 @@ class IsmChatConversationModel {
             ? []
             : List<String>.from(map['userIds'] as List),
         privateOneToOne: map['privateOneToOne'] as bool? ?? false,
+        selfChat: map['selfChat'] as bool? ?? false,
         opponentDetails: map['opponentDetails'] == null
             ? null
             : UserDetails.fromMap(
@@ -200,6 +201,47 @@ class IsmChatConversationModel {
     return model;
   }
 
+  /// In-memory stub for "Message yourself" before the first outbound message.
+  ///
+  /// Same pattern as opening a new 1:1 from [IsmChatCreateConversationView]:
+  /// [conversationId] is empty until [createSelfChat] runs on first send.
+  /// Hive [IsmChatDbWrapper.saveConversation] rejects empty ids, so this is not
+  /// persisted until after creation.
+  factory IsmChatConversationModel.selfChatPlaceholder() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final user = IsmChatConfig.communicationConfig.userConfig;
+    final selfMember = IsmChatSelfChatLabels.signedInUserMember();
+    final createdByName = selfMember.displayName.trim().isNotEmpty
+        ? selfMember.displayName
+        : (user.userName ?? '');
+    return IsmChatConversationModel(
+      messagingDisabled: false,
+      isGroup: false,
+      selfChat: true,
+      privateOneToOne: true,
+      conversationType: IsmChatConversationType.private,
+      conversationId: '',
+      unreadMessagesCount: 0,
+      members: [selfMember],
+      membersCount: 1,
+      createdAt: now,
+      createdBy: user.userId,
+      createdByUserName: createdByName,
+      lastMessageSentAt: 0,
+      lastMessageDetails: LastMessageDetails(
+        sentByMe: true,
+        showInConversation: true,
+        sentAt: now,
+        senderName: '',
+        messageType: 0,
+        messageId: '',
+        conversationId: '',
+        body: '',
+      ),
+      messages: {},
+    );
+  }
+
   IsmChatConversationModel({
     this.updatedAt,
     this.unreadMessagesCount,
@@ -228,6 +270,7 @@ class IsmChatConversationModel {
     this.customType,
     this.pushNotifications,
     this.searchableTags,
+    this.selfChat,
   });
 
   final int? updatedAt;
@@ -258,9 +301,22 @@ class IsmChatConversationModel {
   final bool? pushNotifications;
   final List<String>? searchableTags;
 
+  /// `true` when this is the signed-in user's private self chat (Teams / WhatsApp).
+  ///
+  /// Omitted or `false` on the wire for normal conversations — treat missing as
+  /// false. UI should use [chatName] / [profileUrl] (backed by
+  /// [IsmChatSelfChatLabels]), not [opponentDetails].
+  final bool? selfChat;
+
+  /// See [selfChat].
+  bool get isSelfChat => selfChat == true;
+
   String get replyName => opponentDetails?.userName ?? '';
 
   String get chatName {
+    if (isSelfChat) {
+      return IsmChatSelfChatLabels.displayNameFor(this);
+    }
     if (conversationTitle.isNullOrEmpty) {
       if (isOpponentDetailsEmpty) {
         return IsmChatStrings.deletedUser;
@@ -274,6 +330,10 @@ class IsmChatConversationModel {
   }
 
   String get profileUrl {
+    if (isSelfChat) {
+      final url = IsmChatSelfChatLabels.profileUrlFor(this);
+      return url.isNotEmpty ? url : IsmChatConstants.profileUrl;
+    }
     if (conversationImageUrl.isNullOrEmpty) {
       if (isOpponentDetailsEmpty) {
         return IsmChatConstants.profileUrl;
@@ -284,6 +344,7 @@ class IsmChatConversationModel {
   }
 
   bool get isOpponentDetailsEmpty =>
+      !isSelfChat &&
       isGroup == false &&
       (opponentDetails?.userId ?? '').isEmpty &&
       ((opponentDetails?.userName ?? '').isEmpty ||
@@ -319,6 +380,7 @@ class IsmChatConversationModel {
     OutSideMessage? outSideMessage,
     bool? pushNotifications,
     List<String>? userIds,
+    bool? selfChat,
   }) =>
       IsmChatConversationModel(
         updatedAt: updatedAt ?? this.updatedAt,
@@ -348,6 +410,7 @@ class IsmChatConversationModel {
         pushNotifications: pushNotifications ?? this.pushNotifications,
         userIds: userIds ?? this.userIds,
         searchableTags: searchableTags ?? this.searchableTags,
+        selfChat: selfChat ?? this.selfChat,
       );
 
   Map<String, dynamic> toMap() => {
@@ -383,6 +446,7 @@ class IsmChatConversationModel {
         'outSideMessage': outSideMessage?.toMap(),
         'customType': customType,
         'pushNotifications': pushNotifications,
+        'selfChat': selfChat,
       }.removeNullValues();
 
   String toJson() => json.encode(toMap());
@@ -422,6 +486,7 @@ class IsmChatConversationModel {
         other.createdByUserName == createdByUserName &&
         other.customType == customType &&
         other.pushNotifications == pushNotifications &&
+        other.selfChat == selfChat &&
         other.messages == messages;
   }
 
@@ -452,6 +517,7 @@ class IsmChatConversationModel {
       outSideMessage.hashCode ^
       customType.hashCode ^
       pushNotifications.hashCode ^
+      selfChat.hashCode ^
       userIds.hashCode ^
       messages.hashCode;
 }
