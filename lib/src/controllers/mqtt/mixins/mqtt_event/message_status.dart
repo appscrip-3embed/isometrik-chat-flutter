@@ -21,7 +21,9 @@ mixin IsmChatMqttEventMessageStatusMixin {
         self is IsmChatMqttEventVariablesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
       final vars = self as IsmChatMqttEventVariablesMixin;
-      if (utils.isSenderMe(actionModel.userDetails?.userId)) return;
+      final conversation =
+          await _conversationForStatusEvent(actionModel.conversationId);
+      if (_skipStatusUpdateForOwnUser(utils, actionModel, conversation)) return;
 
       vars.deliverdActions.add(actionModel);
       final actionsData =
@@ -93,7 +95,9 @@ mixin IsmChatMqttEventMessageStatusMixin {
         self is IsmChatMqttEventVariablesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
       final vars = self as IsmChatMqttEventVariablesMixin;
-      if (utils.isSenderMe(actionModel.userDetails?.userId)) return;
+      final conversation =
+          await _conversationForStatusEvent(actionModel.conversationId);
+      if (_skipStatusUpdateForOwnUser(utils, actionModel, conversation)) return;
       vars.readActions.add(actionModel);
       vars.ismChatReadDebounce.run(() async {
         final actionsData = List<IsmChatMqttActionModel>.from(vars.readActions);
@@ -172,7 +176,9 @@ mixin IsmChatMqttEventMessageStatusMixin {
     final self = this;
     if (self is IsmChatMqttEventUtilitiesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
-      if (utils.isSenderMe(actionModel.userDetails?.userId)) return;
+      final conversation =
+          await _conversationForStatusEvent(actionModel.conversationId);
+      if (_skipStatusUpdateForOwnUser(utils, actionModel, conversation)) return;
       final conversationId = actionModel.conversationId ?? '';
       // Group chats emit this event for a whole page of messages. Reuse each
       // row's existing map key. Keying by metaData.messageSentAt collapses
@@ -323,6 +329,28 @@ int _othersToAckCount(IsmChatConversationModel? conversation) {
     return (conversation?.membersCount ?? 0) - 1;
   }
   return 1;
+}
+
+/// Loads the conversation row used by deliver/read guards and receipt updates.
+Future<IsmChatConversationModel?> _conversationForStatusEvent(
+  String? conversationId,
+) async {
+  final id = conversationId?.trim() ?? '';
+  if (id.isEmpty) return null;
+  return IsmChatConfig.dbWrapper?.getConversation(id);
+}
+
+/// Whether to ignore a deliver/read MQTT action from the logged-in user.
+///
+/// Self-chat acks use the same [userId] as the sender; 1:1 events from "me" are
+/// still ignored (multi-device echoes).
+bool _skipStatusUpdateForOwnUser(
+  IsmChatMqttEventUtilitiesMixin utils,
+  IsmChatMqttActionModel action,
+  IsmChatConversationModel? conversation,
+) {
+  if (conversation?.isSelfChat == true) return false;
+  return utils.isSenderMe(action.userDetails?.userId);
 }
 
 /// One stored row, addressed by the key already used in the conversation map.
