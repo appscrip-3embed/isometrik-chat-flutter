@@ -133,6 +133,28 @@ void main() {
     });
   });
 
+  group('IsmChatSelfChatLabels.matchesUserListSearch', () {
+    test('empty query always matches', () {
+      expect(IsmChatSelfChatLabels.matchesUserListSearch(''), isTrue);
+      expect(IsmChatSelfChatLabels.matchesUserListSearch('   '), isTrue);
+    });
+
+    test('matches display name and message yourself subtitle', () {
+      expect(
+        IsmChatSelfChatLabels.matchesUserListSearch(kMeName),
+        isTrue,
+      );
+      expect(
+        IsmChatSelfChatLabels.matchesUserListSearch('message yourself'),
+        isTrue,
+      );
+      expect(
+        IsmChatSelfChatLabels.matchesUserListSearch('no-such-user'),
+        isFalse,
+      );
+    });
+  });
+
   group('ConversationConfigModel', () {
     test('round trip', () {
       final config = ConversationConfigModel(

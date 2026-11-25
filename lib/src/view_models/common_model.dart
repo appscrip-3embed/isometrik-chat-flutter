@@ -288,6 +288,15 @@ class IsmChatCommonViewModel {
               messageId: response.messageId,
             );
           }
+          if (response.messageId.isNotEmpty) {
+            unawaited(
+              IsmChatSelfChatStatusCoordinator.acknowledgeAfterSend(
+                conversationId: conversationId,
+                messageId: response.messageId,
+                conversation: conversationModel,
+              ),
+            );
+          }
           return true;
         }
         // Server rejected message -> mark it failed so UI shows error icon

@@ -12,9 +12,10 @@ IsmChatConversationProperties(
   enableSelfChat: true,
   showCreateChatIcon: true,
   onCreateTap: () {},
-  // optional: enableGroupChat: true, // adds "Message yourself" to the create sheet
 ),
 ```
+
+**UI entry:** New conversation → 1-to-1 user list → top row **`{userName} (You)`** with subtitle **Message yourself** (same row style as contacts; scrolls with the list). Search matches that row by name or subtitle. Shown even when the user API returns no contacts.
 
 Programmatic open (still respects `enableSelfChat`):
 
@@ -30,7 +31,7 @@ await IsmChat.i.openSelfChat();
 
 When `enableSelfChat` is `false`:
 
-- No bottom-sheet / FAB entry points
+- No self-chat row in the new 1-to-1 user picker
 - `openSelfChat()` is a no-op
 - Self-chat rows from the API are hidden in the SDK list
 
@@ -46,9 +47,10 @@ Full backend contract: see project attachment `SELF_CHAT_API.md`.
 
 ## SDK behavior
 
-- **`IsmChatSelfChatLabels`** — display name `{userName} (You)` and profile from `IsmChatUserConfig`
+- **`IsmChatSelfChatLabels`** — display name `{userName} (You)`, profile from `IsmChatUserConfig`, and `matchesUserListSearch` for the user-picker row
 - **`IsmChatConversationModel.isSelfChat`** — parsed from API / DB
 - **`createSelfChat`** — `IsmChatCommonController` → `POST` with `selfChat: true` (first send or direct API call)
 - **`selfChatPlaceholder`** — stub conversation until first send
 - List sorting does not treat self chat as “deleted user” (empty `opponentDetails`)
 - Block / unblock is hidden and disabled for self chat (header ⋮ menu, conversation info, and `blockUser` / `unblockUser` APIs)
+- **Delivered / read ticks:** after each successful send, [`IsmChatSelfChatStatusCoordinator`](lib/src/utilities/self_chat_status_coordinator.dart) calls `PUT /chat/.../delivered` then `PUT /chat/.../read` so the server emits MQTT status events (same-device sends do not trigger the inbound deliver/read path). Include `IsmChatFeature.showMessageStatus` in chat page features to show ticks in the UI.

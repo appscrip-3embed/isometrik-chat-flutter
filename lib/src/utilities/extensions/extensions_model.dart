@@ -124,6 +124,14 @@ class IsmChatSelfChatLabels {
     }
     return profileUrl;
   }
+
+  /// Filters the self-chat row in [IsmChatCreateConversationView] user search.
+  static bool matchesUserListSearch(String searchQuery) {
+    final query = searchQuery.trim();
+    if (query.isEmpty) return true;
+    return displayName.didMatch(query) ||
+        IsmChatStrings.messageYourself.didMatch(query);
+  }
 }
 
 /// Self-chat helpers on [IsmChatConversationModel].

@@ -127,8 +127,8 @@ class IsmChatConversationProperties {
   /// Defaults to `false`.
   final bool enableGroupChat;
 
-  /// When `true`, shows “Message yourself” entry points and keeps self-chat
-  /// rows from `GET /chat/conversations`. Default `false`.
+  /// When `true`, shows the self-chat row in the 1-to-1 user picker and keeps
+  /// self-chat rows from `GET /chat/conversations`. Default `false`.
   ///
   /// Also gates [IsmChat.i.openSelfChat]. See `docs/SELF_CHAT.md`.
   final bool enableSelfChat;
