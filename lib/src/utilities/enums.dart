@@ -269,6 +269,8 @@ enum IsmChatCustomMessageType {
         return null;
       case IsmChatActionEvents.messagesDeleteForAll:
         return null;
+      case IsmChatActionEvents.messagesDeleteLocal:
+        return null;
       case IsmChatActionEvents.multipleMessagesRead:
         return null;
       case IsmChatActionEvents.clearConversation:
@@ -576,6 +578,7 @@ enum IsmChatActionEvents {
   messageDelivered,
   messageRead,
   messagesDeleteForAll,
+  messagesDeleteLocal,
   multipleMessagesRead,
   userBlock,
   userBlockConversation,
@@ -617,6 +620,8 @@ enum IsmChatActionEvents {
         return IsmChatActionEvents.messageRead;
       case 'messagesDeleteForAll':
         return IsmChatActionEvents.messagesDeleteForAll;
+      case 'messagesDeleteLocal':
+        return IsmChatActionEvents.messagesDeleteLocal;
       case 'multipleMessagesRead':
         return IsmChatActionEvents.multipleMessagesRead;
       case 'userBlock':
@@ -691,6 +696,8 @@ enum IsmChatActionEvents {
         return 'messageRead';
       case IsmChatActionEvents.messagesDeleteForAll:
         return 'messagesDeleteForAll';
+      case IsmChatActionEvents.messagesDeleteLocal:
+        return 'messagesDeleteLocal';
       case IsmChatActionEvents.multipleMessagesRead:
         return 'multipleMessagesRead';
       case IsmChatActionEvents.userBlock:

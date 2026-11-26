@@ -71,6 +71,7 @@ void main() {
         'messageDelivered',
         'messageRead',
         'messagesDeleteForAll',
+        'messagesDeleteLocal',
         'multipleMessagesRead',
         'userBlock',
         'userBlockConversation',

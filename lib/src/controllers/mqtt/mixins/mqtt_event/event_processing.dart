@@ -133,6 +133,13 @@ mixin IsmChatMqttEventProcessingMixin {
               .handleUnreadMessages(actionModel.userDetails?.userId ?? '');
         }
         break;
+      case IsmChatActionEvents.messagesDeleteLocal:
+        if (self is IsmChatMqttEventMessageStatusMixin &&
+            self is IsmChatMqttEventUtilitiesMixin) {
+          (self as IsmChatMqttEventMessageStatusMixin)
+              .handleMessageDeleteLocal(actionModel);
+        }
+        break;
       case IsmChatActionEvents.multipleMessagesRead:
         if (self is IsmChatMqttEventMessageStatusMixin) {
           (self as IsmChatMqttEventMessageStatusMixin)

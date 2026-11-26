@@ -863,7 +863,7 @@ Set<String> mentionUserIdsInComposerText(
 
   for (final seg in segments) {
     final trimmed = seg.trimLeft();
-  outer:
+    outer:
     for (final member in groupMembers) {
       if (_isCurrentChatUserWhenConfigured(member.userId)) continue;
       final userName = member.userName.trim();
@@ -916,8 +916,7 @@ int? _mentionEndForUser(String text, int atIndex, UserDetails user) {
     if (byName != null) return byName;
   }
   final label = mentionLabelForUser(user);
-  final words =
-      label.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  final words = label.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return null;
   // Do not consume [wordCount] words unless the inserted label's first token matches.
   if (_mentionNameEndAfterAt(text, atIndex, words.first) == null) {
@@ -991,8 +990,7 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
     final currentId =
         IsmChatConfig.communicationConfig.userConfig.userId.trim();
     if (currentId.isEmpty) return false;
-    for (final member
-        in IsmChatUtility.chatPageController.groupMembers) {
+    for (final member in IsmChatUtility.chatPageController.groupMembers) {
       if (member.userId.trim() != currentId) continue;
       for (final name in _mentionNamesForUser(member)) {
         if (_mentionNameEndAfterAt(text, start, name) == endExclusive) {
@@ -1010,8 +1008,7 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
     if (text[i] == '@' && _isComposerMentionAt(text, i)) {
       int? end;
 
-      if (useAuthoritativeMentions &&
-          mentionSlotIndex < authoritative.length) {
+      if (useAuthoritativeMentions && mentionSlotIndex < authoritative.length) {
         end = _mentionEndForUser(text, i, authoritative[mentionSlotIndex]);
       } else if (!useAuthoritativeMentions) {
         end = mentionEndAt(i);
@@ -1024,9 +1021,7 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
         }
       }
 
-      if (end != null &&
-          end > i + 1 &&
-          !isSelfMentionSpan(i, end)) {
+      if (end != null && end > i + 1 && !isSelfMentionSpan(i, end)) {
         segments.add(
           LocalMentionAndLinkData(
             text: text.substring(i, end),
@@ -1160,8 +1155,7 @@ extension MentionMessage on IsmChatMessageModel {
       if (userName.split(' ').first == q) return true;
       if (userName.contains(q)) return true;
       final firstName = user.metaData?.firstName?.trim().toLowerCase() ?? '';
-      if (firstName.isNotEmpty &&
-          (firstName == q || firstName.startsWith(q))) {
+      if (firstName.isNotEmpty && (firstName == q || firstName.startsWith(q))) {
         return true;
       }
       return false;
@@ -1268,7 +1262,7 @@ extension MentionMessage on IsmChatMessageModel {
   /// Reuse in tests and MQTT — do not duplicate rules in views.
   bool get canShowEditInFocusMenu {
     if (!IsmChatProperties.chatPageProperties.features
-      .contains(IsmChatFeature.edit)) {
+        .contains(IsmChatFeature.edit)) {
       return false;
     }
     if (!sentByMe) return false;
@@ -1332,19 +1326,24 @@ extension MentionMessage on IsmChatMessageModel {
         .contains(IsmChatFeature.deleteMessage)) {
       menu.remove(IsmChatFocusMenuType.delete);
     }
-    if (![
-      IsmChatCustomMessageType.audio,
-      IsmChatCustomMessageType.image,
-      IsmChatCustomMessageType.video,
-      IsmChatCustomMessageType.file,
-      IsmChatCustomMessageType.multipleAttachments,
-    ].contains(customType)) {
-      menu.remove(IsmChatFocusMenuType.save);
-    }
-    if (!IsmChatProperties.chatPageProperties.features
-        .contains(IsmChatFeature.mediaDownload)) {
-      menu.remove(IsmChatFocusMenuType.save);
-    }
+    // Long-press Save — disabled; media preview / app bars still expose Save.
+    menu.remove(IsmChatFocusMenuType.save);
+    // if (![
+    //   IsmChatCustomMessageType.audio,
+    //   IsmChatCustomMessageType.image,
+    //   IsmChatCustomMessageType.video,
+    //   IsmChatCustomMessageType.file,
+    //   IsmChatCustomMessageType.multipleAttachments,
+    // ].contains(customType)) {
+    //   menu.remove(IsmChatFocusMenuType.save);
+    // }
+    // if (!IsmChatProperties.chatPageProperties.features
+    //     .contains(IsmChatFeature.mediaDownload)) {
+    //   menu.remove(IsmChatFocusMenuType.save);
+    // }
+    // if (isGifOrStickerMessage) {
+    //   menu.remove(IsmChatFocusMenuType.save);
+    // }
 
     if (!(IsmChatProperties.chatPageProperties.canReplayMessage?.call(this) ??
         true)) {
@@ -1405,8 +1404,7 @@ extension MentionMessage on IsmChatMessageModel {
   int get threadReplyCount => IsmChatThreadCoordinator.replyCountOf(this);
 
   /// Whether the "N replies" footer should be shown under this message.
-  bool get showThreadFooter =>
-      IsmChatThreadCoordinator.shouldShowFooter(this);
+  bool get showThreadFooter => IsmChatThreadCoordinator.shouldShowFooter(this);
 
   /// Returns the text style for the message based on sender.
   TextStyle get style {
@@ -2111,7 +2109,8 @@ extension IsmChatMessageMediaExtension on IsmChatMessageModel {
           fromMeta != IsmChatCustomMessageType.forward) {
         return fromMeta;
       }
-      final fromAttachment = _threadPanelTypeFromAttachment(primaryAttachmentType);
+      final fromAttachment =
+          _threadPanelTypeFromAttachment(primaryAttachmentType);
       if (fromAttachment != null) return fromAttachment;
       if (isGifOrStickerMessage && (attachments?.isNotEmpty ?? false)) {
         return IsmChatCustomMessageType.image;
