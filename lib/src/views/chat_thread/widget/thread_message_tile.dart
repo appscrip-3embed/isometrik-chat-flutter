@@ -140,6 +140,15 @@ class IsmChatThreadMessageTile extends StatelessWidget {
                     ),
                   ),
                   IsmChatDimens.boxWidth4,
+                  if (message.messageUpdated) ...[
+                    Text(
+                      IsmChatStrings.messageEdited,
+                      style: theme.timeStyle.copyWith(
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    IsmChatDimens.boxWidth4,
+                  ],
                   Text(
                     message.sentAt.toTimeString,
                     style: theme.timeStyle,

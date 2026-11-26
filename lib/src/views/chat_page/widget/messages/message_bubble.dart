@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
+import 'package:isometrik_chat_flutter/src/views/chat_page/widget/messages/message_inner_time_metrics.dart';
 
 class MessageBubble extends StatelessWidget {
   MessageBubble({
@@ -274,7 +275,17 @@ class MessageBubble extends StatelessWidget {
                       ],
                     ],
                   ),
-                  _buildMessageContent(context, controller)
+                  _buildMessageContent(context, controller),
+                  // Width floor so the bottom-right time / "edited" row is not
+                  // painted outside the bubble (see [ismChatInnerTimeStatusMinWidth]).
+                  if (!showMessageInCenter &&
+                      (IsmChatProperties.chatPageProperties.messageStatus
+                              ?.shouldShowTimeStatusInner ??
+                          true))
+                    SizedBox(
+                      width: ismChatInnerTimeStatusMinWidth(context, _message),
+                      height: 0,
+                    ),
                 ],
               ),
             ),
