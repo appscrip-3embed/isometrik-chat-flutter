@@ -328,75 +328,14 @@ mixin IsmChatShowDialogMixin on GetxController {
     }
   }
 
-  /// Groups media messages (image/video) so actions like delete
-  /// apply to the whole media grid batch.
+  /// Same rules as multi-select forward grouping: [IsmChatMediaGridGrouping].
   List<IsmChatMessageModel> _getGroupedMediaMessagesForDeletion(
     IsmChatMessageModel message,
   ) {
-    final isImage = message.customType == IsmChatCustomMessageType.image;
-    final isVideo = message.customType == IsmChatCustomMessageType.video;
-    if (!isImage && !isVideo) {
-      return [message];
-    }
-
     final allMessages = _controller.messages
         .where((msg) => msg.customType != IsmChatCustomMessageType.date)
         .toList();
-    if (allMessages.isEmpty) return [message];
-
-    // Match the clicked message reliably (avoid `message.key` collisions).
-    int currentIndex = allMessages.indexWhere((m) {
-      final msgIdA = (m.messageId ?? '').trim();
-      final msgIdB = (message.messageId ?? '').trim();
-      if (msgIdA.isNotEmpty && msgIdB.isNotEmpty) {
-        return msgIdA == msgIdB;
-      }
-
-      final attA =
-          m.attachments?.isNotEmpty == true ? m.attachments!.first : null;
-      final attB = message.attachments?.isNotEmpty == true
-          ? message.attachments!.first
-          : null;
-      return m.sentAt == message.sentAt &&
-          m.sentByMe == message.sentByMe &&
-          m.customType == message.customType &&
-          (attA?.thumbnailUrl ?? '') == (attB?.thumbnailUrl ?? '') &&
-          (attA?.mediaUrl ?? '') == (attB?.mediaUrl ?? '');
-    });
-
-    if (currentIndex == -1) return [message];
-
-    final currentMessage = allMessages[currentIndex];
-    final sentByMe = currentMessage.sentByMe;
-    const timeWindow = 10000; // 10 seconds in milliseconds.
-    final groupedMessages = <IsmChatMessageModel>[];
-
-    var groupStartIndex = currentIndex;
-    for (var i = currentIndex; i >= 0; i--) {
-      final msg = allMessages[i];
-      final msgIsImage = msg.customType == IsmChatCustomMessageType.image;
-      final msgIsVideo = msg.customType == IsmChatCustomMessageType.video;
-      if (!msgIsImage && !msgIsVideo) break;
-      if (msg.sentByMe != sentByMe) break;
-
-      final timeDiff = (msg.sentAt - currentMessage.sentAt).abs();
-      if (timeDiff > timeWindow) break;
-      groupStartIndex = i;
-    }
-
-    for (var i = groupStartIndex; i < allMessages.length; i++) {
-      final msg = allMessages[i];
-      final msgIsImage = msg.customType == IsmChatCustomMessageType.image;
-      final msgIsVideo = msg.customType == IsmChatCustomMessageType.video;
-      if (!msgIsImage && !msgIsVideo) break;
-      if (msg.sentByMe != sentByMe) break;
-
-      final timeDiff = (msg.sentAt - allMessages[groupStartIndex].sentAt).abs();
-      if (timeDiff > timeWindow && groupedMessages.isNotEmpty) break;
-      groupedMessages.add(msg);
-    }
-
-    return groupedMessages.length >= 2 ? groupedMessages : [message];
+    return IsmChatMediaGridGrouping.collectActionableGroup(allMessages, message);
   }
 
   /// Converts a list of messages into a map with unique keys.
@@ -412,12 +351,16 @@ mixin IsmChatShowDialogMixin on GetxController {
     return map;
   }
 
-  void showDialogForDeleteMultipleMessage(bool sentByMe,
-      bool messageDeletedForEveryone, IsmChatMessages messages) async {
+  void showDialogForDeleteMultipleMessage(
+    bool allSelectedFromMe,
+    IsmChatMessages messages,
+  ) async {
     final messageCount = messages.length;
     final titleText = messageCount > 1
         ? '${IsmChatStrings.delete} $messageCount ${IsmChatStrings.messages.toLowerCase()} ?'
         : IsmChatStrings.deleteMessage;
+    final canDeleteForEveryone = allSelectedFromMe &&
+        messages.values.any((m) => m.isEligibleForDeleteForEveryone);
 
     void onDeleteSelectionCancel() {
       IsmChatRoute.goBack<void>();
@@ -425,7 +368,7 @@ mixin IsmChatShowDialogMixin on GetxController {
       _controller.isMessageSeleted = false;
     }
 
-    if (sentByMe && !messageDeletedForEveryone) {
+    if (canDeleteForEveryone) {
       await _presentChatConfirmation(
         IsmChatConfirmationRequest(
           type: IsmChatConfirmationType.deleteMultipleOwn,
@@ -451,9 +394,9 @@ mixin IsmChatShowDialogMixin on GetxController {
       await _presentChatConfirmation(
         IsmChatConfirmationRequest(
           type: IsmChatConfirmationType.deleteMultipleOther,
-          title: messageDeletedForEveryone
-              ? titleText
-              : '${IsmChatStrings.deleteMessages}',
+          title: !allSelectedFromMe
+              ? '${IsmChatStrings.deleteMessages}'
+              : titleText,
           conversation: _controller.conversation,
           messageCount: messageCount,
           onCancel: onDeleteSelectionCancel,

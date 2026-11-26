@@ -154,60 +154,39 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
     }
   }
 
+  /// Matches the visible media grid via [IsmChatMediaGridGrouping]; GIF/sticker
+  /// rows are not batch-selected unless they share a true grid group.
   List<IsmChatMessageModel> _getGroupedMediaMessagesForSelection(
     IsmChatMessageModel message,
   ) {
-    final isImage = message.customType == IsmChatCustomMessageType.image;
-    final isVideo = message.customType == IsmChatCustomMessageType.video;
-    if (!isImage && !isVideo) {
-      return [message];
+    final allMessages = _controller.messages
+        .where((msg) => msg.customType != IsmChatCustomMessageType.date)
+        .toList();
+    return IsmChatMediaGridGrouping.collectActionableGroup(allMessages, message);
+  }
+
+  /// Whether [message] is in the current multi-select set (stable identity).
+  bool isMessageInSelection(IsmChatMessageModel message) {
+    final selected = _controller.selectedMessage;
+    if (selected.any(
+      (item) => _messageIdentity(item) == _messageIdentity(message),
+    )) {
+      return true;
     }
 
     final allMessages = _controller.messages
         .where((msg) => msg.customType != IsmChatCustomMessageType.date)
         .toList();
-    if (allMessages.isEmpty) {
-      return [message];
+    final group = IsmChatMediaGridGrouping.collect(allMessages, message);
+    if (group.length < 2 ||
+        !IsmChatMediaGridGrouping.isGridHost(group, message)) {
+      return false;
     }
-
-    final currentIndex = allMessages.indexWhere(
-      (msg) => _messageIdentity(msg) == _messageIdentity(message),
+    return group.any(
+      (peer) => selected.any(
+        (item) => _messageIdentity(item) == _messageIdentity(peer),
+      ),
     );
-    if (currentIndex == -1) {
-      return [message];
-    }
-
-    final currentMessage = allMessages[currentIndex];
-    final sentByMe = currentMessage.sentByMe;
-    const timeWindow = 10000; // 10 seconds in milliseconds.
-    final groupedMessages = <IsmChatMessageModel>[];
-
-    var groupStartIndex = currentIndex;
-    for (var i = currentIndex; i >= 0; i--) {
-      final msg = allMessages[i];
-      final msgIsImage = msg.customType == IsmChatCustomMessageType.image;
-      final msgIsVideo = msg.customType == IsmChatCustomMessageType.video;
-      if (!msgIsImage && !msgIsVideo) break;
-      if (msg.sentByMe != sentByMe) break;
-
-      final timeDiff = (msg.sentAt - currentMessage.sentAt).abs();
-      if (timeDiff > timeWindow) break;
-      groupStartIndex = i;
-    }
-
-    for (var i = groupStartIndex; i < allMessages.length; i++) {
-      final msg = allMessages[i];
-      final msgIsImage = msg.customType == IsmChatCustomMessageType.image;
-      final msgIsVideo = msg.customType == IsmChatCustomMessageType.video;
-      if (!msgIsImage && !msgIsVideo) break;
-      if (msg.sentByMe != sentByMe) break;
-
-      final timeDiff = (msg.sentAt - allMessages[groupStartIndex].sentAt).abs();
-      if (timeDiff > timeWindow && groupedMessages.isNotEmpty) break;
-      groupedMessages.add(msg);
-    }
-
-    return groupedMessages.length >= 2 ? groupedMessages : [message];
   }
 
   String _messageIdentity(IsmChatMessageModel message) {
@@ -250,7 +229,13 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
       return;
     }
 
-    await _controller.showOverlay(context, message);
+    final allMessages = _controller.messages
+        .where((msg) => msg.customType != IsmChatCustomMessageType.date)
+        .toList();
+    final focusMessage =
+        IsmChatMediaGridGrouping.focusMenuAnchor(allMessages, message);
+
+    await _controller.showOverlay(context, focusMessage);
   }
 
   /// Shows overlay for message focus menu (mobile).

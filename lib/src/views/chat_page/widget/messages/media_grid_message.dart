@@ -171,12 +171,18 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
                       .tapForMediaPreview(messageToShow);
                 },
                 onLongPress: () {
-                  if (IsmChatUtility.chatPageControllerRegistered) {
-                    IsmChatUtility.chatPageController.onMessageLongPress(
-                      context,
-                      message,
-                    );
+                  if (!IsmChatUtility.chatPageControllerRegistered) {
+                    return;
                   }
+                  // Focus menu should preview the whole grid (host or first tile).
+                  final anchor = widget.gridHostMessage ??
+                      (widget.messages.length >= 2
+                          ? widget.messages.first
+                          : message);
+                  IsmChatUtility.chatPageController.onMessageLongPress(
+                    context,
+                    anchor,
+                  );
                 },
                 child: Stack(
                   fit: StackFit.expand,

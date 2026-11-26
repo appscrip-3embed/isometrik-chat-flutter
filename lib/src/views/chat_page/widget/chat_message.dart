@@ -156,7 +156,7 @@ class _IsmChatMessageState extends State<IsmChatMessage>
               absorbing: controller.isMessageSeleted,
               child: Container(
                 padding: IsmChatDimens.edgeInsets4_0,
-                color: controller.selectedMessage.contains(widget._message)
+                color: controller.isMessageInSelection(widget._message!)
                     ? (IsmChatConfig.chatTheme.chatPageTheme
                                 ?.messageSelectionColor ??
                             IsmChatConfig.chatTheme.primaryColor!)

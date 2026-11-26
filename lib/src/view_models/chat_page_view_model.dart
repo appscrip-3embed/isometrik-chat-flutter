@@ -382,14 +382,18 @@ class IsmChatPageViewModel {
   Future<void> deleteMessageForEveryone(
     IsmChatMessages messages,
   ) async {
-    messages.removeWhere(
-      (key, value) => (value.messageId ?? '').trim().isEmpty,
-    );
-    if (messages.isEmpty) {
+    final eligible = IsmChatMessages.from(messages)
+      ..removeWhere((key, value) => !value.isEligibleForDeleteForEveryone);
+    if (eligible.isEmpty) {
       return;
     }
-    final conversationId = messages.values.first.conversationId ?? '';
-    final messageIds = messages.values
+
+    final conversationId = _conversationIdForDelete(eligible);
+    if (conversationId.isEmpty) {
+      return;
+    }
+
+    final messageIds = eligible.values
         .map((e) => (e.messageId ?? '').trim())
         .where((id) => id.isNotEmpty)
         .toSet()
@@ -401,6 +405,7 @@ class IsmChatPageViewModel {
 
     // Delete each message ID individually for compatibility with servers
     // that only honor the first ID from a comma-separated query param.
+    final deletedIds = <String>[];
     for (final messageId in messageIds) {
       final response = await _repository.deleteMessageForEveryone(
         conversationId: conversationId,
@@ -412,13 +417,14 @@ class IsmChatPageViewModel {
         if (IsmChatThreadCoordinator.isRootDeleteBlocked(response)) {
           IsmChatUtility.showToast(IsmChatStrings.threadRootDeleteBlocked);
         }
-        return;
+        continue;
       }
+      deletedIds.add(messageId);
       // Media-storage quota: sync freed bytes into cached usage when quota is on.
       IsmChatStorageQuotaGuard.syncUsageFromResponse(response);
       // A deleted thread reply lowers its root's badge; keep the open panel and
       // the cached root in step (no-op with threads off).
-      final deleted = messages.values.cast<IsmChatMessageModel?>().firstWhere(
+      final deleted = eligible.values.cast<IsmChatMessageModel?>().firstWhere(
             (e) => (e?.messageId ?? '') == messageId,
             orElse: () => null,
           );
@@ -430,6 +436,11 @@ class IsmChatPageViewModel {
         );
       }
     }
+
+    if (deletedIds.isEmpty) {
+      return;
+    }
+
     var conversation =
         await IsmChatConfig.dbWrapper?.getConversation(conversationId);
     final allMessages = conversation?.messages;
@@ -437,7 +448,11 @@ class IsmChatPageViewModel {
       return;
     }
 
-    for (var message in messages.entries) {
+    for (var message in eligible.entries) {
+      final messageId = (message.value.messageId ?? '').trim();
+      if (!deletedIds.contains(messageId)) {
+        continue;
+      }
       final gotMessage =
           allMessages.values.toList().cast<IsmChatMessageModel?>().firstWhere(
                 (e) => e?.messageId == message.value.messageId,
@@ -457,6 +472,21 @@ class IsmChatPageViewModel {
           ?.saveConversation(conversation: conversation);
     }
     await IsmChatUtility.chatPageController.getMessagesFromDB(conversationId);
+  }
+
+  String _conversationIdForDelete(IsmChatMessages messages) {
+    for (final message in messages.values) {
+      final id = (message.conversationId ?? '').trim();
+      if (id.isNotEmpty) {
+        return id;
+      }
+    }
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      return (IsmChatUtility.chatPageController.conversation?.conversationId ??
+              '')
+          .trim();
+    }
+    return '';
   }
 
   /// Lowers the cached root's `replyCount` after one of its replies was

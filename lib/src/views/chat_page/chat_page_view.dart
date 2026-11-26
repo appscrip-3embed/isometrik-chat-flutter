@@ -478,17 +478,12 @@ class _IsmChatPageView extends StatelessWidget {
                               // groups where multiple messages can share same timestamp key.
                               selectedMessage['${stableKey}_$i'] = message;
                             }
-                            // Check if all messages are from current user
-                            var messageSenderSide =
+                            final allSelectedFromMe =
                                 controller.isAllMessagesFromMe();
-                            // Check if any message is deleted for everyone
-                            var messageDeletedForEveryone =
-                                controller.isAnyMessageDeletedForEveryone();
-                            // Show delete confirmation dialog
                             controller.showDialogForDeleteMultipleMessage(
-                                messageSenderSide,
-                                messageDeletedForEveryone,
-                                selectedMessage);
+                              allSelectedFromMe,
+                              selectedMessage,
+                            );
                           },
                           icon: Icon(
                             Icons.delete_rounded,

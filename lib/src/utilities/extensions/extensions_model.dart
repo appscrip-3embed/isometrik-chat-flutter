@@ -1282,6 +1282,15 @@ extension MentionMessage on IsmChatMessageModel {
     return true;
   }
 
+  /// Own, persisted, non-deleted rows that the server can delete for everyone.
+  ///
+  /// Reuse in multi-select delete UI, [IsmChatPageViewModel.deleteMessageForEveryone],
+  /// and tests — keep rules in one place.
+  bool get isEligibleForDeleteForEveryone =>
+      sentByMe &&
+      customType != IsmChatCustomMessageType.deletedForEveryone &&
+      (messageId ?? '').trim().isNotEmpty;
+
   /// Returns a list of focus menu types available for this message.
   List<IsmChatFocusMenuType> get focusMenuList {
     var menu = [...IsmChatFocusMenuType.values];
@@ -1951,6 +1960,44 @@ class IsmChatMediaGridGrouping {
     IsmChatMessageModel current,
   ) =>
       group.length >= 2 && !group.first.hasSameMediaGridIdentityAs(current);
+
+  /// Messages that should be selected, forwarded, or deleted as one unit when
+  /// the user acts on [anchor]. Reuses [collect] so batch actions match the
+  /// visible media grid; standalone GIF/sticker rows stay single-message.
+  static List<IsmChatMessageModel> collectActionableGroup(
+    List<IsmChatMessageModel> chronologicMessages,
+    IsmChatMessageModel anchor,
+  ) {
+    final group = collect(chronologicMessages, anchor);
+    return group.length >= 2 ? group : [anchor];
+  }
+
+  /// Message to show in the long-press focus menu — the visible grid host, not
+  /// an individual tile (consecutive images or a multi-attachment grid slice).
+  static IsmChatMessageModel focusMenuAnchor(
+    List<IsmChatMessageModel> chronologicMessages,
+    IsmChatMessageModel message,
+  ) {
+    final group = collect(chronologicMessages, message);
+    if (group.length >= 2) {
+      return group.first;
+    }
+
+    final messageId = (message.messageId ?? '').trim();
+    if (messageId.isNotEmpty && message.isGridDisplayableMedia) {
+      for (final candidate in chronologicMessages) {
+        if (candidate.customType ==
+                IsmChatCustomMessageType.multipleAttachments &&
+            candidate.multipleAttachmentLayout ==
+                MultipleAttachmentLayout.mediaGrid &&
+            (candidate.messageId ?? '').trim() == messageId) {
+          return candidate;
+        }
+      }
+    }
+
+    return message;
+  }
 }
 
 /// flutter_contacts 2.x helpers for a device [Contact].

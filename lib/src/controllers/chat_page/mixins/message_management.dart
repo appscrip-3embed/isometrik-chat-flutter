@@ -165,38 +165,34 @@ mixin IsmChatPageMessageManagementMixin on GetxController {
   Future<void> deleteMessageForEveryone(
     IsmChatMessages messages,
   ) async {
-    final pendingMessges = IsmChatMessages.from(messages);
     await _controller.viewModel.deleteMessageForEveryone(messages);
     _controller.selectedMessage.clear();
-    pendingMessges.entries.where((e) => e.value.messageId == '');
-    if (pendingMessges.isNotEmpty) {
+    _controller.isMessageSeleted = false;
+    final pendingOnly = IsmChatMessages.from(messages)
+      ..removeWhere((key, value) => (value.messageId ?? '').trim().isNotEmpty);
+    if (pendingOnly.isNotEmpty) {
       await IsmChatConfig.dbWrapper?.removePendingMessage(
-          _controller.conversation?.conversationId ?? '', pendingMessges);
-      await _controller
-          .getMessagesFromDB(_controller.conversation!.conversationId!);
-      _controller.selectedMessage.clear();
-      _controller.isMessageSeleted = false;
+        _controller.conversation?.conversationId ?? '',
+        pendingOnly,
+      );
     }
-    // IsmChatUtility.showToast('Deleted your message');
   }
 
   /// Deletes message for me only.
   Future<void> deleteMessageForMe(
     IsmChatMessages messages,
   ) async {
-    final pendingMessges = IsmChatMessages.from(messages);
     await _controller.viewModel.deleteMessageForMe(messages);
     _controller.selectedMessage.clear();
-    pendingMessges.entries.where((e) => e.value.messageId == '');
-    if (pendingMessges.isNotEmpty) {
+    _controller.isMessageSeleted = false;
+    final pendingOnly = IsmChatMessages.from(messages)
+      ..removeWhere((key, value) => (value.messageId ?? '').trim().isNotEmpty);
+    if (pendingOnly.isNotEmpty) {
       await IsmChatConfig.dbWrapper?.removePendingMessage(
-          _controller.conversation?.conversationId ?? '', pendingMessges);
-      await _controller
-          .getMessagesFromDB(_controller.conversation?.conversationId ?? '');
-      _controller.selectedMessage.clear();
-      _controller.isMessageSeleted = false;
+        _controller.conversation?.conversationId ?? '',
+        pendingOnly,
+      );
     }
-    // IsmChatUtility.showToast('Deleted your message');
   }
 
   /// Clears all messages in the conversation.
