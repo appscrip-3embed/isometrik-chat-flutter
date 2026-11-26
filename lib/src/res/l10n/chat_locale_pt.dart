@@ -98,6 +98,12 @@ const Map<String, String> kIsmChatLocalePt = {
   'contactAppear': 'Os contatos selecionados aparecerão aqui…',
   'participants': 'participantes',
   'exitGroup': 'Sair do grupo',
+  'leaveGroup': 'Sair do grupo',
+  'leaveAndDeleteForMe': 'Sair e excluir para mim',
+  'youLeftTheGroup': 'Você saiu do grupo',
+  'memberLeftTheGroup': '{name} saiu do grupo',
+  'addedMembersToGroup': '{initiator} adicionou {members} ao grupo.',
+  'youWereAddedToGroupBy': 'Você foi adicionado a este grupo por {initiator}.',
   'createdOn': 'Criado em',
   'by': 'por',
   'noMedia': 'Sem mídia',
@@ -203,7 +209,7 @@ const Map<String, String> kIsmChatLocalePt = {
   'messageYourselfAction': 'Mensagem para você',
   'selfChatYouSuffix': '(Você)',
   'exitGroupBody':
-      'Somente os admins do grupo serão notificados de que você saiu do grupo',
+      'Escolha manter este chat na sua lista ou removê-lo deste dispositivo. Os outros membros são sempre notificados quando você sai.',
   'focusMenuInfo': 'Info',
   'focusMenuCopy': 'Copiar',
   'focusMenuSelectMessage': 'Selecionar mensagem',
@@ -238,4 +244,16 @@ const Map<String, String> kIsmChatLocalePt = {
   'sameNameUploadTitle': 'Arquivo já no armazenamento',
   'reshareOlderFile': 'Reenviar arquivo anterior',
   'uploadACopy': 'Enviar uma cópia',
+  'errorGeneric': 'Algo correu mal. Tente novamente.',
+  'errorServerUnavailable':
+      'Os nossos servidores estão com problemas. Tente novamente em instantes.',
+  'errorServiceUnavailable':
+      'Este serviço está temporariamente indisponível. Tente mais tarde.',
+  'errorRequestTimeout':
+      'O pedido demorou demasiado. Verifique a ligação e tente novamente.',
+  'deleteForEveryoneFailed':
+      'Não foi possível eliminar as mensagens para todos.',
+  'deleteForMeFailed': 'Não foi possível eliminar as mensagens.',
+  'deleteRetryFailed':
+      'Ainda não foi possível concluir a eliminação. Tente mais tarde.',
 };

@@ -488,10 +488,20 @@ mixin IsmChatShowDialogMixin on GetxController {
           actions: [
             IsmChatConfirmationAction(
               id: IsmChatConfirmationActionId.exitGroup,
-              label: IsmChatStrings.exitGroup,
+              label: IsmChatStrings.leaveGroup,
               onPressed: () async => await _controller.leaveGroup(
                 adminCount: adminCount,
                 isUserAdmin: isUserAdmin,
+                mode: IsmChatLeaveGroupMode.keepHistory,
+              ),
+            ),
+            IsmChatConfirmationAction(
+              id: IsmChatConfirmationActionId.leaveGroupAndDeleteForMe,
+              label: IsmChatStrings.leaveAndDeleteForMe,
+              onPressed: () async => await _controller.leaveGroup(
+                adminCount: adminCount,
+                isUserAdmin: isUserAdmin,
+                mode: IsmChatLeaveGroupMode.deleteForMe,
               ),
             ),
           ],

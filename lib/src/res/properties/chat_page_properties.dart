@@ -230,7 +230,9 @@ class IsmChatPageProperties {
   /// [IsmChatConfirmationType] and [IsmChatConfirmationActionId] as needed.
   ///
   /// Exit group types:
-  /// - [IsmChatConfirmationType.exitGroup] — confirm leave
+  /// - [IsmChatConfirmationType.exitGroup] — Leave Group / Leave and Delete for Me
+  ///   ([IsmChatConfirmationActionId.exitGroup],
+  ///   [IsmChatConfirmationActionId.leaveGroupAndDeleteForMe]); Cancel uses dialog dismiss
   /// - [IsmChatConfirmationType.exitGroupOnlyAdmin] — only-admin warning first
   ///
   /// Change group title ([IsmChatConfirmationType.changeGroupTitle]):

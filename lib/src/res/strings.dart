@@ -132,6 +132,24 @@ class IsmChatStrings {
   static String get contactAppear => IsmChatL10n.get('contactAppear');
   static String get participants => IsmChatL10n.get('participants');
   static String get exitGroup => IsmChatL10n.get('exitGroup');
+  static String get leaveGroup => IsmChatL10n.get('leaveGroup');
+  static String get leaveAndDeleteForMe => IsmChatL10n.get('leaveAndDeleteForMe');
+  static String get youLeftTheGroup => IsmChatL10n.get('youLeftTheGroup');
+
+  static String memberLeftTheGroup(String name) =>
+      IsmChatL10n.get('memberLeftTheGroup').replaceAll('{name}', name);
+
+  static String addedMembersToGroup({
+    required String initiator,
+    required String members,
+  }) =>
+      IsmChatL10n.get('addedMembersToGroup')
+          .replaceAll('{initiator}', initiator)
+          .replaceAll('{members}', members);
+
+  static String youWereAddedToGroupBy(String initiator) =>
+      IsmChatL10n.get('youWereAddedToGroupBy')
+          .replaceAll('{initiator}', initiator);
   static String get createdOn => IsmChatL10n.get('createdOn');
   static String get by => IsmChatL10n.get('by');
   static String get noMedia => IsmChatL10n.get('noMedia');
@@ -297,6 +315,19 @@ class IsmChatStrings {
 
   /// Retry button in the thread panel's error state.
   static String get threadRetry => IsmChatL10n.get('threadRetry');
+
+  /// User-facing HTTP / gateway failures ([IsmChatResponseModel.userFacingApiErrorMessage]).
+  static String get errorGeneric => IsmChatL10n.get('errorGeneric');
+  static String get errorServerUnavailable =>
+      IsmChatL10n.get('errorServerUnavailable');
+  static String get errorServiceUnavailable =>
+      IsmChatL10n.get('errorServiceUnavailable');
+  static String get errorRequestTimeout =>
+      IsmChatL10n.get('errorRequestTimeout');
+  static String get deleteForEveryoneFailed =>
+      IsmChatL10n.get('deleteForEveryoneFailed');
+  static String get deleteForMeFailed => IsmChatL10n.get('deleteForMeFailed');
+  static String get deleteRetryFailed => IsmChatL10n.get('deleteRetryFailed');
 
   /// Shown when a thread reply could not reach the server and was queued for
   /// retry (offline send).

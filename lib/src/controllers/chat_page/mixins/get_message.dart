@@ -199,6 +199,7 @@ mixin IsmChatPageGetMessageMixin on GetxController {
     messages.removeWhere(
       (m) => !m.isVisibleInGroupChat(_controller.conversation),
     );
+    IsmChatGroupSystemMessageCoordinator.dedupeMemberLeaveTimelineRows(messages);
     // Slack-style threads: replies that live only in a thread never belong in
     // the channel list. No-op while IsmChatConfig.threadsEnabled is false, so
     // cached inline replies keep rendering as they do today.

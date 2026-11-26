@@ -276,6 +276,28 @@ extension BlockStatus on IsmChatConversationModel {
         last.customType == IsmChatCustomMessageType.memberLeave;
   }
 
+  /// True when the latest preview is `removeMember` for the signed-in user
+  /// (admin removed them — not voluntary leave). Used for composer banner copy.
+  bool get isCurrentUserRemovedFromGroup {
+    if (isGroup != true) return false;
+    final currentUserId =
+        IsmChatConfig.communicationConfig.userConfig.userId.trim();
+    if (currentUserId.isEmpty) return false;
+
+    final last = lastMessageDetails;
+    if (last == null) return false;
+    if (last.conversationId.isNotEmpty &&
+        last.conversationId != conversationId) {
+      return false;
+    }
+    if (last.customType != IsmChatCustomMessageType.removeMember) {
+      return false;
+    }
+
+    final subjectId = (last.userId ?? last.memberId ?? '').trim();
+    return subjectId.isNotEmpty && subjectId == currentUserId;
+  }
+
   /// Returns true if the conversation is blocked by the current user.
   bool get isBlockedByMe {
     if (isChattingAllowed) {
@@ -465,6 +487,52 @@ extension LastMessageMediaPreview on LastMessageDetails {
   }
 }
 
+/// Builds list-preview copy for group system rows from [LastMessageDetails].
+extension LastMessageGroupBannerPreview on LastMessageDetails {
+  IsmChatMessageModel get _groupBannerMessageStub => IsmChatMessageModel(
+        body: body,
+        customType: customType,
+        sentAt: sentAt,
+        sentByMe: sentByMe,
+        initiatorId: initiatorId,
+        initiatorName: senderName,
+        userId: userId ?? senderId,
+        userName: senderName,
+        memberId: memberId,
+        memberName: memberName,
+      );
+
+  String groupSystemListPreview() {
+    switch (customType) {
+      case IsmChatCustomMessageType.removeMember:
+        return _groupBannerMessageStub.groupAddRemoveMemberBannerText(
+          isAdded: false,
+        );
+      case IsmChatCustomMessageType.addMember:
+        final names = (members ?? []).join(', ');
+        if (names.isNotEmpty) {
+          final stub = _groupBannerMessageStub.copyWith(
+            memberName: memberName ?? names,
+          );
+          if (stub.isCurrentUserAmongAddedMembers) {
+            return stub.groupAddRemoveMemberBannerText(isAdded: true);
+          }
+          return IsmChatStrings.addedMembersToGroup(
+            initiator: stub.initiator,
+            members: names,
+          );
+        }
+        return _groupBannerMessageStub.groupAddRemoveMemberBannerText(
+          isAdded: true,
+        );
+      case IsmChatCustomMessageType.memberLeave:
+        return _groupBannerMessageStub.groupMemberLeaveBannerText();
+      default:
+        return '';
+    }
+  }
+}
+
 /// Extension for LastMessageDetails to get message body and icon.
 extension LastMessageBody on LastMessageDetails {
   /// Returns the formatted message body based on custom type.
@@ -516,15 +584,25 @@ extension LastMessageBody on LastMessageDetails {
       case IsmChatCustomMessageType.conversationTitleUpdated:
         return 'Changed this group title';
       case IsmChatCustomMessageType.removeMember:
-        return 'Removed ${(members ?? []).join(', ')}';
       case IsmChatCustomMessageType.addMember:
-        return 'Added ${(members ?? []).join(', ')}';
+      case IsmChatCustomMessageType.memberLeave:
+        final preview = groupSystemListPreview();
+        if (preview.isNotEmpty) {
+          return preview;
+        }
+        if (customType == IsmChatCustomMessageType.addMember) {
+          return 'Added ${(members ?? []).join(', ')}';
+        }
+        if (customType == IsmChatCustomMessageType.removeMember) {
+          return 'Removed ${(members ?? []).join(', ')}';
+        }
+        return IsmChatStrings.memberLeftTheGroup(
+          senderName.isNotEmpty ? senderName : 'Someone',
+        );
       case IsmChatCustomMessageType.addAdmin:
         return 'Added $adminOpponentName as an Admin';
       case IsmChatCustomMessageType.removeAdmin:
         return 'Remove $adminOpponentName as an Admin';
-      case IsmChatCustomMessageType.memberLeave:
-        return '$senderName left';
       case IsmChatCustomMessageType.memberJoin:
         return '$senderName join';
       case IsmChatCustomMessageType.deletedForMe:
@@ -679,6 +757,92 @@ extension SdkCallBubbleMessage on IsmChatMessageModel {
 extension MemberLeaveVisibility on IsmChatMessageModel {
   /// All members see center banners including [IsmChatCustomMessageType.memberLeave].
   bool isVisibleInGroupChat(IsmChatConversationModel? conversation) => true;
+}
+
+/// Centered group system row copy (chat banners and conversation list previews).
+extension GroupSystemBannerText on IsmChatMessageModel {
+  bool get _isLeaveSubjectCurrentUser {
+    final candidates = <String>[
+      userId ?? '',
+      memberId ?? '',
+      senderInfo?.userId ?? '',
+    ].map((id) => id.trim()).where((id) => id.isNotEmpty);
+    return candidates.any(isCurrentChatUser);
+  }
+
+  bool get isCurrentUserAmongAddedMembers {
+    final membersList = members;
+    if (membersList != null) {
+      for (final member in membersList) {
+        final id = member.userId.trim().isNotEmpty
+            ? member.userId.trim()
+            : (member.memberId?.trim() ?? '');
+        if (id.isNotEmpty && isCurrentChatUser(id)) {
+          return true;
+        }
+      }
+    }
+    final single = memberId?.trim() ?? '';
+    return single.isNotEmpty && isCurrentChatUser(single);
+  }
+
+  String _resolvedAddedMemberLabel() {
+    final fromList = members
+            ?.map((e) => (e.memberName ?? e.userName).trim())
+            .where((name) => name.isNotEmpty)
+            .join(', ') ??
+        '';
+    if (fromList.isNotEmpty) {
+      return fromList;
+    }
+    final single = (memberName ?? '').trim();
+    if (single.isNotEmpty) {
+      if (isCurrentUserAmongAddedMembers) {
+        return IsmChatStrings.you;
+      }
+      return single;
+    }
+    return '';
+  }
+
+  String groupMemberLeaveBannerText() {
+    if (_isLeaveSubjectCurrentUser) {
+      return IsmChatStrings.youLeftTheGroup;
+    }
+    final name = (userName ?? '').trim().isNotEmpty
+        ? (userName ?? '').trim()
+        : (initiatorName ?? '').trim();
+    if (name.isEmpty) {
+      return IsmChatStrings.memberLeftTheGroup('Someone');
+    }
+    return IsmChatStrings.memberLeftTheGroup(name);
+  }
+
+  String groupMemberJoinBannerText() {
+    final name = (userName ?? '').trim();
+    if (name.isEmpty) {
+      return '';
+    }
+    if (_isLeaveSubjectCurrentUser) {
+      return '${IsmChatStrings.you} joined conversation';
+    }
+    return '$name joined conversation';
+  }
+
+  String groupAddRemoveMemberBannerText({required bool isAdded}) {
+    if (!isAdded) {
+      final memberLabel = _resolvedAddedMemberLabel();
+      return '${initiator} removed $memberLabel'.trim();
+    }
+    if (isCurrentUserAmongAddedMembers) {
+      return IsmChatStrings.youWereAddedToGroupBy(initiator);
+    }
+    final memberLabel = _resolvedAddedMemberLabel();
+    return IsmChatStrings.addedMembersToGroup(
+      initiator: initiator,
+      members: memberLabel,
+    );
+  }
 }
 
 /// Label inserted after `@` when picking someone from the mention list.
@@ -1614,6 +1778,13 @@ extension MentionMessage on IsmChatMessageModel {
     if (trimmedBody.startsWith('AttachmentMessage:')) return '';
     return trimmedBody;
   }
+
+  /// Caption under [IsmChatMediaGridMessage] — [IsmChatMetaData.caption] only.
+  ///
+  /// Outbound image/video captions are duplicated in [body] and metadata
+  /// (`captionMessage` on the wire). The grid must not fall back to [body] or
+  /// batch preview placeholders.
+  String get mediaGridCaption => metaData?.caption?.trim() ?? '';
 
   /// Homogeneous layout for multipleAttachments messages.
   ///

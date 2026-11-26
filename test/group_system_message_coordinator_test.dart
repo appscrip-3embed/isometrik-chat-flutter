@@ -38,6 +38,48 @@ void main() {
       expect(row.sentByMe, isTrue);
     });
 
+    test('replaceMemberLeaveRowsForSubject keeps one row per leaving user', () {
+      final oldRow = IsmChatMessageModel(
+        body: '',
+        customType: IsmChatCustomMessageType.memberLeave,
+        sentAt: 1000,
+        sentByMe: true,
+        userId: 'user-3',
+        userName: 'Leaver',
+      );
+      final map = <String, IsmChatMessageModel>{'1000': oldRow};
+      final newRow = oldRow.copyWith(sentAt: 2000);
+      IsmChatGroupSystemMessageCoordinator.replaceMemberLeaveRowsForSubject(
+        map,
+        newRow,
+      );
+      map['2000'] = newRow;
+      expect(map.length, 1);
+      expect(map.values.first.sentAt, 2000);
+    });
+
+    test('dedupeMemberLeaveTimelineRows collapses duplicate leave banners', () {
+      final rows = [
+        IsmChatMessageModel(
+          body: '',
+          customType: IsmChatCustomMessageType.memberLeave,
+          sentAt: 1000,
+          sentByMe: true,
+          userId: 'user-3',
+        ),
+        IsmChatMessageModel(
+          body: '',
+          customType: IsmChatCustomMessageType.memberLeave,
+          sentAt: 2000,
+          sentByMe: true,
+          userId: 'user-3',
+        ),
+      ];
+      IsmChatGroupSystemMessageCoordinator.dedupeMemberLeaveTimelineRows(rows);
+      expect(rows.length, 1);
+      expect(rows.single.sentAt, 2000);
+    });
+
     test('buildFromMqttAction uses subject userName for memberLeave', () {
       final action = IsmChatMqttActionModel(
         conversationId: 'conv-1',

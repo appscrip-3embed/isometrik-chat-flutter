@@ -112,6 +112,139 @@ class IsmChatGroupSystemMessageCoordinator {
     );
   }
 
+  /// Subject user id for join/leave centered rows (who joined or left).
+  static String leaveOrJoinSubjectId(IsmChatMessageModel message) =>
+      (message.userId ?? message.memberId ?? message.senderInfo?.userId ?? '')
+          .trim();
+
+  /// Drops older `memberLeave` rows for the same subject before inserting another.
+  static void replaceMemberLeaveRowsForSubject(
+    Map<String, IsmChatMessageModel> messages,
+    IsmChatMessageModel row,
+  ) {
+    if (row.customType != IsmChatCustomMessageType.memberLeave) {
+      return;
+    }
+    final subjectId = leaveOrJoinSubjectId(row);
+    if (subjectId.isEmpty) {
+      return;
+    }
+    final removeKeys = <String>[];
+    for (final entry in messages.entries) {
+      final existing = entry.value;
+      if (existing.customType != IsmChatCustomMessageType.memberLeave) {
+        continue;
+      }
+      if (leaveOrJoinSubjectId(existing) == subjectId) {
+        removeKeys.add(entry.key);
+      }
+    }
+    for (final key in removeKeys) {
+      messages.remove(key);
+    }
+  }
+
+  /// Timeline safety net when local optimistic leave and MQTT share different [sentAt].
+  static void dedupeMemberLeaveTimelineRows(List<IsmChatMessageModel> messages) {
+    final newestBySubject = <String, IsmChatMessageModel>{};
+    for (final message in messages) {
+      if (message.customType != IsmChatCustomMessageType.memberLeave) {
+        continue;
+      }
+      final subjectId = leaveOrJoinSubjectId(message);
+      if (subjectId.isEmpty) {
+        continue;
+      }
+      final existing = newestBySubject[subjectId];
+      if (existing == null || message.sentAt >= existing.sentAt) {
+        newestBySubject[subjectId] = message;
+      }
+    }
+    if (newestBySubject.isEmpty) {
+      return;
+    }
+    messages.removeWhere((message) {
+      if (message.customType != IsmChatCustomMessageType.memberLeave) {
+        return false;
+      }
+      final subjectId = leaveOrJoinSubjectId(message);
+      if (subjectId.isEmpty) {
+        return false;
+      }
+      final keep = newestBySubject[subjectId];
+      return keep != null && keep != message;
+    });
+  }
+
+  /// Local DB first; then in-memory chat list when user never opened the group.
+  static Future<IsmChatConversationModel?> resolveConversation(
+    String conversationId,
+  ) async {
+    final trimmedId = conversationId.trim();
+    if (trimmedId.isEmpty) {
+      return null;
+    }
+
+    var conversation =
+        await IsmChatConfig.dbWrapper?.getConversation(trimmedId);
+    if (conversation != null) {
+      return conversation;
+    }
+
+    if (IsmChatUtility.conversationControllerRegistered) {
+      conversation =
+          IsmChatUtility.conversationController.getConversation(trimmedId);
+      if (conversation != null) {
+        await IsmChatConfig.dbWrapper?.saveConversation(
+          conversation: conversation,
+        );
+        return conversation;
+      }
+    }
+    return null;
+  }
+
+  /// Keeps [IsmChatConversationsController.conversations] in sync after MQTT rows.
+  static void syncConversationListCache(IsmChatConversationModel conversation) {
+    if (!IsmChatUtility.conversationControllerRegistered) {
+      return;
+    }
+    final controller = IsmChatUtility.conversationController;
+    final conversationId = conversation.conversationId ?? '';
+    if (conversationId.isEmpty) {
+      return;
+    }
+
+    final index = controller.conversations
+        .indexWhere((entry) => entry.conversationId == conversationId);
+    if (index != -1) {
+      final list =
+          List<IsmChatConversationModel>.from(controller.conversations);
+      list[index] = conversation;
+      controller.conversations = list;
+    }
+
+    if (controller.currentConversationId == conversationId) {
+      controller.currentConversation = conversation;
+    }
+
+    if (IsmChatUtility.chatPageControllerRegistered &&
+        IsmChatUtility.chatPageController.conversation?.conversationId ==
+            conversationId) {
+      final page = IsmChatUtility.chatPageController;
+      page.conversation = page.conversation?.copyWith(
+            members: conversation.members,
+            membersCount: conversation.membersCount,
+            lastMessageDetails: conversation.lastMessageDetails,
+            lastMessageSentAt: conversation.lastMessageSentAt,
+          ) ??
+          conversation;
+      if (conversation.members != null) {
+        page.groupMembers = List<UserDetails>.from(conversation.members!);
+      }
+    }
+  }
+
   static LastMessageDetails buildLastMessageDetails(
     IsmChatMqttActionModel actionModel, {
     required bool sentByMe,
@@ -162,8 +295,7 @@ class IsmChatGroupSystemMessageCoordinator {
     final conversationId = actionModel.conversationId ?? '';
     if (conversationId.isEmpty) return null;
 
-    var conversation =
-        await IsmChatConfig.dbWrapper?.getConversation(conversationId);
+    var conversation = await resolveConversation(conversationId);
     if (conversation == null) return null;
 
     if (transformBeforeSave != null) {
@@ -174,6 +306,7 @@ class IsmChatGroupSystemMessageCoordinator {
     final messages = Map<String, IsmChatMessageModel>.from(
       conversation.messages ?? {},
     );
+    replaceMemberLeaveRowsForSubject(messages, row);
     messages['${actionModel.sentAt}'] = row;
 
     conversation = conversation.copyWith(
@@ -182,11 +315,13 @@ class IsmChatGroupSystemMessageCoordinator {
         actionModel,
         sentByMe: sentByMe,
       ),
+      lastMessageSentAt: actionModel.sentAt,
       unreadMessagesCount:
           unreadMessagesCount ?? conversation.unreadMessagesCount,
     );
 
     await IsmChatConfig.dbWrapper?.saveConversation(conversation: conversation);
+    syncConversationListCache(conversation);
     return conversation;
   }
 

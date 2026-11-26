@@ -65,11 +65,13 @@ mixin IsmChatDelegateCleanupMixin {
   Future<void> exitGroup({
     required int adminCount,
     required bool isUserAdmin,
+    IsmChatLeaveGroupMode mode = IsmChatLeaveGroupMode.keepHistory,
   }) async {
     if (IsmChatUtility.chatPageControllerRegistered) {
       await IsmChatUtility.chatPageController.leaveGroup(
         adminCount: adminCount,
         isUserAdmin: isUserAdmin,
+        mode: mode,
       );
     }
   }

@@ -165,7 +165,11 @@ mixin IsmChatPageMessageManagementMixin on GetxController {
   Future<void> deleteMessageForEveryone(
     IsmChatMessages messages,
   ) async {
-    await _controller.viewModel.deleteMessageForEveryone(messages);
+    final deleted =
+        await _controller.viewModel.deleteMessageForEveryone(messages);
+    if (!deleted) {
+      return;
+    }
     _controller.selectedMessage.clear();
     _controller.isMessageSeleted = false;
     final pendingOnly = IsmChatMessages.from(messages)
@@ -182,7 +186,10 @@ mixin IsmChatPageMessageManagementMixin on GetxController {
   Future<void> deleteMessageForMe(
     IsmChatMessages messages,
   ) async {
-    await _controller.viewModel.deleteMessageForMe(messages);
+    final deleted = await _controller.viewModel.deleteMessageForMe(messages);
+    if (!deleted) {
+      return;
+    }
     _controller.selectedMessage.clear();
     _controller.isMessageSeleted = false;
     final pendingOnly = IsmChatMessages.from(messages)

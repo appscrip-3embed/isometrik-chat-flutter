@@ -258,8 +258,8 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
             ),
           ),
         ),
-        // Caption lives on the host message body for web multi-attachment
-        // sends, or on metaData.caption for older one-file grid groups.
+        // Caption from metadata only (captionMessage); body duplicates or holds
+        // batch placeholders and must not be shown here.
         if (_hasCaption(messages))
           Padding(
             padding: const EdgeInsets.only(left: 4, right: 4, top: 0),
@@ -270,26 +270,25 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
   }
 
   bool _hasCaption(List<IsmChatMessageModel> messages) {
-    if (widget.gridHostMessage?.multipleAttachmentCaption.isNotEmpty == true) {
+    if (widget.gridHostMessage?.mediaGridCaption.isNotEmpty == true) {
       return true;
     }
-    return messages.any((msg) => msg.multipleAttachmentCaption.isNotEmpty);
+    return messages.any((msg) => msg.mediaGridCaption.isNotEmpty);
   }
 
   Widget _buildCaption(BuildContext context) {
     final messages = widget.messages;
     final host = widget.gridHostMessage;
-    final hostCaption = host?.multipleAttachmentCaption ?? '';
-    // Host caption covers AttachmentMessage:Multiple (body or metaData).
-    // Grouped single-file sends still store the caption on each tile.
+    final hostCaption = host?.mediaGridCaption ?? '';
+    // Host metadata caption (AttachmentMessage:Multiple) or grouped tiles.
     final messageWithCaption = hostCaption.isNotEmpty
         ? host!
         : messages.firstWhere(
-            (msg) => msg.multipleAttachmentCaption.isNotEmpty,
+            (msg) => msg.mediaGridCaption.isNotEmpty,
             orElse: () => messages.last,
           );
 
-    final caption = messageWithCaption.multipleAttachmentCaption;
+    final caption = messageWithCaption.mediaGridCaption;
     if (caption.isEmpty) {
       return const SizedBox.shrink();
     }

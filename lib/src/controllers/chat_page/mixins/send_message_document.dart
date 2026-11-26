@@ -145,7 +145,9 @@ mixin IsmChatPageSendMessageDocumentMixin {
 
     // Same wire rule as photos: body is the caption, or this placeholder.
     const multipleBody = 'AttachmentMessage:Multiple';
-    final caption = _controller.chatInputController.text.trim();
+    final caption = IsmChatUtility.resolveOutboundMediaCaption(
+      composerText: _controller.chatInputController.text,
+    );
     final body = caption.isNotEmpty ? caption : multipleBody;
     if (caption.isNotEmpty) {
       _controller.chatInputController.clear();
@@ -170,7 +172,7 @@ mixin IsmChatPageSendMessageDocumentMixin {
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
-        caption: caption.isEmpty ? null : caption,
+        caption: IsmChatUtility.outboundAttachmentCaptionMeta(caption),
       ),
     );
 

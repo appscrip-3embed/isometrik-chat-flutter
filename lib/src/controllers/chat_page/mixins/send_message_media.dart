@@ -286,9 +286,11 @@ mixin IsmChatPageSendMessageMediaMixin {
       return;
     }
 
-    final hadMediaCaption = mediaList.any(
-      (media) => media.caption?.trim().isNotEmpty == true,
-    );
+    final hadMediaCaption = mediaList.any((media) {
+      final trimmed = media.caption?.trim() ?? '';
+      return trimmed.isNotEmpty &&
+          !IsmChatUtility.isOutboundMediaCaptionPlaceholder(trimmed);
+    });
     if (!hadMediaCaption && caption.isNotEmpty) {
       _controller.chatInputController.clear();
     }
@@ -418,7 +420,9 @@ mixin IsmChatPageSendMessageMediaMixin {
     required String resolvedCaption,
     String? mediaCaption,
   }) {
-    final hadMediaCaption = mediaCaption?.trim().isNotEmpty == true;
+    final trimmedMediaCaption = mediaCaption?.trim() ?? '';
+    final hadMediaCaption = trimmedMediaCaption.isNotEmpty &&
+        !IsmChatUtility.isOutboundMediaCaptionPlaceholder(trimmedMediaCaption);
     if (!hadMediaCaption && resolvedCaption.isNotEmpty) {
       _controller.chatInputController.clear();
     }

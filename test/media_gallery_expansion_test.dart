@@ -189,6 +189,30 @@ void main() {
       expect(message.syntheticMessagesForGrid.length, 2);
     });
 
+    test('media grid caption ignores body without metadata', () {
+      final message = IsmChatMessageModel(
+        body: 'body-only caption',
+        sentAt: 1,
+        sentByMe: true,
+        customType: IsmChatCustomMessageType.image,
+      );
+
+      expect(message.mediaGridCaption, isEmpty);
+      expect(message.multipleAttachmentCaption, 'body-only caption');
+    });
+
+    test('media grid caption prefers metadata over body', () {
+      final message = IsmChatMessageModel(
+        body: 'duplicate in body',
+        sentAt: 1,
+        sentByMe: true,
+        customType: IsmChatCustomMessageType.image,
+        metaData: IsmChatMetaData(caption: 'from metadata'),
+      );
+
+      expect(message.mediaGridCaption, 'from metadata');
+    });
+
     test('caption in metadata is the visible caption', () {
       final message = IsmChatMessageModel(
         body: 'Look at these',
@@ -263,6 +287,29 @@ void main() {
         'note',
       );
       expect(IsmChatUtility.outboundAttachmentCaptionMeta('  '), isNull);
+      expect(
+        IsmChatUtility.outboundAttachmentCaptionMeta(IsmChatStrings.image),
+        isNull,
+      );
+      expect(
+        IsmChatUtility.outboundAttachmentCaptionMeta(
+          IsmChatStrings.imagesAndVideos,
+        ),
+        isNull,
+      );
+      expect(
+        IsmChatUtility.resolveOutboundMediaCaption(
+          mediaCaption: IsmChatStrings.image,
+          composerText: 'real caption',
+        ),
+        'real caption',
+      );
+      expect(
+        IsmChatUtility.resolveOutboundMediaCaption(
+          composerText: IsmChatStrings.imagesAndVideos,
+        ),
+        isEmpty,
+      );
     });
 
     test('placeholder body is not shown as a caption', () {

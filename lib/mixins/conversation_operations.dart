@@ -308,10 +308,12 @@ mixin IsmChatConversationOperationsMixin {
   Future<void> exitGroup({
     required int adminCount,
     required bool isUserAdmin,
+    IsmChatLeaveGroupMode mode = IsmChatLeaveGroupMode.keepHistory,
   }) async =>
       await _delegate.exitGroup(
         adminCount: adminCount,
         isUserAdmin: isUserAdmin,
+        mode: mode,
       );
 
   /// Clears all messages in a conversation with the specified ID.

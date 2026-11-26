@@ -49,6 +49,31 @@ mixin IsmChatMqttEventGroupOperationsMixin {
     );
   }
 
+  /// Removes the subject user from [members] after a voluntary group leave MQTT event.
+  IsmChatConversationModel _applyMemberLeaveDelta(
+    IsmChatConversationModel conversation,
+    IsmChatMqttActionModel actionModel,
+  ) {
+    if (actionModel.action != IsmChatActionEvents.memberLeave) {
+      return conversation;
+    }
+    final subjectId = (actionModel.userDetails?.userId ??
+            actionModel.memberId ??
+            '')
+        .trim();
+    if (subjectId.isEmpty) {
+      return conversation;
+    }
+
+    final existingMembers = List<UserDetails>.from(conversation.members ?? [])
+      ..removeWhere((member) => member.userId.trim() == subjectId);
+
+    return conversation.copyWith(
+      members: existingMembers,
+      membersCount: existingMembers.length,
+    );
+  }
+
   /// Handles a group remove and add user event.
   ///
   /// * `actionModel`: The group remove and add user event model to handle
@@ -115,9 +140,14 @@ mixin IsmChatMqttEventGroupOperationsMixin {
           .trim();
       final sentByMe = utils.isSenderMe(subjectId);
 
+      IsmChatConversationModel applyLeaveDelta(IsmChatConversationModel conv) =>
+          _applyMemberLeaveDelta(conv, actionModel);
+
       await IsmChatGroupSystemMessageCoordinator.persistAndRefreshOpenChat(
         actionModel: actionModel,
         sentByMe: sentByMe,
+        transformBeforeSave: applyLeaveDelta,
+        syncInMemoryConversation: applyLeaveDelta,
       );
 
       await conversationController.getConversationsFromDB();
@@ -125,19 +155,10 @@ mixin IsmChatMqttEventGroupOperationsMixin {
       if (IsmChatUtility.chatPageControllerRegistered) {
         final controller = IsmChatUtility.chatPageController;
         if (controller.conversation?.conversationId ==
-                actionModel.conversationId &&
-            controller.conversation?.lastMessageSentAt != actionModel.sentAt) {
-          unawaited(
-            controller.getMessagesFromAPI(
-              lastMessageTimestamp: controller.messages.isNotEmpty
-                  ? controller.messages.last.sentAt
-                  : controller.conversation?.lastMessageSentAt,
-            ),
-          );
+            actionModel.conversationId) {
+          await controller.getConverstaionDetails(isLoading: false);
         }
       }
-
-      unawaited(conversationController.getChatConversations());
     }
   }
 

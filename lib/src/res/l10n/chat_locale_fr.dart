@@ -99,6 +99,12 @@ const Map<String, String> kIsmChatLocaleFr = {
   'contactAppear': 'Les contacts sélectionnés apparaîtront ici…',
   'participants': 'participants',
   'exitGroup': 'Quitter le groupe',
+  'leaveGroup': 'Quitter le groupe',
+  'leaveAndDeleteForMe': 'Quitter et supprimer pour moi',
+  'youLeftTheGroup': 'Vous avez quitté le groupe',
+  'memberLeftTheGroup': '{name} a quitté le groupe',
+  'addedMembersToGroup': '{initiator} a ajouté {members} au groupe.',
+  'youWereAddedToGroupBy': 'Vous avez été ajouté à ce groupe par {initiator}.',
   'createdOn': 'Créé le',
   'by': 'par',
   'noMedia': 'Aucun média',
@@ -206,7 +212,7 @@ const Map<String, String> kIsmChatLocaleFr = {
   'messageYourselfAction': 'Message à vous-même',
   'selfChatYouSuffix': '(Vous)',
   'exitGroupBody':
-      'Seuls les admins du groupe seront informés que vous avez quitté le groupe',
+      'Choisissez de conserver ce chat dans votre liste ou de le supprimer de cet appareil. Les autres membres sont toujours informés lorsque vous quittez.',
   'focusMenuInfo': 'Infos',
   'focusMenuCopy': 'Copier',
   'focusMenuSelectMessage': 'Sélectionner le message',
@@ -240,4 +246,16 @@ const Map<String, String> kIsmChatLocaleFr = {
   'sameNameUploadTitle': 'Fichier déjà dans le stockage',
   'reshareOlderFile': 'Partager l’ancien fichier',
   'uploadACopy': 'Téléverser une copie',
+  'errorGeneric': 'Une erreur s’est produite. Veuillez réessayer.',
+  'errorServerUnavailable':
+      'Nos serveurs rencontrent un problème. Réessayez dans un instant.',
+  'errorServiceUnavailable':
+      'Ce service est temporairement indisponible. Réessayez plus tard.',
+  'errorRequestTimeout':
+      'La requête a pris trop de temps. Vérifiez votre connexion et réessayez.',
+  'deleteForEveryoneFailed':
+      'Impossible de supprimer les messages pour tout le monde.',
+  'deleteForMeFailed': 'Impossible de supprimer les messages.',
+  'deleteRetryFailed':
+      'La suppression a encore échoué. Veuillez réessayer plus tard.',
 };

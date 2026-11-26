@@ -97,6 +97,12 @@ const Map<String, String> kIsmChatLocaleEn = {
   'contactAppear': 'The selected contacts will appear hare..',
   'participants': 'participants',
   'exitGroup': 'Exit group',
+  'leaveGroup': 'Leave Group',
+  'leaveAndDeleteForMe': 'Leave and Delete for Me',
+  'youLeftTheGroup': 'You left the group',
+  'memberLeftTheGroup': '{name} left the group',
+  'addedMembersToGroup': '{initiator} added {members} to the group.',
+  'youWereAddedToGroupBy': 'You were added to this group by {initiator}.',
   'createdOn': 'Created on',
   'by': 'by',
   'noMedia': 'No Media',
@@ -203,7 +209,8 @@ const Map<String, String> kIsmChatLocaleEn = {
   'messageYourself': 'Message yourself',
   'messageYourselfAction': 'Message yourself',
   'selfChatYouSuffix': '(You)',
-  'exitGroupBody': 'Everyone will be notified that you left the group',
+  'exitGroupBody':
+      'Choose whether to keep this chat in your list or remove it from this device. Other members are always notified when you leave.',
   'focusMenuInfo': 'Info',
   'focusMenuCopy': 'Copy',
   'focusMenuSelectMessage': 'Select Message',
@@ -236,4 +243,15 @@ const Map<String, String> kIsmChatLocaleEn = {
   'sameNameUploadTitle': 'File already in storage',
   'reshareOlderFile': 'Reshare older file',
   'uploadACopy': 'Upload a copy',
+  'errorGeneric': 'Something went wrong. Please try again.',
+  'errorServerUnavailable':
+      'Our servers are having trouble right now. Please try again in a moment.',
+  'errorServiceUnavailable':
+      'This service is temporarily unavailable. Please try again later.',
+  'errorRequestTimeout':
+      'The request took too long. Check your connection and try again.',
+  'deleteForEveryoneFailed': "Couldn't delete messages for everyone.",
+  'deleteForMeFailed': "Couldn't delete messages.",
+  'deleteRetryFailed':
+      "We still couldn't complete the delete. Please try again later.",
 };

@@ -684,14 +684,9 @@ class _IsmChatPageView extends StatelessWidget {
                                                   ?.isLastMessageCurrentUserRemovedFromGroup ==
                                               true)) ...[
                                     _MessageNotAllowedWidget(
-                                      showMessage: controller.isActionAllowed ==
-                                                  true ||
-                                              controller
-                                                      .conversation
-                                                      ?.lastMessageDetails
-                                                      ?.customType ==
-                                                  IsmChatCustomMessageType
-                                                      .removeMember
+                                      showMessage: controller.conversation
+                                                  ?.isCurrentUserRemovedFromGroup ==
+                                              true
                                           ? IsmChatStrings.removeGroupMessage
                                           : IsmChatStrings.leftGroupMessage,
                                     )

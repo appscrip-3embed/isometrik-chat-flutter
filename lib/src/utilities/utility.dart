@@ -154,16 +154,25 @@ class IsmChatUtility {
     );
   }
 
-  static Future<void> showErrorDialog(String message,
-      {void Function()? onCancel}) async {
+  static Future<void> showErrorDialog(
+    String message, {
+    String? title,
+    void Function()? onCancel,
+    void Function()? onRetry,
+  }) async {
     if (IsmChatContextWidget.tryDialogContext() == null) {
       return;
     }
+    final headline = title ?? message;
+    final body = title != null ? message : null;
     await IsmChatContextWidget.showDialogContext(
       content: IsmChatAlertDialogBox(
-        title: message,
+        title: headline,
+        content: body == null ? null : Text(body),
         cancelLabel: IsmChatStrings.okay,
         onCancel: onCancel,
+        actionLabels: onRetry == null ? null : [IsmChatStrings.threadRetry],
+        callbackActions: onRetry == null ? null : [onRetry],
       ),
     );
   }
@@ -1239,6 +1248,25 @@ class IsmChatUtility {
         trimmed == IsmChatStrings.sticker;
   }
 
+  /// Type labels and wire placeholders that must not be sent as captionMessage.
+  ///
+  /// Reused by multi-photo sends so batch preview text ([multipleMediaBatchLabel],
+  /// [AttachmentMessage:Multiple]) does not land in metadata caption.
+  static bool isOutboundMediaCaptionPlaceholder(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return false;
+    if (isOutboundAttachmentPlaceholderBody(trimmed)) {
+      return true;
+    }
+    if (trimmed == 'AttachmentMessage:Multiple') {
+      return true;
+    }
+    if (trimmed == IsmChatStrings.imagesAndVideos) {
+      return true;
+    }
+    return false;
+  }
+
   /// Wire `body` when an attachment has no caption (see [outboundAttachmentBody]).
   static String _outboundAttachmentPlaceholderBody(
       IsmChatMediaType? mediaType) {
@@ -1259,7 +1287,10 @@ class IsmChatUtility {
   /// Metadata `caption` / `captionMessage` for outbound attachment sends.
   static String? outboundAttachmentCaptionMeta(String? caption) {
     final trimmed = caption?.trim() ?? '';
-    return trimmed.isEmpty ? null : trimmed;
+    if (trimmed.isEmpty || isOutboundMediaCaptionPlaceholder(trimmed)) {
+      return null;
+    }
+    return trimmed;
   }
 
   /// FCM / conversation preview for a multi photo+video batch (no docs).
@@ -1360,15 +1391,23 @@ class IsmChatUtility {
   }
 
   /// Picks the first non-empty per-file caption, else composer text.
+  ///
+  /// Skips localized type labels and batch preview strings so they are not
+  /// duplicated into captionMessage on multi-media sends.
   static String resolveOutboundMediaCaption({
     String? mediaCaption,
     String? composerText,
   }) {
     final fromMedia = mediaCaption?.trim() ?? '';
-    if (fromMedia.isNotEmpty) {
+    if (fromMedia.isNotEmpty && !isOutboundMediaCaptionPlaceholder(fromMedia)) {
       return fromMedia;
     }
-    return composerText?.trim() ?? '';
+    final fromComposer = composerText?.trim() ?? '';
+    if (fromComposer.isNotEmpty &&
+        !isOutboundMediaCaptionPlaceholder(fromComposer)) {
+      return fromComposer;
+    }
+    return '';
   }
 
   static bool isOnlyEmoji(String text) {

@@ -51,9 +51,9 @@ class MessageBubble extends StatelessWidget {
         (groupedMessages != null && groupedMessages.isNotEmpty);
     final hasCaption = (groupedMessages != null &&
             groupedMessages.any(
-              (msg) => msg.multipleAttachmentCaption.isNotEmpty,
+              (msg) => msg.mediaGridCaption.isNotEmpty,
             )) ||
-        _message.multipleAttachmentCaption.isNotEmpty;
+        _message.mediaGridCaption.isNotEmpty;
     return IsmChatPageTheme.resolveBubblePadding(
       custom: IsmChatConfig.chatTheme.chatPageTheme?.messageBubblePadding,
       isMediaGrid: isGridMessage,
@@ -101,9 +101,9 @@ class MessageBubble extends StatelessWidget {
 
     if (isGridMessage) {
       final hasCaption = groupedMessages.any(
-            (msg) => msg.multipleAttachmentCaption.isNotEmpty,
+            (msg) => msg.mediaGridCaption.isNotEmpty,
           ) ||
-          _message.multipleAttachmentCaption.isNotEmpty;
+          _message.mediaGridCaption.isNotEmpty;
 
       if (hasCaption) {
         // Position time lower when caption is present

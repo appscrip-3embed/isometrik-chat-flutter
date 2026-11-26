@@ -532,7 +532,7 @@ class IsmChatPageRepository {
         headers: IsmChatUtility.tokenCommonHeader(),
       );
       if (response.hasError) {
-        return null;
+        return response;
       }
       return response;
     } catch (e, st) {
@@ -552,7 +552,7 @@ class IsmChatPageRepository {
         headers: IsmChatUtility.tokenCommonHeader(),
       );
       if (response.hasError) {
-        return null;
+        return response;
       }
 
       return response;
