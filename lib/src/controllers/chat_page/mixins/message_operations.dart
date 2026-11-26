@@ -262,6 +262,7 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
 
           return IsmChatFocusMenu(
             message,
+            pageController: _controller,
             animation: animation,
           );
         },
@@ -322,6 +323,7 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
               );
               return IsmChatFocusMenu(
                 message,
+                pageController: _controller,
                 animation: animation,
               );
             },

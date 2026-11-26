@@ -231,6 +231,12 @@ class IsmChatStrings {
   static String get recipients => IsmChatL10n.get('recipients');
   static String get addrecipient => IsmChatL10n.get('addrecipient');
   static String get deletedUser => IsmChatL10n.get('deletedUser');
+
+  // Self chat — [IsmChatConversationProperties.enableSelfChat]
+  static String get messageYourself => IsmChatL10n.get('messageYourself');
+  static String get messageYourselfAction =>
+      IsmChatL10n.get('messageYourselfAction');
+  static String get selfChatYouSuffix => IsmChatL10n.get('selfChatYouSuffix');
   static String get exitGroupBody => IsmChatL10n.get('exitGroupBody');
   static String get focusMenuInfo => IsmChatL10n.get('focusMenuInfo');
   static String get focusMenuCopy => IsmChatL10n.get('focusMenuCopy');

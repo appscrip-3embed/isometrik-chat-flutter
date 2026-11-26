@@ -25,6 +25,45 @@ void main() {
       expect(model.conversationTitle, 'G');
     });
 
+    test('selfChatPlaceholder is not persisted until creation', () {
+      final placeholder = IsmChatConversationModel.selfChatPlaceholder();
+      expect(placeholder.isSelfChat, isTrue);
+      expect(placeholder.conversationId, '');
+      expect(placeholder.isOpponentDetailsEmpty, isFalse);
+    });
+
+    test('selfChat is not treated as deleted or empty opponent', () {
+      final model = IsmChatConversationModel.fromMap({
+        'conversationId': 'self-1',
+        'isGroup': false,
+        'selfChat': true,
+        'opponentDetails': <String, dynamic>{},
+      });
+      expect(model.isOpponentDetailsEmpty, isFalse);
+    });
+
+    test('selfChat parses and uses self labels instead of deleted user', () {
+      final model = IsmChatConversationModel.fromMap({
+        'conversationId': 'self-1',
+        'isGroup': false,
+        'selfChat': true,
+        'privateOneToOne': true,
+        'opponentDetails': <String, dynamic>{},
+        'conversationTitle': '',
+      });
+      expect(model.isSelfChat, isTrue);
+      expect(model.selfChat, isTrue);
+      expect(model.chatName, contains(kMeName));
+      expect(model.chatName, isNot(IsmChatStrings.deletedUser));
+      final roundTrip = IsmChatConversationModel.fromMap(model.toMap());
+      expect(roundTrip.isSelfChat, isTrue);
+    });
+
+    test('missing selfChat on API payload is false', () {
+      final model = IsmChatConversationModel.fromMap(conversationJson());
+      expect(model.isSelfChat, isFalse);
+    });
+
     test('directConversation factory round-trips through json', () {
       final original = directConversation();
       final copy = IsmChatConversationModel.fromJson(original.toJson());
@@ -91,6 +130,28 @@ void main() {
       expect(details.body, 'latest');
       expect(details.senderId, kOpponentId);
       expect(details.copyWith(body: 'x').body, 'x');
+    });
+  });
+
+  group('IsmChatSelfChatLabels.matchesUserListSearch', () {
+    test('empty query always matches', () {
+      expect(IsmChatSelfChatLabels.matchesUserListSearch(''), isTrue);
+      expect(IsmChatSelfChatLabels.matchesUserListSearch('   '), isTrue);
+    });
+
+    test('matches display name and message yourself subtitle', () {
+      expect(
+        IsmChatSelfChatLabels.matchesUserListSearch(kMeName),
+        isTrue,
+      );
+      expect(
+        IsmChatSelfChatLabels.matchesUserListSearch('message yourself'),
+        isTrue,
+      );
+      expect(
+        IsmChatSelfChatLabels.matchesUserListSearch('no-such-user'),
+        isFalse,
+      );
     });
   });
 

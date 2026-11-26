@@ -283,6 +283,7 @@ class IsmChatCommonRepository {
     String? conversationTitle,
     String? conversationImageUrl,
     String? customType,
+    bool selfChat = false,
     bool isLoading = false,
   }) async {
     try {
@@ -290,7 +291,6 @@ class IsmChatCommonRepository {
         'typingEvents': typingEvents,
         'readEvents': readEvents,
         'pushNotifications': pushNotifications,
-        'members': members,
         'isGroup': isGroup,
         'conversationType': conversationType,
         'searchableTags': searchableTags,
@@ -298,6 +298,11 @@ class IsmChatCommonRepository {
         'customType': customType,
         'conversationTitle': conversationTitle,
       };
+      if (selfChat) {
+        payload['selfChat'] = true;
+      } else {
+        payload['members'] = members;
+      }
       final imageUrl = conversationImageUrl?.trim();
       if (imageUrl != null && imageUrl.isNotEmpty) {
         payload['conversationImageUrl'] = imageUrl;

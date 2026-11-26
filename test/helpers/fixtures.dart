@@ -16,6 +16,9 @@ const kDirectConversationId = 'conv-direct';
 /// Conversation id used by the default group fixture.
 const kGroupConversationId = 'conv-group';
 
+/// Conversation id used by the default self-chat fixture.
+const kSelfChatConversationId = 'conv-self';
+
 UserDetails user({
   String id = kOpponentId,
   String name = kOpponentName,
@@ -58,6 +61,35 @@ IsmChatConversationModel directConversation({
       messagingDisabled: messagingDisabled,
       userIds: const [kMeId, kOpponentId],
       members: [me(), user()],
+      lastReadAt: const [],
+      config: ConversationConfigModel(
+        typingEvents: true,
+        readEvents: true,
+        pushNotifications: true,
+      ),
+    );
+
+/// A self-chat conversation (single participant: [kMeId]).
+///
+/// Reuse for MQTT status tests and any flow that needs [isSelfChat] in DB.
+IsmChatConversationModel selfChatConversation({
+  String conversationId = kSelfChatConversationId,
+  Map<String, IsmChatMessageModel>? messages,
+}) =>
+    IsmChatConversationModel(
+      conversationId: conversationId,
+      isGroup: false,
+      privateOneToOne: true,
+      selfChat: true,
+      opponentDetails: me(),
+      membersCount: 1,
+      conversationType: IsmChatConversationType.private,
+      conversationTitle: '',
+      conversationImageUrl: '',
+      messages: messages ?? {},
+      metaData: IsmChatMetaData(),
+      userIds: const [kMeId],
+      members: [me()],
       lastReadAt: const [],
       config: ConversationConfigModel(
         typingEvents: true,

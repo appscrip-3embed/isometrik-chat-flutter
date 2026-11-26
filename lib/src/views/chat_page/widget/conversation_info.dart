@@ -1044,8 +1044,10 @@ class _IsmChatConverstaionInfoViewState
                                   ),
                                 ),
                                 if (controller
-                                        .conversation?.isOpponentDetailsEmpty ==
-                                    false) ...[
+                                            .conversation?.isOpponentDetailsEmpty ==
+                                        false &&
+                                    controller.conversation?.isSelfChat !=
+                                        true) ...[
                                   Divider(
                                     thickness: 1,
                                     color: groupTheme.dividerColor

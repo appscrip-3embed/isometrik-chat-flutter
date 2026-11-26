@@ -64,11 +64,10 @@ class IsmChatCreateConversationView extends StatelessWidget {
               Expanded(
                 child: controller.forwardedList.isEmpty
                     ? controller.isLoadResponse
-                        ? Center(
-                            child: Text(
-                              IsmChatStrings.noUserFound,
-                              style: IsmChatStyles.w600Black16,
-                            ),
+                        ? _buildEmptyUserPickerContent(
+                            context,
+                            controller,
+                            isGroupConversation,
                           )
                         : const IsmChatLoadingDialog()
                     : NotificationListener<ScrollNotification>(
@@ -264,6 +263,43 @@ class IsmChatCreateConversationView extends StatelessWidget {
         ),
       );
 
+  /// When the user API returns no contacts, still allow self-chat from the list.
+  Widget _buildEmptyUserPickerContent(
+    BuildContext context,
+    IsmChatConversationsController controller,
+    bool isGroupConversation,
+  ) {
+    final showSelfChat = !isGroupConversation &&
+        IsmChatProperties.conversationProperties.enableSelfChat &&
+        IsmChatSelfChatLabels.matchesUserListSearch(
+          controller.userSearchNameController.text,
+        );
+
+    if (!showSelfChat) {
+      return Center(
+        child: Text(
+          IsmChatStrings.noUserFound,
+          style: IsmChatStyles.w600Black16,
+        ),
+      );
+    }
+
+    return ListView(
+      children: [
+        const _SelfChatUserListTile(),
+        Padding(
+          padding: IsmChatDimens.edgeInsets16,
+          child: Center(
+            child: Text(
+              IsmChatStrings.noUserFound,
+              style: IsmChatStyles.w600Black16,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _onCreateConversationSearchChanged(
     IsmChatConversationsController controller,
     String value,
@@ -326,6 +362,41 @@ class IsmChatCreateConversationView extends StatelessWidget {
   }
 }
 
+/// Scrollable top row in the 1-to-1 user picker when [enableSelfChat] is on.
+/// Reuses contact [ListTile] styling — see [IsmChatSelfChatLabels].
+class _SelfChatUserListTile extends StatelessWidget {
+  const _SelfChatUserListTile();
+
+  Future<void> _onTap() async {
+    IsmChatRoute.goBack<void>();
+    await IsmChat.i.openSelfChat();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final member = IsmChatSelfChatLabels.signedInUserMember();
+    return ListTile(
+      onTap: _onTap,
+      dense: true,
+      mouseCursor: SystemMouseCursors.click,
+      leading: IsmChatImage.profile(
+        IsmChatSelfChatLabels.profileUrl,
+        name: member.userName,
+      ),
+      title: Text(
+        IsmChatSelfChatLabels.displayName,
+        style: IsmChatStyles.w600Black14,
+      ),
+      subtitle: Text(
+        IsmChatStrings.messageYourself,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: IsmChatStyles.w400Black12,
+      ),
+    );
+  }
+}
+
 /// A custom AzListView wrapper that handles alphabet clicks and fetches missing contacts
 class _AlphabetAwareAzListView extends StatefulWidget {
   const _AlphabetAwareAzListView({
@@ -346,6 +417,13 @@ class _AlphabetAwareAzListView extends StatefulWidget {
 }
 
 class _AlphabetAwareAzListViewState extends State<_AlphabetAwareAzListView> {
+  bool get _showSelfChatRow =>
+      !widget.isGroupConversation &&
+      IsmChatProperties.conversationProperties.enableSelfChat &&
+      IsmChatSelfChatLabels.matchesUserListSearch(
+        widget.controller.userSearchNameController.text,
+      );
+
   @override
   Widget build(BuildContext context) {
     // Get only the alphabets that have contacts
@@ -400,6 +478,7 @@ class _AlphabetAwareAzListViewState extends State<_AlphabetAwareAzListView> {
         }
         return Column(
           children: [
+            if (index == 0 && _showSelfChatRow) const _SelfChatUserListTile(),
             if (index == 0 &&
                 !widget.isGroupConversation &&
                 IsmChatConfig.communicationConfig.userConfig.accessToken !=

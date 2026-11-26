@@ -202,6 +202,9 @@ const Map<String, String> kIsmChatLocaleFr = {
   'recipients': 'Destinataires :',
   'addrecipient': 'Ajouter un destinataire',
   'deletedUser': 'Utilisateur supprimé',
+  'messageYourself': 'Message à vous-même',
+  'messageYourselfAction': 'Message à vous-même',
+  'selfChatYouSuffix': '(Vous)',
   'exitGroupBody':
       'Seuls les admins du groupe seront informés que vous avez quitté le groupe',
   'focusMenuInfo': 'Infos',

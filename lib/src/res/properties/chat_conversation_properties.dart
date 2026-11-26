@@ -18,6 +18,7 @@ class IsmChatConversationProperties {
     this.showCreateChatIcon = false,
     this.createChatIcon,
     this.enableGroupChat = false,
+    this.enableSelfChat = false,
     this.allowDelete = false,
     this.actions,
     this.endActions,
@@ -125,6 +126,12 @@ class IsmChatConversationProperties {
   ///
   /// Defaults to `false`.
   final bool enableGroupChat;
+
+  /// When `true`, shows the self-chat row in the 1-to-1 user picker and keeps
+  /// self-chat rows from `GET /chat/conversations`. Default `false`.
+  ///
+  /// Also gates [IsmChat.i.openSelfChat]. See `docs/SELF_CHAT.md`.
+  final bool enableSelfChat;
 
   /// Whether to show the create chat button.
   ///

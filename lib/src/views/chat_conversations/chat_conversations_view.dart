@@ -349,8 +349,9 @@ class _IsmChatConversationsState extends State<IsmChatConversations>
                 icon:
                     IsmChatProperties.conversationProperties.createChatIcon,
                 onTap: () {
-                  if (IsmChatProperties
-                      .conversationProperties.enableGroupChat) {
+                  final conversationProps =
+                      IsmChatProperties.conversationProperties;
+                  if (conversationProps.enableGroupChat) {
                     IsmChatContextWidget.showBottomsheetContext(
                       content: const _CreateChatBottomSheet(),
                       backgroundColor: IsmChatColors.transparent,
@@ -358,8 +359,7 @@ class _IsmChatConversationsState extends State<IsmChatConversations>
                       elevation: 0,
                     );
                   } else {
-                    IsmChatProperties.conversationProperties.onCreateTap
-                        ?.call();
+                    conversationProps.onCreateTap?.call();
                     IsmChatRoute.goToRoute(IsmChatCreateConversationView(
                       isGroupConversation: false,
                       conversationType: IsmChatConversationType.private,

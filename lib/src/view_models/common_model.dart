@@ -288,6 +288,15 @@ class IsmChatCommonViewModel {
               messageId: response.messageId,
             );
           }
+          if (response.messageId.isNotEmpty) {
+            unawaited(
+              IsmChatSelfChatStatusCoordinator.acknowledgeAfterSend(
+                conversationId: conversationId,
+                messageId: response.messageId,
+                conversation: conversationModel,
+              ),
+            );
+          }
           return true;
         }
         // Server rejected message -> mark it failed so UI shows error icon
@@ -515,6 +524,7 @@ class IsmChatCommonViewModel {
     String? conversationTitle,
     String? conversationImageUrl,
     String? customType,
+    bool selfChat = false,
     bool isLoading = false,
   }) async =>
       await _repository.createConversation(
@@ -530,6 +540,7 @@ class IsmChatCommonViewModel {
         isLoading: isLoading,
         customType: customType,
         searchableTags: searchableTags,
+        selfChat: selfChat,
       );
 
   Future<List<IsmChatMessageModel>> getChatMessages({
