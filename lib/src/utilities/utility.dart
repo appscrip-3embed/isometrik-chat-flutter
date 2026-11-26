@@ -46,6 +46,40 @@ class IsmChatUtility {
   static void openKeyboard() =>
       FocusManager.instance.primaryFocus?.requestFocus();
 
+  /// Latest non-zero [MediaQuery.viewInsets.bottom] while the soft keyboard
+  /// was visible. Used so [IsmChatComposerEmojiBoard] can match keyboard height
+  /// after the keyboard is dismissed.
+  static double _lastKeyboardViewInset = 0;
+
+  /// Records [MediaQuery.viewInsets.bottom] when the keyboard is on screen.
+  /// Call before hiding the keyboard when opening the emoji panel.
+  static void rememberKeyboardViewInset(BuildContext? context) {
+    if (context == null || !context.mounted) return;
+    final inset = MediaQuery.viewInsetsOf(context).bottom;
+    if (inset > 0) {
+      _lastKeyboardViewInset = inset;
+    }
+  }
+
+  /// Resets cached keyboard metrics (tests only).
+  @visibleForTesting
+  static void resetComposerKeyboardMetricsForTest() {
+    _lastKeyboardViewInset = 0;
+  }
+
+  /// Emoji panel body height inside [IsmChatComposerEmojiBoard] (home indicator
+  /// padding is applied separately and is not included here).
+  static double composerEmojiPanelBodyHeight(BuildContext context) {
+    rememberKeyboardViewInset(context);
+    final fallback = IsmChatDimens.twoHundredFifty;
+    if (_lastKeyboardViewInset <= 0) {
+      return fallback;
+    }
+    final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
+    final matched = _lastKeyboardViewInset - bottomSafe;
+    return matched > fallback ? matched : fallback;
+  }
+
   /// Method for Do Work After Frame Call Back
   static void doLater(VoidCallback? work) {
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {

@@ -307,6 +307,9 @@ class IsmChatThreadController extends GetxController {
         replyFocusNode.requestFocus();
       }
     } else {
+      final context =
+          IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context;
+      IsmChatUtility.rememberKeyboardViewInset(context);
       IsmChatUtility.hideKeyboard();
     }
     _showEmojiBoard.value = showEmoji ?? !showEmojiBoard;

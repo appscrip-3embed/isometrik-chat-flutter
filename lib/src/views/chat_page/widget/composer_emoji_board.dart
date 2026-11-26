@@ -56,13 +56,15 @@ class IsmChatComposerEmojiBoard extends StatelessWidget {
     final isDark = IsmChatThemeResolver.brightness(context) == Brightness.dark;
     final showGiphy = _showGiphyPicker;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    final panelBodyHeight =
+        IsmChatUtility.composerEmojiPanelBodyHeight(context);
 
     return ColoredBox(
       color: panelColor,
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: SizedBox(
-          height: IsmChatDimens.twoHundredFifty,
+          height: panelBodyHeight,
           child: Column(
             children: [
               if (showGiphy) ...[

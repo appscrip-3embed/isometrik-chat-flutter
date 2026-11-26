@@ -1467,19 +1467,11 @@ extension MentionMessage on IsmChatMessageModel {
             channelThreadContextStyle.color,
       );
 
-  /// File name row in [IsmChatFileMessage] — not solid bubble fill.
+  /// File name row in [IsmChatFileMessage] and document tiles in multi-attach.
   ///
-  /// Self messages use in-bubble white [style], which is unreadable on the
-  /// thread panel's light scaffold and on the document bar's light tint.
-  TextStyle get fileAttachmentNameStyle {
-    if (!sentByMe) return style;
-    return channelThreadContextStyle.copyWith(
-      fontWeight: FontWeight.w500,
-      color: IsmChatConfig.isChatDarkMode
-          ? IsmChatColors.whiteColor
-          : IsmChatColors.blackColor,
-    );
-  }
+  /// Same as text bubbles: [IsmChatMessageTheme.textStyle] + [textColor] from
+  /// [IsmChatPageTheme.selfMessageTheme] / [opponentMessageTheme].
+  TextStyle get fileAttachmentNameStyle => style;
 
   /// "Forwarded" label style derived from the message text color at 70% opacity.
   TextStyle get forwardedTextStyle => style.copyWith(

@@ -19,6 +19,9 @@ mixin IsmChatPageUiStateManagementMixin on GetxController {
         _controller.messageFocusNode.requestFocus();
       }
     } else {
+      final context =
+          IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context;
+      IsmChatUtility.rememberKeyboardViewInset(context);
       IsmChatUtility.hideKeyboard();
     }
     _controller.showEmojiBoard = showEmoji ?? !_controller.showEmojiBoard;
