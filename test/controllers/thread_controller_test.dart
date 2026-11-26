@@ -906,6 +906,37 @@ void main() {
   });
 
   group('message reaction sync', () {
+    test('applyMessageUpdate patches root body for remote edit', () async {
+      stubThread([]);
+      await controller.openThread(
+        root: threadRoot(messageId: 'root-1').copyWith(body: 'before'),
+      );
+
+      expect(
+        controller.applyMessageUpdate(
+          controller.root!.copyWith(body: 'after', messageUpdated: true),
+        ),
+        isTrue,
+      );
+      expect(controller.root?.body, 'after');
+      expect(controller.root?.messageUpdated, isTrue);
+    });
+
+    test('findMessageInOpenPanel resolves root and reply', () async {
+      stubThread([threadReplyJson(messageId: 'r1', sentAt: 2000)]);
+      await controller.openThread(root: threadRoot(messageId: 'root-1'));
+
+      expect(
+        IsmChatThreadController.findMessageInOpenPanel('root-1')?.messageId,
+        'root-1',
+      );
+      expect(
+        IsmChatThreadController.findMessageInOpenPanel('r1')?.messageId,
+        'r1',
+      );
+      expect(IsmChatThreadController.findMessageInOpenPanel('missing'), isNull);
+    });
+
     test('applyMessageUpdate patches root and reply reactions', () async {
       stubThread([threadReplyJson(messageId: 'r1', sentAt: 2000)]);
       await controller.openThread(root: threadRoot(replyCount: 1));

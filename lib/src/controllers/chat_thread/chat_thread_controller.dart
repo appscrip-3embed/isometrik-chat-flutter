@@ -950,6 +950,24 @@ class IsmChatThreadController extends GetxController {
     }
   }
 
+  /// Root or reply currently shown in the panel with [messageId], if any.
+  ///
+  /// Reuse when MQTT edit payloads arrive before the row is in the DB cache.
+  static IsmChatMessageModel? findMessageInOpenPanel(String messageId) {
+    final id = messageId.trim();
+    if (id.isEmpty) return null;
+    final controller = instance;
+    if (controller == null) return null;
+    final rootMessage = controller.root;
+    if (rootMessage != null && (rootMessage.messageId ?? '').trim() == id) {
+      return rootMessage;
+    }
+    for (final reply in controller.replies) {
+      if ((reply.messageId ?? '').trim() == id) return reply;
+    }
+    return null;
+  }
+
   /// Routes a reaction add/remove to the open panel when the row has no DB
   /// entry (typical for thread-only replies).
   /// Routes `messageDetailsUpdated` to the open thread panel when applicable.
