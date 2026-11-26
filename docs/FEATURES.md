@@ -500,9 +500,18 @@ enum IsmChatFeature {
   audioMessage,       // ✅ Supported
   giphyPicker,        // ✅ Supported
   threadReply,        // ✅ Supported (needs IsmChatConfig.threadsEnabled)
+  edit,               // ✅ Opt-in — add to `features`; see docs/EDIT_MESSAGE.md
   // mediaDownload,   // 📝 Planned (commented out)
 }
 ```
+
+### Edit message ✅ (opt-in)
+
+**Status:** ✅ Supported  
+**Gate:** `IsmChatFeature.edit` (excluded from default `IsmChatPageProperties.features`)  
+**Docs:** [EDIT_MESSAGE.md](./EDIT_MESSAGE.md)
+
+Sender-only text edits via focus menu → composer → `PATCH /chat/message`; 15-minute window; hidden in broadcast flow.
 
 ### Self chat ✅
 

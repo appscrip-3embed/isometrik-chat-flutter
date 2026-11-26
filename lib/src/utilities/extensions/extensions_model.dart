@@ -1261,6 +1261,33 @@ extension MentionMessage on IsmChatMessageModel {
     return null;
   }
 
+  /// Whether **Edit** may appear in the long-press focus menu.
+  ///
+  /// Gated by [IsmChatFeature.edit], sender-only, plain text, non-broadcast,
+  /// non-deleted, persisted `messageId`, and [IsmChatConstants.editMessageMaxAge].
+  /// Reuse in tests and MQTT — do not duplicate rules in views.
+  bool get canShowEditInFocusMenu {
+    if (!IsmChatProperties.chatPageProperties.features
+      .contains(IsmChatFeature.edit)) {
+      return false;
+    }
+    if (!sentByMe) return false;
+    if (customType != IsmChatCustomMessageType.text) return false;
+    if (customType == IsmChatCustomMessageType.deletedForEveryone) return false;
+    if (metaData?.isBroadCastMessage == true) return false;
+    if (IsmChatUtility.chatPageControllerRegistered &&
+        IsmChatUtility.chatPageController.isBroadcast) {
+      return false;
+    }
+    final id = messageId?.trim() ?? '';
+    if (id.isEmpty) return false;
+    final ageMs = DateTime.now().millisecondsSinceEpoch - sentAt;
+    if (ageMs > IsmChatConstants.editMessageMaxAge.inMilliseconds) {
+      return false;
+    }
+    return true;
+  }
+
   /// Returns a list of focus menu types available for this message.
   List<IsmChatFocusMenuType> get focusMenuList {
     var menu = [...IsmChatFocusMenuType.values];
@@ -1284,7 +1311,8 @@ extension MentionMessage on IsmChatMessageModel {
         .contains(IsmChatFeature.forward)) {
       menu.remove(IsmChatFocusMenuType.forward);
     }
-    if (IsmChatUtility.chatPageController.isBroadcast) {
+    if (IsmChatUtility.chatPageControllerRegistered &&
+        IsmChatUtility.chatPageController.isBroadcast) {
       menu.removeWhere((e) => [
             IsmChatFocusMenuType.info,
             IsmChatFocusMenuType.delete,
@@ -1329,6 +1357,10 @@ extension MentionMessage on IsmChatMessageModel {
     }
     if (!IsmChatThreadCoordinator.shouldShowReplyFocusMenu(this)) {
       menu.remove(IsmChatFocusMenuType.reply);
+    }
+
+    if (!canShowEditInFocusMenu) {
+      menu.remove(IsmChatFocusMenuType.edit);
     }
 
     return menu;

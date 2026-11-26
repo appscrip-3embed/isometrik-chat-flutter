@@ -352,6 +352,22 @@ void main() {
       ),
       isTrue,
     );
+    expect(
+      await repo.editMessageText(
+        messageId: 'm',
+        conversationId: conv,
+        body: 'updated',
+        searchableTags: [IsmChatConstants.textMessageSearchTag, 'updated'],
+        isLoading: false,
+      ),
+      isTrue,
+    );
+    final editReq = api.requestsTo('/message', method: 'PATCH').last;
+    expect(editReq.json['body'], 'updated');
+    expect(editReq.json['searchableTags'], [
+      IsmChatConstants.textMessageSearchTag,
+      'updated',
+    ]);
     api.on(
       'GET',
       '/messages/status',

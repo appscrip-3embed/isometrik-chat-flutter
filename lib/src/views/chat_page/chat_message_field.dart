@@ -135,7 +135,7 @@ class IsmChatMessageField extends StatelessWidget {
                         autofocus: true,
                         child: Container(
                           margin: IsmChatDimens.edgeInsets4.copyWith(
-                              bottom: controller.isreplying
+                              bottom: controller.isreplying || controller.isEditing
                                   ? IsmChatDimens.twelve
                                   : IsmChatDimens.eight),
                           decoration: BoxDecoration(
@@ -153,6 +153,10 @@ class IsmChatMessageField extends StatelessWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (controller.isEditing)
+                                IsmChatComposerEditBar(
+                                  onDismiss: controller.cancelEditMessage,
+                                ),
                               if (controller.isreplying &&
                                   controller.replayMessage != null)
                                 IsmChatComposerReplyBar(
@@ -306,7 +310,8 @@ class IsmChatMessageField extends StatelessWidget {
                                           controller.handleComposerTextChanged,
                                     ),
                                   ),
-                                  if (IsmChatProperties.chatPageProperties
+                                  if (!controller.isEditing &&
+                                      IsmChatProperties.chatPageProperties
                                           .attachments.isNotEmpty &&
                                       !IsmChatResponsive.isWeb(context)) ...[
                                     const _AttachmentIcon()

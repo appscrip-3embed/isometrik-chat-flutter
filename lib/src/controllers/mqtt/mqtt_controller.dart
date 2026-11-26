@@ -19,6 +19,7 @@ class IsmChatMqttController extends GetxController
         IsmChatMqttEventGroupOperationsMixin,
         IsmChatMqttEventConversationOperationsMixin,
         IsmChatMqttEventReactionsMixin,
+        IsmChatMqttEventMessageDetailsUpdatedMixin,
         IsmChatMqttEventBlockUnblockMixin,
         IsmChatMqttEventBroadcastMixin,
         IsmChatMqttEventObserverOperationsMixin,

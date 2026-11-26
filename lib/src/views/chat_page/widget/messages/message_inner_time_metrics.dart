@@ -15,6 +15,18 @@ double ismChatInnerTimeStatusMinWidth(
 
   var width = IsmChatDimens.ten;
 
+  if (message.messageUpdated) {
+    final editedPainter = TextPainter(
+      text: TextSpan(
+        text: IsmChatStrings.messageEdited,
+        style: message.timeStyle.copyWith(fontStyle: FontStyle.italic),
+      ),
+      maxLines: 1,
+      textDirection: Directionality.of(context),
+    )..layout();
+    width += editedPainter.width + IsmChatDimens.four;
+  }
+
   if (status?.shouldShowMessageTime ?? true) {
     final painter = TextPainter(
       text: TextSpan(

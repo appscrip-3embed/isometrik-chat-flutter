@@ -8,25 +8,82 @@ class LastMessageDetails {
   factory LastMessageDetails.fromJson(String source) =>
       LastMessageDetails.fromMap(json.decode(source) as Map<String, dynamic>);
 
-  factory LastMessageDetails.fromMap(Map<String, dynamic> map) {
-    // Check if this is a broadcast message and get groupcastId from metaData for decryption
-    final metaDataMap = map['metaData'] as Map<String, dynamic>?;
+  /// Resolves ciphertext/plaintext for list preview — root [body] or MQTT
+  /// `messageDetailsUpdated` nested `details.body`.
+  static String _resolveWireBody(Map<String, dynamic> map, String decryptionId) {
+    final root = (map['body'] as String? ?? '').trim();
+    if (root.isNotEmpty) {
+      return IsmChatUtility.decryptMessage(root, decryptionId);
+    }
+    final nested = map['details'];
+    if (nested is Map) {
+      final fromDetails = (nested['body'] as String? ?? '').trim();
+      if (fromDetails.isNotEmpty) {
+        return IsmChatUtility.decryptMessage(fromDetails, decryptionId);
+      }
+    }
+    return '';
+  }
+
+  static String _decryptionIdForWireMap(Map<String, dynamic> map) {
+    final metaDataMap = () {
+      if (map['metaData'] is Map<String, dynamic>) {
+        return map['metaData'] as Map<String, dynamic>;
+      }
+      final nested = map['details'];
+      if (nested is Map && nested['metaData'] is Map<String, dynamic>) {
+        return nested['metaData'] as Map<String, dynamic>;
+      }
+      return null;
+    }();
+
     final isBroadcastMessage =
         metaDataMap?['isBroadCastMessage'] as bool? ?? false;
-    final groupcastIdFromMetaData =
-        metaDataMap?['groupCastId'] as String? ?? '';
-
-    // For broadcast messages, use groupcastId from metaData if available, otherwise use conversationId
+    final groupcastId = metaDataMap?['groupCastId'] as String? ?? '';
     final conversationId = map['conversationId'] as String? ?? '';
-    final decryptionId =
-        isBroadcastMessage && groupcastIdFromMetaData.isNotEmpty
-            ? groupcastIdFromMetaData
-            : conversationId;
+    if (isBroadcastMessage && groupcastId.isNotEmpty) {
+      return groupcastId;
+    }
+    return conversationId;
+  }
+
+  factory LastMessageDetails.fromMap(Map<String, dynamic> map) {
+    final conversationId = map['conversationId'] as String? ?? '';
+    final decryptionId = _decryptionIdForWireMap(map);
+    final nestedDetails = map['details'] is Map
+        ? Map<String, dynamic>.from(map['details'] as Map)
+        : null;
+
+    final metaData = map['metaData'] != null
+        ? IsmChatMetaData.fromMap(map['metaData'] as Map<String, dynamic>)
+        : nestedDetails?['metaData'] is Map
+            ? IsmChatMetaData.fromMap(
+                Map<String, dynamic>.from(
+                  nestedDetails!['metaData'] as Map,
+                ),
+              )
+            : null;
+
+    final resolvedCustomType = () {
+      if (map['customType'] != null) {
+        return map['customType'].runtimeType == String
+            ? IsmChatCustomMessageType.fromString(map['customType'] as String)
+            : IsmChatCustomMessageType.fromValue(map['customType'] as int);
+      }
+      if (nestedDetails?['customType'] != null) {
+        final raw = nestedDetails!['customType'];
+        if (raw is String) {
+          return IsmChatCustomMessageType.fromString(raw);
+        }
+      }
+      if (map['action'] != null) {
+        return IsmChatCustomMessageType.fromAction(map['action'] as String);
+      }
+      return null;
+    }();
 
     var details = LastMessageDetails(
-      metaData: map['metaData'] != null
-          ? IsmChatMetaData.fromMap(map['metaData'] as Map<String, dynamic>)
-          : null,
+      metaData: metaData,
       showInConversation: map['showInConversation'] as bool? ?? false,
       sentAt: map['sentAt'] as int? ?? 0,
       senderName: map['senderName'] as String? ??
@@ -39,21 +96,12 @@ class LastMessageDetails {
           '',
       messageType: map['messageType'] as int? ?? 0,
       messageId: map['messageId'] as String? ?? map['userId'] as String? ?? '',
-      conversationId: map['conversationId'] as String? ?? '',
-      body: IsmChatUtility.decryptMessage(
-        map['body'] as String? ?? '',
-        decryptionId,
-      ),
+      conversationId: conversationId,
+      body: _resolveWireBody(map, decryptionId),
       deliverCount:
           map['deliveredTo'] != null ? (map['deliveredTo'] as List).length : 0,
       readCount: map['readBy'] != null ? (map['readBy'] as List).length : 0,
-      customType: map['customType'] != null
-          ? map['customType'].runtimeType == String
-              ? IsmChatCustomMessageType.fromString(map['customType'] as String)
-              : IsmChatCustomMessageType.fromValue(map['customType'] as int)
-          : map['action'] != null
-              ? IsmChatCustomMessageType.fromAction(map['action'] as String)
-              : null,
+      customType: resolvedCustomType,
       sentByMe: true,
       members: map['members'] != null
           ? (map['members'] as List).map((e) {

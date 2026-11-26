@@ -11,7 +11,7 @@ class IsmChatPageProperties {
     this.messageBuilder,
     this.textMessageWithLinkBuilder,
     this.attachments = IsmChatAttachmentType.values,
-    this.features = IsmChatFeature.values,
+    List<IsmChatFeature>? features,
     this.isAllowedDeleteChatFromLocal = false,
     this.attachmentConfig,
     this.messageAllowedConfig,
@@ -61,7 +61,7 @@ class IsmChatPageProperties {
     this.voiceMessageProgressOverlayColorOpponent,
     this.onUserConversationInfoTap,
     this.giphyApiKey,
-  });
+  }) : features = features ?? ismChatDefaultPageFeatures;
 
   final Widget? placeholder;
 

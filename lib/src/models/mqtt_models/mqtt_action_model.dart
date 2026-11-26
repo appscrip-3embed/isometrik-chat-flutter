@@ -5,6 +5,37 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
+/// Nested `details` object on `messageDetailsUpdated` MQTT payloads.
+class IsmChatMqttMessageDetails {
+  const IsmChatMqttMessageDetails({
+    this.body,
+    this.searchableTags,
+    this.customType,
+    this.metaData,
+  });
+
+  factory IsmChatMqttMessageDetails.fromMap(Map<String, dynamic> map) =>
+      IsmChatMqttMessageDetails(
+        body: map['body'] as String?,
+        searchableTags: map['searchableTags'] != null
+            ? List<String>.from(map['searchableTags'] as List<dynamic>)
+            : null,
+        customType: map['customType'] != null
+            ? IsmChatCustomMessageType.fromMap(map['customType'] as String)
+            : null,
+        metaData: map['metaData'] is Map
+            ? IsmChatMetaData.fromMap(
+                Map<String, dynamic>.from(map['metaData'] as Map),
+              )
+            : null,
+      );
+
+  final String? body;
+  final List<String>? searchableTags;
+  final IsmChatCustomMessageType? customType;
+  final IsmChatMetaData? metaData;
+}
+
 class IsmChatMqttActionModel {
   IsmChatMqttActionModel({
     this.conversationId,
@@ -33,6 +64,7 @@ class IsmChatMqttActionModel {
     this.metaData,
     this.isGroup,
     this.meetingId,
+    this.messageDetails,
   });
   factory IsmChatMqttActionModel.fromJson(String source) =>
       IsmChatMqttActionModel.fromMap(
@@ -158,6 +190,11 @@ class IsmChatMqttActionModel {
         meetingId: map['meetingId'] as String? ??
             map['meeting_id'] as String? ??
             '',
+        messageDetails: map['details'] is Map
+            ? IsmChatMqttMessageDetails.fromMap(
+                Map<String, dynamic>.from(map['details'] as Map),
+              )
+            : null,
       );
 
   final String? conversationId;
@@ -186,6 +223,7 @@ class IsmChatMqttActionModel {
   final IsmChatMetaData? metaData;
   final bool? isGroup;
   final String? meetingId;
+  final IsmChatMqttMessageDetails? messageDetails;
 
   IsmChatMqttActionModel copyWith({
     String? conversationId,

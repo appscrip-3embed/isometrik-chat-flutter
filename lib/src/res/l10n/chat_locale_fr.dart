@@ -212,6 +212,10 @@ const Map<String, String> kIsmChatLocaleFr = {
   'focusMenuSelectMessage': 'Sélectionner le message',
   'focusMenuReply': 'Répondre',
   'focusMenuForward': 'Transférer',
+  'focusMenuEdit': 'Modifier',
+  'editingMessage': 'Modification du message',
+  'messageEdited': 'modifié',
+  'editMessageFailed': 'Impossible de modifier le message',
 
   // ---- Slack-style threads (IsmChatConfig.threadsEnabled) ----
   'threadTitle': 'Fil',
