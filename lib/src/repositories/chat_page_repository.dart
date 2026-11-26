@@ -816,6 +816,37 @@ class IsmChatPageRepository {
     }
   }
 
+  /// Text-body edit (`PATCH /chat/message`) — separate from [updateMessage]
+  /// which only patches `metaData` (e.g. download flag).
+  Future<bool> editMessageText({
+    required String messageId,
+    required String conversationId,
+    required String body,
+    required List<String> searchableTags,
+    required bool isLoading,
+  }) async {
+    try {
+      final payload = {
+        'messageId': messageId,
+        'conversationId': conversationId,
+        'body': body,
+        'searchableTags': searchableTags,
+      };
+
+      var response = await _apiWrapper.patch(
+        IsmChatAPI.sendMessage,
+        payload: payload,
+        headers: IsmChatUtility.tokenCommonHeader(),
+        showLoader: isLoading,
+      );
+
+      return !response.hasError;
+    } catch (e, st) {
+      IsmChatLog.error('editMessageText $e', st);
+      return false;
+    }
+  }
+
   Future<bool> updateMessage({
     required Map<String, dynamic> metaData,
     required String messageId,

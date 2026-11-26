@@ -763,6 +763,7 @@ enum ApiCallOrigin {
 
 enum IsmChatFocusMenuType {
   info,
+  edit,
   copy,
   selectMessage,
   reply,
@@ -784,6 +785,8 @@ enum IsmChatFocusMenuType {
     switch (this) {
       case IsmChatFocusMenuType.info:
         return IsmChatStrings.focusMenuInfo;
+      case IsmChatFocusMenuType.edit:
+        return IsmChatStrings.focusMenuEdit;
       case IsmChatFocusMenuType.copy:
         return IsmChatStrings.focusMenuCopy;
       case IsmChatFocusMenuType.selectMessage:
@@ -922,8 +925,18 @@ enum IsmChatFeature {
   ///
   /// Included in [IsmChatFeature.values] (so default integrations get it), but
   /// both surfaces stay hidden until [IsmChatConfig.threadsEnabled] is `true`.
-  threadReply;
+  threadReply,
+
+  /// Sender text edit (focus menu + PATCH `/chat/message`). **Opt-in:** omitted
+  /// from [IsmChatPageProperties] default [features]; add explicitly. See
+  /// `docs/EDIT_MESSAGE.md`.
+  edit;
 }
+
+/// Chat-page features enabled when [IsmChatPageProperties.features] is omitted.
+List<IsmChatFeature> get ismChatDefaultPageFeatures => IsmChatFeature.values
+    .where((f) => f != IsmChatFeature.edit)
+    .toList(growable: false);
 
 /// Which slice of a conversation a message fetch should return.
 ///

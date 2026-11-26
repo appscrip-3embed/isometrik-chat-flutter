@@ -405,6 +405,45 @@ class ReplayParentMessage extends StatelessWidget {
   }
 }
 
+/// Strip shown above the composer while editing an existing text message.
+class IsmChatComposerEditBar extends StatelessWidget {
+  const IsmChatComposerEditBar({
+    required this.onDismiss,
+    super.key,
+  });
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: IsmChatDimens.edgeInsets8,
+        child: Row(
+          children: [
+            Icon(
+              Icons.edit_outlined,
+              size: IsmChatDimens.sixteen,
+              color: IsmChatConfig.chatTheme.primaryColor,
+            ),
+            IsmChatDimens.boxWidth8,
+            Expanded(
+              child: Text(
+                IsmChatStrings.editingMessage,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: IsmChatStyles.w600Black12.copyWith(
+                  color: IsmChatConfig.chatTheme.primaryColor,
+                ),
+              ),
+            ),
+            IsmChatTapHandler(
+              onTap: onDismiss,
+              child: Icon(Icons.close, size: IsmChatDimens.twenty),
+            ),
+          ],
+        ),
+      );
+}
+
 /// Channel-style reply strip above a composer (sender, body, media thumb).
 ///
 /// Reuse in [IsmChatMessageField] and [IsmChatThreadComposer] so thread

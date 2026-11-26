@@ -12,6 +12,7 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
 
   /// Handles reply tap on a message.
   void onReplyTap(IsmChatMessageModel message) {
+    _controller.cancelEditMessage();
     _controller.isreplying = true;
     _controller.replayMessage = message;
     _controller.messageFocusNode.requestFocus();
@@ -90,6 +91,14 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
         break;
       case IsmChatFocusMenuType.delete:
         await _controller.showDialogForMessageDelete(message);
+        break;
+      case IsmChatFocusMenuType.edit:
+        if (IsmChatThreadCoordinator.isMessageInOpenThreadPanel(message) &&
+            Get.isRegistered<IsmChatThreadController>()) {
+          Get.find<IsmChatThreadController>().beginEditMessage(message);
+          break;
+        }
+        _controller.beginEditMessage(message);
         break;
       case IsmChatFocusMenuType.save:
         await _controller.saveMedia(message);

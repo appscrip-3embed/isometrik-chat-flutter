@@ -11,6 +11,7 @@ export 'mqtt_event/message_handlers.dart';
 export 'mqtt_event/message_status.dart';
 export 'mqtt_event/observer_operations.dart';
 export 'mqtt_event/reactions.dart';
+export 'mqtt_event/message_details_updated.dart';
 export 'mqtt_event/typing_events.dart';
 export 'mqtt_event/utilities.dart';
 export 'mqtt_event/variables.dart';

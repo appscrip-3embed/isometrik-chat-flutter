@@ -100,6 +100,10 @@ class IsmChatThreadComposer extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (controller.isEditing)
+                          IsmChatComposerEditBar(
+                            onDismiss: controller.cancelEditMessage,
+                          ),
                         if (controller.replyTo != null)
                           IsmChatComposerReplyBar(
                             key: const Key('ism-thread-reply-to-chip'),
@@ -162,6 +166,7 @@ class IsmChatThreadComposer extends StatelessWidget {
                           ),
                         ),
                         if (_props.showAttachments &&
+                            !controller.isEditing &&
                             !IsmChatResponsive.isWeb(context))
                           const _ThreadAttachmentIcon(),
                           ],
@@ -172,7 +177,8 @@ class IsmChatThreadComposer extends StatelessWidget {
                 ),
                 _ThreadMicOrSendButton(
                   controller: controller,
-                  audioEnabled: _props.isAudioMessageEnabled,
+                  audioEnabled:
+                      _props.isAudioMessageEnabled && !controller.isEditing,
                 ),
                 IsmChatDimens.boxWidth4,
               ],

@@ -55,6 +55,8 @@ extension MenuIcon on IsmChatFocusMenuType {
     switch (this) {
       case IsmChatFocusMenuType.info:
         return Icons.info_outline_rounded;
+      case IsmChatFocusMenuType.edit:
+        return Icons.edit_outlined;
       case IsmChatFocusMenuType.reply:
         return Icons.reply_rounded;
       case IsmChatFocusMenuType.replyInThread:

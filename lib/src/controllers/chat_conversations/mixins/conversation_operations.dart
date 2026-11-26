@@ -44,13 +44,31 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
     final updatedConversations = <IsmChatConversationModel>[];
     for (final conv in dbConversations) {
       final messagesMap = conv.messages;
-      final needsRecompute = (conv.lastMessageDetails == null) ||
-          (conv.lastMessageDetails?.customType ==
+      final lastPreview = conv.lastMessageDetails;
+      var needsRecompute = (lastPreview == null) ||
+          (lastPreview?.customType ==
               IsmChatCustomMessageType.conversationCreated) ||
-          (conv.lastMessageDetails?.customType ==
-              IsmChatCustomMessageType.block) ||
-          (conv.lastMessageDetails?.customType ==
-              IsmChatCustomMessageType.unblock);
+          (lastPreview?.customType == IsmChatCustomMessageType.block) ||
+          (lastPreview?.customType == IsmChatCustomMessageType.unblock) ||
+          (lastPreview?.action ==
+                  IsmChatActionEvents.messageDetailsUpdated.name &&
+              lastPreview!.body.trim().isEmpty);
+
+      if (!needsRecompute &&
+          lastPreview != null &&
+          messagesMap != null &&
+          messagesMap.isNotEmpty) {
+        final previewId = lastPreview.messageId.trim();
+        if (previewId.isNotEmpty) {
+          for (final row in messagesMap.values) {
+            if ((row.messageId ?? '').trim() != previewId) continue;
+            if (row.body.trim() != lastPreview.body.trim()) {
+              needsRecompute = true;
+            }
+            break;
+          }
+        }
+      }
 
       if (!needsRecompute ||
           messagesMap == null ||

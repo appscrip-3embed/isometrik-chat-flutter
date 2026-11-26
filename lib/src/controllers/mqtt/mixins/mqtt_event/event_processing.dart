@@ -6,6 +6,7 @@ import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/br
 import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/calls.dart';
 import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/conversation_operations.dart';
 import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/group_operations.dart';
+import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/message_details_updated.dart';
 import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/message_handlers.dart';
 import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/message_status.dart';
 import 'package:isometrik_chat_flutter/src/controllers/mqtt/mixins/mqtt_event/observer_operations.dart';
@@ -241,7 +242,12 @@ mixin IsmChatMqttEventProcessingMixin {
         }
         break;
       case IsmChatActionEvents.userUpdate:
+        break;
       case IsmChatActionEvents.messageDetailsUpdated:
+        if (self is IsmChatMqttEventMessageDetailsUpdatedMixin) {
+          (self as IsmChatMqttEventMessageDetailsUpdatedMixin)
+              .handleMessageDetailsUpdated(actionModel);
+        }
         break;
       case IsmChatActionEvents.meetingCreated:
       case IsmChatActionEvents.meetingEndedByHost:

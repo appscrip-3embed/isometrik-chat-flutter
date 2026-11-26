@@ -55,6 +55,7 @@ part './mixins/ui_state_management.dart';
 part './mixins/utility_methods.dart';
 part './mixins/contact_group_operations.dart';
 part './mixins/message_operations.dart';
+part './mixins/edit_message.dart';
 part './mixins/media_operations.dart';
 part './mixins/message_management.dart';
 part './mixins/block_unblock.dart';
@@ -134,6 +135,7 @@ class IsmChatPageController extends GetxController
         IsmChatPageUtilityMethodsMixin,
         IsmChatPageContactGroupOperationsMixin,
         IsmChatPageMessageOperationsMixin,
+        IsmChatPageEditMessageMixin,
         IsmChatPageMediaOperationsMixin,
         IsmChatPageMessageManagementMixin,
         IsmChatPageBlockUnblockMixin,

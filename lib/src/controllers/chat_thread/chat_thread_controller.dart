@@ -115,6 +115,54 @@ class IsmChatThreadController extends GetxController {
   /// Clears the nested-reply target.
   void clearReplyTo() => replyTo = null;
 
+  final _isEditing = false.obs;
+  bool get isEditing => _isEditing.value;
+  set isEditing(bool value) => _isEditing.value = value;
+
+  final _editingMessage = Rx<IsmChatMessageModel?>(null);
+  IsmChatMessageModel? get editingMessage => _editingMessage.value;
+  set editingMessage(IsmChatMessageModel? value) =>
+      _editingMessage.value = value;
+
+  void cancelEditMessage() {
+    isEditing = false;
+    editingMessage = null;
+    replyController.clear();
+    showComposerSendButton = false;
+    update();
+  }
+
+  /// Focus-menu edit → thread composer (mirrors [IsmChatPageController.beginEditMessage]).
+  void beginEditMessage(IsmChatMessageModel message) {
+    if (!message.canShowEditInFocusMenu) return;
+    if (showEmojiBoard) closeEmojiBoard();
+    replyTo = null;
+    isEditing = true;
+    editingMessage = message;
+    replyController.text = message.body;
+    showComposerSendButton = true;
+    replyFocusNode.requestFocus();
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      final page = IsmChatUtility.chatPageController;
+      page
+        ..cancelEditMessage()
+        ..isreplying = false
+        ..replayMessage = null;
+    }
+    update();
+  }
+
+  Future<bool> submitEditFromThreadComposer() async {
+    final original = editingMessage;
+    if (!isEditing || original == null) return false;
+    if (!IsmChatUtility.chatPageControllerRegistered) return false;
+    final plainBody = replyController.text.trim();
+    final page = IsmChatUtility.chatPageController;
+    final ok = await page.submitTextEditForMessage(original, plainBody);
+    if (ok) cancelEditMessage();
+    return ok;
+  }
+
   /// Panel counterpart to [IsmChatPageController.onReplyTap]: targets the
   /// thread composer for a nested reply instead of the channel quote bar.
   ///
@@ -124,6 +172,7 @@ class IsmChatThreadController extends GetxController {
     if (showEmojiBoard) {
       closeEmojiBoard();
     }
+    cancelEditMessage();
     replyTo = message;
     replyFocusNode.requestFocus();
     if (IsmChatUtility.chatPageControllerRegistered) {
@@ -472,6 +521,9 @@ class IsmChatThreadController extends GetxController {
     String? text,
     IsmChatMessageModel? replyTo,
   }) async {
+    if (isEditing) {
+      return submitEditFromThreadComposer();
+    }
     final rootMessage = root;
     if (rootMessage == null) return false;
     final body = (text ?? replyController.text).trim();
@@ -795,15 +847,27 @@ class IsmChatThreadController extends GetxController {
 
     final rootMessage = root;
     if (rootMessage != null && (rootMessage.messageId ?? '').trim() == id) {
-      root = rootMessage.copyWith(reactions: _copyReactions(updated.reactions));
+      root = rootMessage.copyWith(
+        body: updated.body,
+        searchableTags: updated.searchableTags,
+        messageUpdated: updated.messageUpdated,
+        metaData: updated.metaData ?? rootMessage.metaData,
+        reactions: _copyReactions(updated.reactions ?? rootMessage.reactions),
+      );
       _root.refresh();
+      update();
       return true;
     }
 
     final index = _replies.indexWhere((e) => (e.messageId ?? '').trim() == id);
     if (index == -1) return false;
-    _replies[index] = _replies[index].copyWith(
-      reactions: _copyReactions(updated.reactions),
+    final row = _replies[index];
+    _replies[index] = row.copyWith(
+      body: updated.body,
+      searchableTags: updated.searchableTags,
+      messageUpdated: updated.messageUpdated,
+      metaData: updated.metaData ?? row.metaData,
+      reactions: _copyReactions(updated.reactions ?? row.reactions),
     );
     _replies.refresh();
     update();
@@ -885,6 +949,14 @@ class IsmChatThreadController extends GetxController {
 
   /// Routes a reaction add/remove to the open panel when the row has no DB
   /// entry (typical for thread-only replies).
+  /// Routes `messageDetailsUpdated` to the open thread panel when applicable.
+  static void applyMessageDetailsUpdate(IsmChatMessageModel updated) {
+    if (!IsmChatThreadCoordinator.isEnabled) return;
+    final controller = instance;
+    if (controller == null) return;
+    controller.applyMessageUpdate(updated);
+  }
+
   static void deliverReactionChange({
     required String messageId,
     required String emojiKey,

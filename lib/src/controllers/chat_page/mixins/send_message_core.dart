@@ -215,6 +215,9 @@ mixin IsmChatPageSendMessageCoreMixin {
     if (text != null) {
       _controller.chatInputController.text = text;
     }
+    if (_controller.isEditing) {
+      return _controller.trySubmitEditFromComposer(text: text);
+    }
     if (!(_controller.conversation?.isChattingAllowed == true) ||
         _controller.conversation?.isBlockedByMe == true) {
       _controller.showDialogCheckBlockUnBlock();

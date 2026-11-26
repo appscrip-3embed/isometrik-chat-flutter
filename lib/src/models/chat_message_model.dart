@@ -127,6 +127,7 @@ class IsmChatMessageModel {
     this.audioOnly,
     this.isInvalidMessage,
     this.encrypted,
+    this.messageUpdated = false,
   });
   factory IsmChatMessageModel.fromJson(String source) =>
       IsmChatMessageModel.fromMap(json.decode(source) as Map<String, dynamic>);
@@ -509,6 +510,7 @@ class IsmChatMessageModel {
       isInvalidMessage: map['isInvalidMessage'] as bool? ?? false,
       meetingType:
           map['meetingType'] == null ? null : map['meetingType'] as int? ?? 0,
+      messageUpdated: map['messageUpdated'] as bool? ?? false,
     );
 
     if (IsmChatConfig.configInitilized) {
@@ -744,6 +746,7 @@ class IsmChatMessageModel {
         'audioOnly': audioOnly,
         'isInvalidMessage': isInvalidMessage,
         'encrypted': encrypted,
+        'messageUpdated': messageUpdated,
       }.removeNullValues();
 
   String body;
@@ -816,6 +819,9 @@ class IsmChatMessageModel {
   bool? audioOnly;
   bool? isInvalidMessage;
   bool? encrypted;
+
+  /// `true` after the message body was edited (server / MQTT).
+  bool messageUpdated;
 
   String get chatName => conversationTitle ?? senderInfo?.userName ?? '';
 
@@ -907,6 +913,7 @@ class IsmChatMessageModel {
     bool? audioOnly,
     bool? isInvalidMessage,
     bool? encrypted,
+    bool? messageUpdated,
   }) =>
       IsmChatMessageModel(
         body: body ?? this.body,
@@ -971,6 +978,7 @@ class IsmChatMessageModel {
         audioOnly: audioOnly ?? this.audioOnly,
         isInvalidMessage: isInvalidMessage ?? this.isInvalidMessage,
         encrypted: encrypted ?? this.encrypted,
+        messageUpdated: messageUpdated ?? this.messageUpdated,
       );
 
   String toJson() => json.encode(toMap());

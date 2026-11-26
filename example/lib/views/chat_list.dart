@@ -98,7 +98,10 @@ class ChatList extends StatelessWidget {
               chatPageProperties: IsmChatPageProperties(
                 // Giphy: free API key from https://developers.giphy.com/
                 giphyApiKey: 'oXf5IF53KmB99uHRcNDOkwUpxyAAAk7Y',
-                // features: [..., IsmChatFeature.giphyPicker, IsmChatFeature.emojiIcon],
+                features: [
+                  ...ismChatDefaultPageFeatures,
+                  IsmChatFeature.edit,
+                ],
                 // Configure the interval for periodic conversation details API calls
                 // Default is 1 minute. You can customize it as needed:
                 conversationDetailsApiInterval:
@@ -170,12 +173,6 @@ class ChatList extends StatelessWidget {
                   if (!kIsWeb) IsmChatAttachmentType.contact,
                 ],
 
-                // features: [
-                //   IsmChatFeature.reply,
-                //   IsmChatFeature.showMessageStatus,
-                //   IsmChatFeature.audioMessage,
-                //   IsmChatFeature.emojiIcon,
-                // ],
               ),
 
               noChatSelectedPlaceholder: Center(

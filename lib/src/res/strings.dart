@@ -244,6 +244,10 @@ class IsmChatStrings {
       IsmChatL10n.get('focusMenuSelectMessage');
   static String get focusMenuReply => IsmChatL10n.get('focusMenuReply');
   static String get focusMenuForward => IsmChatL10n.get('focusMenuForward');
+  static String get focusMenuEdit => IsmChatL10n.get('focusMenuEdit');
+  static String get editingMessage => IsmChatL10n.get('editingMessage');
+  static String get messageEdited => IsmChatL10n.get('messageEdited');
+  static String get editMessageFailed => IsmChatL10n.get('editMessageFailed');
 
   // ------------------------- Slack-style threads -------------------------
   // Only reachable while [IsmChatConfig.threadsEnabled] is true.

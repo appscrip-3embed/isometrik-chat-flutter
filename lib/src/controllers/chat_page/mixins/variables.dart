@@ -162,6 +162,16 @@ mixin IsmChatPageVariablesMixin on GetxController {
   IsmChatMessageModel? get replayMessage => _replayMessage.value;
   set replayMessage(IsmChatMessageModel? value) => _replayMessage.value = value;
 
+  final RxBool _isEditing = false.obs;
+  bool get isEditing => _isEditing.value;
+  set isEditing(bool value) => _isEditing.value = value;
+
+  final Rx<IsmChatMessageModel?> _editingMessage =
+      Rx<IsmChatMessageModel?>(null);
+  IsmChatMessageModel? get editingMessage => _editingMessage.value;
+  set editingMessage(IsmChatMessageModel? value) =>
+      _editingMessage.value = value;
+
   final RxBool _isSearchSelect = false.obs;
   bool get isSearchSelect => _isSearchSelect.value;
   set isSearchSelect(bool value) => _isSearchSelect.value = value;

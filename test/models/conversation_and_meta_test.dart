@@ -131,6 +131,38 @@ void main() {
       expect(details.senderId, kOpponentId);
       expect(details.copyWith(body: 'x').body, 'x');
     });
+
+    test('fromMap resolves body from nested details on messageDetailsUpdated',
+        () {
+      final details = LastMessageDetails.fromMap({
+        'conversationId': kDirectConversationId,
+        'messageId': 'msg-edit-1',
+        'action': IsmChatActionEvents.messageDetailsUpdated.name,
+        'showInConversation': true,
+        'sentAt': 1,
+        'senderName': kOpponentName,
+        'senderId': kOpponentId,
+        'messageType': 0,
+        'body': '',
+        'details': {'body': 'edited preview text'},
+      });
+      expect(details.body, 'edited preview text');
+      expect(details.messageBody, 'edited preview text');
+    });
+
+    test('root body wins over nested details.body', () {
+      final details = LastMessageDetails.fromMap({
+        'conversationId': kDirectConversationId,
+        'messageId': 'm1',
+        'showInConversation': true,
+        'sentAt': 1,
+        'senderName': 'A',
+        'messageType': 0,
+        'body': 'from root',
+        'details': {'body': 'from nested'},
+      });
+      expect(details.body, 'from root');
+    });
   });
 
   group('IsmChatSelfChatLabels.matchesUserListSearch', () {

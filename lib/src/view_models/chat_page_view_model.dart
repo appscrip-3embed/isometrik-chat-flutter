@@ -789,6 +789,21 @@ class IsmChatPageViewModel {
           messageId: messageId,
           conversationId: conversationId);
 
+  Future<bool> editMessageText({
+    required String messageId,
+    required String conversationId,
+    required String body,
+    required List<String> searchableTags,
+    required bool isLoading,
+  }) async =>
+      _repository.editMessageText(
+        messageId: messageId,
+        conversationId: conversationId,
+        body: body,
+        searchableTags: searchableTags,
+        isLoading: isLoading,
+      );
+
   Future<List<MessageStatusModel>?> getMessageForStatus({
     required String conversationId,
     required List<String> messageIds,

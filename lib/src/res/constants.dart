@@ -37,6 +37,12 @@ class IsmChatConstants {
   /// Max images/videos/documents per picker session (gallery + file picker).
   static const int maxOutboundPickerAttachments = 5;
 
+  /// First searchable tag for text message edits (`PATCH /chat/message`).
+  static const String textMessageSearchTag = '/@text';
+
+  /// Sender edit window after [IsmChatMessageModel.sentAt] (ms since epoch).
+  static const Duration editMessageMaxAge = Duration(minutes: 15);
+
   /// [IsmChatMetaData.customMetaData] key for multi photo/video preview text.
   static const String multipleMediaPreviewLabelKey = 'multipleMediaPreviewLabel';
 
