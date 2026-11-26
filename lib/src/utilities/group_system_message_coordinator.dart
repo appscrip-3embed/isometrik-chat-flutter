@@ -176,6 +176,26 @@ class IsmChatGroupSystemMessageCoordinator {
     });
   }
 
+  /// True when the logged-in user appears in an `addMember` MQTT payload.
+  ///
+  /// Reused when there is no local conversation row yet (newly added member):
+  /// list refresh must use [IsmChatConversationsController.getChatConversations]
+  /// like [conversationCreated], not [getConversationsFromDB] alone.
+  static bool isCurrentUserAmongAddedMembers(
+    IsmChatMqttActionModel actionModel,
+  ) {
+    final selfId =
+        IsmChatConfig.communicationConfig.userConfig.userId.trim();
+    if (selfId.isEmpty) return false;
+    for (final member in actionModel.members ?? const <UserDetails>[]) {
+      if (member.matchesConversationMember(selfId)) {
+        return true;
+      }
+    }
+    final memberId = (actionModel.memberId ?? '').trim();
+    return memberId.isNotEmpty && memberId == selfId;
+  }
+
   /// Local DB first; then in-memory chat list when user never opened the group.
   static Future<IsmChatConversationModel?> resolveConversation(
     String conversationId,
@@ -204,6 +224,87 @@ class IsmChatGroupSystemMessageCoordinator {
     return null;
   }
 
+  /// Minimal local row when MQTT delivers a chat message before Hive has that
+  /// conversation (e.g. newly added to an existing group). Server metadata is
+  /// back-filled by [IsmChatConversationsController.getChatConversations].
+  static IsmChatConversationModel? bootstrapConversationFromIncomingMessage(
+    IsmChatMessageModel message, {
+    required bool sentByMe,
+  }) {
+    final conversationId = (message.conversationId ?? '').trim();
+    if (conversationId.isEmpty) {
+      return null;
+    }
+
+    final details = message.conversationDetails;
+    final detailsIsGroup = details?['isGroup'];
+    final isGroup =
+        message.isGroup == true || detailsIsGroup == true;
+
+    final title = _firstNonEmpty([
+      message.conversationTitle,
+      details?['conversationTitle'] as String?,
+    ]);
+    final imageUrl = _firstNonEmpty([
+      message.conversationImageUrl,
+      details?['conversationImageUrl'] as String?,
+    ]);
+
+    var membersCount = message.membersCount ?? 0;
+    final fromDetails = details?['membersCount'];
+    if (membersCount == 0 && fromDetails is int) {
+      membersCount = fromDetails;
+    }
+
+    final lastMessageDetails = LastMessageDetails(
+      showInConversation: true,
+      sentAt: message.sentAt,
+      senderName: message.senderInfo?.userName ?? message.chatName,
+      senderId: message.senderInfo?.userId ?? '',
+      messageType: message.messageType?.value ?? 0,
+      messageId: message.messageId ?? '',
+      conversationId: conversationId,
+      body: IsmChatUtility.lastMessageBodyForConversationSync(message),
+      sentByMe: sentByMe,
+      customType: message.customType,
+      action: message.action ?? '',
+      meetingId: message.meetingId,
+      meetingType: message.meetingType,
+      callDurations: message.callDurations,
+      deliverCount: 0,
+      deliveredTo: const <MessageStatus>[],
+      readCount: 0,
+      readBy: const <MessageStatus>[],
+      reactionType: '',
+      metaData: message.metaData,
+      audioOnly: message.audioOnly,
+      isInvalidMessage: message.isInvalidMessage,
+    );
+
+    return IsmChatConversationModel(
+      conversationId: conversationId,
+      conversationTitle: title,
+      conversationImageUrl: imageUrl,
+      isGroup: isGroup,
+      privateOneToOne: message.privateOneToOne,
+      membersCount: membersCount,
+      lastMessageSentAt: message.sentAt,
+      lastMessageDetails: lastMessageDetails,
+      unreadMessagesCount: sentByMe ? 0 : 1,
+      messages: <String, IsmChatMessageModel>{},
+      opponentDetails:
+          isGroup ? null : message.senderInfo,
+      conversationType: IsmChatConversationType.fromValue(
+        message.conversationType ?? 0,
+      ),
+      config: ConversationConfigModel(
+        typingEvents: true,
+        readEvents: true,
+        pushNotifications: true,
+      ),
+    );
+  }
+
   /// Keeps [IsmChatConversationsController.conversations] in sync after MQTT rows.
   static void syncConversationListCache(IsmChatConversationModel conversation) {
     if (!IsmChatUtility.conversationControllerRegistered) {
@@ -215,14 +316,19 @@ class IsmChatGroupSystemMessageCoordinator {
       return;
     }
 
-    final index = controller.conversations
-        .indexWhere((entry) => entry.conversationId == conversationId);
+    final list =
+        List<IsmChatConversationModel>.from(controller.conversations);
+    final index =
+        list.indexWhere((entry) => entry.conversationId == conversationId);
     if (index != -1) {
-      final list =
-          List<IsmChatConversationModel>.from(controller.conversations);
       list[index] = conversation;
-      controller.conversations = list;
+    } else {
+      list.add(conversation);
+      int sortKey(IsmChatConversationModel c) =>
+          c.lastMessageDetails?.sentAt ?? c.lastMessageSentAt ?? 0;
+      list.sort((a, b) => sortKey(b).compareTo(sortKey(a)));
     }
+    controller.conversations = list;
 
     if (controller.currentConversationId == conversationId) {
       controller.currentConversation = conversation;

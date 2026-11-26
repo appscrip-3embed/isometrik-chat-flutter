@@ -96,16 +96,30 @@ mixin IsmChatMqttEventGroupOperationsMixin {
           IsmChatGroupSystemMessageCoordinator.resolveInitiator(actionModel);
       final sentByMe = utils.isSenderMe(initiator.id);
 
-      await IsmChatGroupSystemMessageCoordinator.persistAndRefreshOpenChat(
+      final saved = await IsmChatGroupSystemMessageCoordinator.persistSystemMessage(
         actionModel: actionModel,
         sentByMe: sentByMe,
         transformBeforeSave: (conv) => _applyMemberDelta(conv, actionModel),
         unreadMessagesCount:
             actionModel.action == IsmChatActionEvents.membersRemove ? 0 : null,
-        syncInMemoryConversation: (conv) => _applyMemberDelta(conv, actionModel),
       );
-
-      await conversationController.getConversationsFromDB();
+      if (saved != null) {
+        await IsmChatGroupSystemMessageCoordinator.refreshOpenChatPage(
+          actionModel,
+          lastMessageDetails: saved.lastMessageDetails,
+          syncInMemoryConversation:
+              (conv) => _applyMemberDelta(conv, actionModel),
+        );
+        await conversationController.getConversationsFromDB();
+      } else if (actionModel.action == IsmChatActionEvents.addMember &&
+          IsmChatGroupSystemMessageCoordinator.isCurrentUserAmongAddedMembers(
+            actionModel,
+          )) {
+        // No local row yet — fetch from server so the list shows the new group.
+        await conversationController.getChatConversations();
+      } else {
+        await conversationController.getConversationsFromDB();
+      }
 
       if (IsmChatUtility.chatPageControllerRegistered) {
         final chatPageController = IsmChatUtility.chatPageController;

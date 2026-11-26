@@ -1057,13 +1057,24 @@ bool _isComposerMentionAt(String text, int index) {
   return prev == ' ' || prev == '\n' || prev == '\t';
 }
 
-List<UserDetails> _orderedMentionUsersByApiOrder(
-  List<UserDetails> users,
-) {
+/// True when [body] contains at least one composer-style `@mention`.
+///
+/// Reuse in thread rows and replies before full segment parsing is available.
+bool messageBodyHasComposerMention(String body) {
+  for (var i = 0; i < body.length; i++) {
+    if (body[i] == '@' && _isComposerMentionAt(body, i)) return true;
+  }
+  return false;
+}
+
+/// Authoritative mention rows sorted by [UserDetails.order] (includes self).
+///
+/// Receiver bodies keep every `@` that was sent; dropping the signed-in user
+/// desyncs slot indices and breaks highlight spans.
+List<UserDetails> orderedMentionedUsersForParsing(List<UserDetails> users) {
   final seen = <String>{};
   final ordered = <UserDetails>[];
   for (final user in users) {
-    if (_isCurrentChatUserWhenConfigured(user.userId)) continue;
     final id = user.userId.trim();
     if (id.isEmpty || !seen.add(id)) continue;
     ordered.add(user);
@@ -1072,25 +1083,120 @@ List<UserDetails> _orderedMentionUsersByApiOrder(
   return ordered;
 }
 
-/// Mention span end for one [user] at `@` in [text], preferring full name match.
-int? _mentionEndForUser(String text, int atIndex, UserDetails user) {
-  if (!_isComposerMentionAt(text, atIndex)) return null;
-  for (final name in _mentionNamesForUser(user)) {
-    final byName = _mentionNameEndAfterAt(text, atIndex, name);
-    if (byName != null) return byName;
+/// Merges wire `mentionedUsers` (userId/wordCount/order) with [memberCandidates].
+///
+/// MQTT/API payloads often omit display names; group members supply labels for
+/// matching while preserving server [UserDetails.wordCount] and [UserDetails.order].
+List<UserDetails> enrichMentionedUsersFromMembers(
+  List<UserDetails> mentionedUsers,
+  List<UserDetails> memberCandidates,
+) {
+  if (mentionedUsers.isEmpty) return const [];
+
+  final byId = <String, UserDetails>{};
+  for (final member in memberCandidates) {
+    final id = member.userId.trim();
+    if (id.isNotEmpty) byId[id] = member;
+    final memberId = member.memberId?.trim() ?? '';
+    if (memberId.isNotEmpty) byId.putIfAbsent(memberId, () => member);
   }
+
+  return mentionedUsers.map((wire) {
+    final id = wire.userId.trim();
+    final member = id.isNotEmpty ? byId[id] : null;
+    if (member == null) return wire;
+    final apiWords = wire.wordCount ?? 0;
+    final labelWords = _mentionLabelWordCount(member);
+    final mergedWordCount = apiWords >= 1
+        ? (labelWords > apiWords ? labelWords : apiWords)
+        : member.wordCount;
+    return member.copyWith(
+      order: wire.order ?? member.order,
+      wordCount: mergedWordCount,
+    );
+  }).toList();
+}
+
+/// Longest display/user-name match at `@` in [body] (exclusive end index).
+///
+/// Reuse in send-path mention resolution when multiple members share a prefix.
+int? longestMentionNameEndInBody(String body, int atIndex, UserDetails user) {
+  int? best;
+  for (final name in _mentionNamesForUser(user)) {
+    final end = _mentionNameEndAfterAt(body, atIndex, name);
+    if (end != null && (best == null || end > best)) best = end;
+  }
+  return best;
+}
+
+/// Fallback `@` token through the next whitespace (phones, handles, masked ids).
+int? _mentionHandleEndAfterAt(String body, int atIndex) {
+  if (atIndex >= body.length || body[atIndex] != '@') return null;
+  var pos = atIndex + 1;
+  while (pos < body.length && body[pos] != ' ' && body[pos] != '\n') {
+    pos++;
+  }
+  return pos > atIndex + 1 ? pos : null;
+}
+
+int? _mentionWordCountSpanEnd(
+  String text,
+  int atIndex,
+  UserDetails user,
+  int wordCount, {
+  bool trustAuthoritativeWordCount = false,
+}) {
+  if (wordCount < 1) return null;
+
   final label = mentionLabelForUser(user);
+
+  // Receiver wire rows (userId/wordCount/order only): trust API word span length.
+  if (trustAuthoritativeWordCount && label.isEmpty) {
+    return _mentionWordCountEndAfterAt(text, atIndex, wordCount);
+  }
   final words = label.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-  if (words.isEmpty) return null;
+  if (words.isEmpty) {
+    return _mentionWordCountEndAfterAt(text, atIndex, wordCount);
+  }
   // Do not consume [wordCount] words unless the inserted label's first token matches.
   if (_mentionNameEndAfterAt(text, atIndex, words.first) == null) {
     return null;
   }
+  return _mentionWordCountEndAfterAt(text, atIndex, wordCount);
+}
+
+/// Mention span end for one [user] at `@` in [text], preferring full name match.
+int? _mentionEndForUser(
+  String text,
+  int atIndex,
+  UserDetails user, {
+  bool trustAuthoritativeWordCount = false,
+}) {
+  if (!_isComposerMentionAt(text, atIndex)) return null;
+
+  final bestNameEnd = longestMentionNameEndInBody(text, atIndex, user);
+
   final apiWordCount = user.wordCount ?? 0;
   final wordCount =
       apiWordCount >= 1 ? apiWordCount : _mentionLabelWordCount(user);
-  if (wordCount < 1) return null;
-  return _mentionWordCountEndAfterAt(text, atIndex, wordCount);
+  final wordCountEnd = _mentionWordCountSpanEnd(
+    text,
+    atIndex,
+    user,
+    wordCount,
+    trustAuthoritativeWordCount: trustAuthoritativeWordCount,
+  );
+
+  int? best;
+  void consider(int? end) {
+    if (end != null && end > atIndex + 1 && (best == null || end > best!)) {
+      best = end;
+    }
+  }
+
+  consider(bestNameEnd);
+  consider(wordCountEnd);
+  return best;
 }
 
 List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
@@ -1102,14 +1208,18 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
     r'\bhttps?:\/\/\S+\b|\bwww\.\S+\b|\b\d{9,13}\b|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
     caseSensitive: false,
   );
-  final singleWordMention = RegExp(r'^@[A-Za-z0-9_.]+');
-
   bool hasLinkAt(int index) =>
       nonMentionLink.allMatches(text).any((m) => m.start == index);
 
-  final authoritative = _orderedMentionUsersByApiOrder(
-    authoritativeMentionedUsers ?? const <UserDetails>[],
-  );
+  final rawAuthoritative = authoritativeMentionedUsers ?? const <UserDetails>[];
+  final authoritative = rawAuthoritative.isEmpty
+      ? const <UserDetails>[]
+      : orderedMentionedUsersForParsing(
+          enrichMentionedUsersFromMembers(
+            rawAuthoritative,
+            mentionCandidates,
+          ),
+        );
   final useAuthoritativeMentions = authoritative.isNotEmpty;
 
   final legacyOrderedMentionUsers = <UserDetails>[];
@@ -1173,7 +1283,21 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
       int? end;
 
       if (useAuthoritativeMentions && mentionSlotIndex < authoritative.length) {
-        end = _mentionEndForUser(text, i, authoritative[mentionSlotIndex]);
+        end = _mentionEndForUser(
+          text,
+          i,
+          authoritative[mentionSlotIndex],
+          trustAuthoritativeWordCount: true,
+        );
+        if (end == null || end <= i + 1) {
+          end = mentionEndAt(i);
+        }
+      } else if (useAuthoritativeMentions) {
+        // More `@` in body than [mentionedUsers] entries (e.g. extra handles).
+        end = mentionEndAt(i);
+        if (end == null || end <= i + 1) {
+          end = _mentionHandleEndAfterAt(text, i);
+        }
       } else if (!useAuthoritativeMentions) {
         end = mentionEndAt(i);
 
@@ -1183,9 +1307,15 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
           final user = legacyOrderedMentionUsers[mentionSlotIndex];
           end = _mentionEndForUser(text, i, user);
         }
+        if (end == null || end <= i + 1) {
+          end = _mentionHandleEndAfterAt(text, i);
+        }
       }
 
-      if (end != null && end > i + 1 && !isSelfMentionSpan(i, end)) {
+      final suppressSelfHighlight = end != null &&
+          !useAuthoritativeMentions &&
+          isSelfMentionSpan(i, end);
+      if (end != null && end > i + 1 && !suppressSelfHighlight) {
         segments.add(
           LocalMentionAndLinkData(
             text: text.substring(i, end),
@@ -1200,17 +1330,22 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
         continue;
       }
 
-      if (!useAuthoritativeMentions) {
-        // Last resort: single token after `@` (legacy bodies without wordCount).
-        final fallback = singleWordMention.matchAsPrefix(text, i);
-        if (fallback != null && !isSelfMentionSpan(i, fallback.end)) {
+      final allowHandleFallback = !useAuthoritativeMentions ||
+          mentionSlotIndex >= authoritative.length;
+      if (allowHandleFallback) {
+        final tokenEnd = _mentionHandleEndAfterAt(text, i);
+        final suppressSelf = tokenEnd != null &&
+            !useAuthoritativeMentions &&
+            isSelfMentionSpan(i, tokenEnd);
+        if (tokenEnd != null && !suppressSelf) {
           segments.add(
             LocalMentionAndLinkData(
-              text: fallback.group(0)!,
+              text: text.substring(i, tokenEnd),
               isLink: true,
             ),
           );
-          i = fallback.end;
+          if (useAuthoritativeMentions) mentionSlotIndex++;
+          i = tokenEnd;
           continue;
         }
       }

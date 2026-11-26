@@ -82,7 +82,32 @@ mixin IsmChatMqttEventMessageHandlersMixin {
         }
       }
     }
-    if (conversation == null) return;
+    // Newly added to a group: row may be missing locally while MQTT still delivers
+    // messages and local notifications. Bootstrap from the payload so the list
+    // updates immediately; back-fill full metadata from the server.
+    if (conversation == null) {
+      final bootstrapped =
+          IsmChatGroupSystemMessageCoordinator
+              .bootstrapConversationFromIncomingMessage(
+        message,
+        sentByMe: isFromCurrentUser,
+      );
+      if (bootstrapped != null) {
+        await IsmChatConfig.dbWrapper?.saveConversation(
+          conversation: bootstrapped,
+        );
+        IsmChatGroupSystemMessageCoordinator.syncConversationListCache(
+          bootstrapped,
+        );
+        conversation = bootstrapped;
+      }
+      unawaited(
+        IsmChatUtility.conversationController.getChatConversations(),
+      );
+      if (conversation == null) {
+        return;
+      }
+    }
     if (!isFromThisDevice &&
         conversation.lastMessageDetails?.messageId == message.messageId) {
       return;

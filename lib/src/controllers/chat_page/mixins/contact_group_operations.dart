@@ -190,12 +190,20 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
 
     final seenUserIds = <String>{};
 
+    // Longest display names first so "@Rasika Flutter User" beats a "@Rasika" alias.
+    final membersByLabelLength = List<UserDetails>.from(_controller.groupMembers)
+      ..sort(
+        (a, b) =>
+            mentionLabelForUser(b).length.compareTo(mentionLabelForUser(a).length),
+      );
+
     for (var mentionIndex = 0; mentionIndex < mentionedList.length;
         mentionIndex++) {
       final seg = mentionedList[mentionIndex].trimLeft();
       UserDetails? matchedMember;
+      int? bestMatchEnd;
 
-      for (final member in _controller.groupMembers) {
+      for (final member in membersByLabelLength) {
         if (isCurrentChatUser(member.userId)) continue;
         final userName = member.userName.trim();
         if (userName.isEmpty) continue;
@@ -206,9 +214,13 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
             (displayName.isNotEmpty &&
                 mentionSegmentMatchesMemberName(seg, displayName)) ||
             mentionSegmentMatchesMemberName(seg, userName);
-        if (matches) {
+        if (!matches) continue;
+
+        final matchEnd = longestMentionNameEndInBody('@$seg', 0, member);
+        if (matchEnd == null || matchEnd <= 1) continue;
+        if (bestMatchEnd == null || matchEnd > bestMatchEnd) {
+          bestMatchEnd = matchEnd;
           matchedMember = member;
-          break;
         }
       }
 

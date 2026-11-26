@@ -334,6 +334,7 @@ bool _threadBodyUsesMentionRichText(
   IsmChatMessageModel message,
   String body,
 ) =>
+    messageBodyHasComposerMention(body) ||
     message.mentionListForBody(body).any((s) => s.isLink);
 
 /// Channel bubble widgets paint captions with [IsmChatMessageModel.style] (white
