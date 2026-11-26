@@ -70,6 +70,8 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
         }
       }
 
+      // Empty [messages] is normal for chats not opened yet — keep API/DB preview.
+      // Cleared chats null [lastMessageDetails] via [withClearedMessageHistory].
       if (!needsRecompute ||
           messagesMap == null ||
           messagesMap.isEmpty ||
@@ -184,9 +186,11 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
     _controller.isConversationsLoading = false;
 
     if (_controller.conversations.length > 1) {
-      _controller.conversations
-          .sort((a, b) => (b.lastMessageDetails?.sentAt ?? 0)
-              .compareTo(a.lastMessageDetails?.sentAt ?? 0));
+      _controller.conversations.sort((a, b) {
+        int sortKey(IsmChatConversationModel c) =>
+            c.lastMessageDetails?.sentAt ?? c.lastMessageSentAt ?? 0;
+        return sortKey(b).compareTo(sortKey(a));
+      });
       final opponentEmptyData = <IsmChatConversationModel>[];
       final opponentData = <IsmChatConversationModel>[];
       for (var x in _controller.conversations) {

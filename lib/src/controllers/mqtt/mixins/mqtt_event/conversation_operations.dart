@@ -84,6 +84,35 @@ mixin IsmChatMqttEventConversationOperationsMixin {
     }
   }
 
+  /// Clears local messages when `clearConversation` arrives on the Status topic.
+  ///
+  /// Clear-chat is per account: sync to other devices for the same user, skip
+  /// only the originating device when [IsmChatMqttActionModel.deviceId] matches.
+  void handleClearConversation(IsmChatMqttActionModel actionModel) async {
+    final self = this;
+    if (self is IsmChatMqttEventUtilitiesMixin) {
+      final utils = self as IsmChatMqttEventUtilitiesMixin;
+      if (!utils.isSenderMe(actionModel.userDetails?.userId)) return;
+      if (utils.shouldSkipSameDeviceMqttEcho(actionModel)) return;
+      final conversationId = actionModel.conversationId?.trim() ?? '';
+      if (conversationId.isEmpty) return;
+      await IsmChatConfig.dbWrapper?.clearAllMessage(
+        conversationId: conversationId,
+      );
+      if (IsmChatUtility.chatPageControllerRegistered) {
+        final controller = IsmChatUtility.chatPageController;
+        if (controller.conversation?.conversationId == conversationId) {
+          controller.update();
+        }
+      }
+      if (IsmChatUtility.conversationControllerRegistered) {
+        // Same refresh path as [IsmChatPageViewModel.clearAllMessages] on this
+        // device so list order and subtitles match after a remote clear.
+        await IsmChatUtility.conversationController.getChatConversations();
+      }
+    }
+  }
+
   /// Handles deletion of chat from local storage.
   ///
   /// * `actionModel`: The action model containing details for deletion.

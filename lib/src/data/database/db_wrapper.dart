@@ -222,10 +222,7 @@ class IsmChatDBWrapper {
   Future<void> clearAllMessage({required String conversationId}) async {
     var conversation = await getConversation(conversationId);
     if (conversation != null) {
-      conversation = conversation.copyWith(
-        messages: {},
-        metaData: conversation.metaData?.copyWith(blockedMessage: null),
-      );
+      conversation = conversation.withClearedMessageHistory();
       await saveConversation(conversation: conversation);
     }
     if (IsmChatUtility.chatPageControllerRegistered) {

@@ -15,7 +15,8 @@ mixin IsmChatMqttEventReactionsMixin
     final self = this;
     if (self is IsmChatMqttEventUtilitiesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
-      if (utils.isSenderMe(actionModel.userDetails?.userId)) return;
+      if (utils.shouldSkipSameDeviceMqttEcho(actionModel)) return;
+      final actorUserId = actionModel.userDetails?.userId ?? '';
       var conversation = await IsmChatConfig.dbWrapper
           ?.getConversation(actionModel.conversationId ?? '');
       final allMessages = conversation?.messages;
@@ -51,8 +52,9 @@ mixin IsmChatMqttEventReactionsMixin
       if (actionModel.action == IsmChatActionEvents.reactionAdd) {
         for (var x in message.value.reactions ?? <MessageReactionModel>[]) {
           if (x.emojiKey == actionModel.reactionType) {
-            x.userIds.add(actionModel.userDetails?.userId ?? '');
-            x.userIds.toSet().toList();
+            if (!x.userIds.contains(actorUserId)) {
+              x.userIds.add(actorUserId);
+            }
             isEmoji = true;
             break;
           }
@@ -62,15 +64,14 @@ mixin IsmChatMqttEventReactionsMixin
           message.value.reactions?.add(
             MessageReactionModel(
               emojiKey: actionModel.reactionType ?? '',
-              userIds: [actionModel.userDetails?.userId ?? ''],
+              userIds: [actorUserId],
             ),
           );
         }
       } else {
         for (var x in message.value.reactions ?? <MessageReactionModel>[]) {
           if (x.emojiKey == actionModel.reactionType && x.userIds.length > 1) {
-            x.userIds.remove(actionModel.userDetails?.userId ?? '');
-            x.userIds.toSet().toList();
+            x.userIds.remove(actorUserId);
             isEmoji = true;
           }
         }

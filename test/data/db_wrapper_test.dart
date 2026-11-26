@@ -201,9 +201,28 @@ void main() {
           metaData: IsmChatMetaData(blockedMessage: message(sentAt: 9)),
         ),
       );
+      await db.saveConversation(
+        conversation: (await db.getConversation(kDirectConversationId))!
+            .copyWith(
+          lastMessageDetails: LastMessageDetails(
+            showInConversation: true,
+            sentAt: 1,
+            senderName: kMeName,
+            messageType: 0,
+            messageId: 'msg-1',
+            conversationId: kDirectConversationId,
+            body: 'preview',
+            sentByMe: true,
+          ),
+          lastMessageSentAt: 1,
+        ),
+      );
       await db.clearAllMessage(conversationId: kDirectConversationId);
       final cleared = await db.getConversation(kDirectConversationId);
       expect(cleared?.messages, isEmpty);
+      expect(cleared?.lastMessageDetails?.body, isEmpty);
+      expect(cleared?.lastMessageDetails?.sentAt, 1);
+      expect(cleared?.lastMessageSentAt, 1);
       // Unknown conversation is a no-op.
       await db.clearAllMessage(conversationId: 'missing');
     });

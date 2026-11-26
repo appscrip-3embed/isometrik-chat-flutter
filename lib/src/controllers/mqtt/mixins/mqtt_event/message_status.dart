@@ -278,7 +278,7 @@ mixin IsmChatMqttEventMessageStatusMixin {
     final self = this;
     if (self is IsmChatMqttEventUtilitiesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
-      if (_skipDeleteForAllLocalEcho(utils, actionModel)) return;
+      if (utils.shouldSkipSameDeviceMqttEcho(actionModel)) return;
       final targetIds = _deleteForAllTargetIds(actionModel);
       if (targetIds.isEmpty) return;
       final conversationId = actionModel.conversationId ?? '';
@@ -346,7 +346,7 @@ mixin IsmChatMqttEventMessageStatusMixin {
     if (self is IsmChatMqttEventUtilitiesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
       if (!utils.isSenderMe(actionModel.userDetails?.userId)) return;
-      if (_skipDeleteForAllLocalEcho(utils, actionModel)) return;
+      if (utils.shouldSkipSameDeviceMqttEcho(actionModel)) return;
       final targetIds = _deleteForAllTargetIds(actionModel);
       if (targetIds.isEmpty) return;
       final targetIdSet = targetIds.toSet();
@@ -491,20 +491,6 @@ List<String> _deleteForAllTargetIds(IsmChatMqttActionModel action) {
   final single = action.messageId?.trim() ?? '';
   if (single.isNotEmpty) return [single];
   return const [];
-}
-
-/// Skip only when the delete was performed on **this** device.
-///
-/// Unlike deliver/read, delete-for-everyone must reach every device logged into
-/// the same account. When `deviceId` is missing we apply the update rather than
-/// fall back to user-only matching (that would keep other phones stale).
-bool _skipDeleteForAllLocalEcho(
-  IsmChatMqttEventUtilitiesMixin utils,
-  IsmChatMqttActionModel action,
-) {
-  final deviceId = action.deviceId?.trim() ?? '';
-  if (deviceId.isEmpty) return false;
-  return utils.isSenderMe(action.userDetails?.userId, deviceId: deviceId);
 }
 
 /// Whether to ignore a deliver/read MQTT action from the logged-in user.

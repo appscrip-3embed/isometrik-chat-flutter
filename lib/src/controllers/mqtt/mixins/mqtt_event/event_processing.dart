@@ -159,6 +159,11 @@ mixin IsmChatMqttEventProcessingMixin {
         }
         break;
       case IsmChatActionEvents.clearConversation:
+        if (self is IsmChatMqttEventConversationOperationsMixin &&
+            self is IsmChatMqttEventUtilitiesMixin) {
+          (self as IsmChatMqttEventConversationOperationsMixin)
+              .handleClearConversation(actionModel);
+        }
         break;
       case IsmChatActionEvents.deleteConversationLocally:
         if (self is IsmChatMqttEventConversationOperationsMixin &&

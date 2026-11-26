@@ -23,6 +23,17 @@ mixin IsmChatMqttEventUtilitiesMixin {
     return isMyMessage;
   }
 
+  /// Whether to skip a Status-topic MQTT action that originated on this device.
+  ///
+  /// The same account on another phone must still apply the update (reactions,
+  /// delete-for-all, delete-local). When [IsmChatMqttActionModel.deviceId] is
+  /// absent, apply the update instead of treating it as a user-wide echo.
+  bool shouldSkipSameDeviceMqttEcho(IsmChatMqttActionModel action) {
+    final deviceId = action.deviceId?.trim() ?? '';
+    if (deviceId.isEmpty) return false;
+    return isSenderMe(action.userDetails?.userId, deviceId: deviceId);
+  }
+
   /// Shows a push notification.
   ///
   /// * `title`: The title of the notification.
