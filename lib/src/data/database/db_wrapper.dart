@@ -251,6 +251,15 @@ class IsmChatDBWrapper {
     return pendingMessages.first?.messageMap ?? {};
   }
 
+  /// Whether [conversationId] is stored in the main box.
+  ///
+  /// Skips decoding the stored JSON, which holds every cached message, so it
+  /// is cheap enough to call on the send path before the bubble is shown.
+  Future<bool> hasConversation(String conversationId) async {
+    if (conversationId.isEmpty) return false;
+    return await chatConversationBox.get(conversationId) != null;
+  }
+
   Future<IsmChatConversationModel?> getConversation(
     String conversationId, {
     IsmChatDbBox dbBox = IsmChatDbBox.main,
@@ -645,37 +654,27 @@ class IsmChatDBWrapper {
       return;
     }
 
-    var messageMap = {message.key: message};
-    switch (dbBox) {
-      case IsmChatDbBox.main:
-        var conversationMain =
-            await getConversation(message.conversationId ?? '', dbBox: dbBox);
-        if (conversationMain == null) return;
-        final mesasges = conversationMain.messages ?? {};
-        mesasges.addEntries(messageMap.entries);
-        conversationMain = conversationMain.copyWith(
-          messages: mesasges,
-        );
-        await saveConversation(conversation: conversationMain, dbBox: dbBox);
-        break;
-      case IsmChatDbBox.pending:
-        var conversationPending =
-            await getConversation(message.conversationId ?? '', dbBox: dbBox);
-        if (conversationPending == null) {
-          var pendingConversation = IsmChatConversationModel(
-              conversationId: message.conversationId, messages: messageMap);
-          await saveConversation(
-              conversation: pendingConversation, dbBox: dbBox);
-          return;
+    // Queued so it cannot interleave with a send confirmation or MQTT
+    // receipt editing the same conversation (a lost write there either hid
+    // a row or resurrected one already moved out of pending).
+    await updateConversation(
+      conversationId: message.conversationId ?? '',
+      dbBox: dbBox,
+      update: (latest) {
+        if (latest == null) {
+          if (dbBox == IsmChatDbBox.main) return null;
+          return IsmChatConversationModel(
+            conversationId: message.conversationId,
+            messages: {message.key: message},
+          );
         }
-        final mesasges = conversationPending.messages ?? {};
-        mesasges.addEntries(messageMap.entries);
-        conversationPending = conversationPending.copyWith(
-          messages: mesasges,
+        return latest.copyWith(
+          messages: Map<String, IsmChatMessageModel>.from(
+            latest.messages ?? const {},
+          )..[message.key] = message,
         );
-        await saveConversation(conversation: conversationPending, dbBox: dbBox);
-        break;
-    }
+      },
+    );
   }
 
   /// Create Db with user

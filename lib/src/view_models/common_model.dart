@@ -250,36 +250,56 @@ class IsmChatCommonViewModel {
               );
             }
           }
-          chatPendingMessages?.messages
-              ?.removeWhere((key, value) => key == '$createdAt');
-          await dbBox?.saveConversation(
-              conversation: chatPendingMessages!, dbBox: IsmChatDbBox.pending);
-          if (chatPendingMessages?.messages?.isEmpty == true) {
-            await dbBox?.pendingMessageBox
-                .delete(chatPendingMessages?.conversationId ?? '');
-          }
           // Slack-style threads: a reply that lives only in a thread is stored
           // like any message (so it survives a restart and the panel can show
           // it), but it must not become the conversation's preview — the
           // channel timeline filters it out either way.
           final isThreadOnlyReply =
               IsmChatThreadCoordinator.isThreadOnlyReply(pendingMessage);
-          var conversationModel = await dbBox?.getConversation(conversationId);
-          if (conversationModel != null) {
-            final messages = (conversationModel.messages ?? {})
-              ..addEntries({'$createdAt': pendingMessage}.entries);
-            conversationModel = conversationModel.copyWith(
-              lastMessageDetails: isThreadOnlyReply
-                  ? conversationModel.lastMessageDetails
-                  : conversationModel.lastMessageDetails?.copyWith(
-                      reactionType: '',
-                      messageId: pendingMessage.messageId,
-                      action: '',
-                    ),
-              messages: messages,
-            );
+          // Main first, then pending: a chat reload (MQTT receipt, incoming
+          // message) that runs between the two writes must still find the
+          // row in one of the boxes, or the sent bubble vanishes until the
+          // next sync. Both go through the per-conversation write queue so a
+          // concurrent receipt/insert cannot overwrite this row either.
+          final conversationModel = await dbBox?.updateConversation(
+            conversationId: conversationId,
+            update: (latest) {
+              if (latest == null) return null;
+              final messages = Map<String, IsmChatMessageModel>.from(
+                latest.messages ?? const {},
+              )..['$createdAt'] = pendingMessage;
+              return latest.copyWith(
+                lastMessageDetails: isThreadOnlyReply
+                    ? latest.lastMessageDetails
+                    : latest.lastMessageDetails?.copyWith(
+                        reactionType: '',
+                        messageId: pendingMessage.messageId,
+                        action: '',
+                      ),
+                messages: messages,
+              );
+            },
+          );
+          final remainingPending = await dbBox?.updateConversation(
+            conversationId: conversationId,
+            dbBox: IsmChatDbBox.pending,
+            update: (latest) {
+              final pending = latest?.messages;
+              if (latest == null ||
+                  pending == null ||
+                  !pending.containsKey('$createdAt')) {
+                return null;
+              }
+              return latest.copyWith(
+                messages: Map<String, IsmChatMessageModel>.from(pending)
+                  ..remove('$createdAt'),
+              );
+            },
+          );
+          if (remainingPending?.messages?.isEmpty == true) {
+            await dbBox?.pendingMessageBox.delete(conversationId);
           }
-          await dbBox?.saveConversation(conversation: conversationModel!);
+          chatPendingMessages?.messages?.remove('$createdAt');
           // Hand the server id to the open thread panel so its optimistic row
           // becomes a real message and the root badge moves once.
           if (isThreadOnlyReply && response.messageId.isNotEmpty) {

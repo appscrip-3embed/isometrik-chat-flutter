@@ -627,8 +627,11 @@ mixin IsmChatPageSendMessageCoreMixin {
     required String conversationId,
     String? userId,
   }) async {
-    final chatConversationResponse =
-        await IsmChatConfig.dbWrapper?.getConversation(conversationId);
+    // Existence check only: decoding the stored conversation (every cached
+    // message) here delayed the outgoing bubble on long chats.
+    final existsLocally =
+        await IsmChatConfig.dbWrapper?.hasConversation(conversationId) ??
+            false;
     final isBroadcastConversation = _controller.isBroadcast ||
         _controller.conversation?.customType == IsmChatStrings.broadcast;
 
@@ -637,7 +640,7 @@ mixin IsmChatPageSendMessageCoreMixin {
       _controller.isBroadcast = true;
     }
 
-    if (chatConversationResponse == null && !isBroadcastConversation) {
+    if (!existsLocally && !isBroadcastConversation) {
       final existingConversation = _controller.conversation;
       if (existingConversation == null) {
         IsmChatLog.error(
@@ -708,7 +711,7 @@ mixin IsmChatPageSendMessageCoreMixin {
       // 3. The conversation is not found in local database
       if (conversationId.isEmpty &&
           (existingConversationId == null || existingConversationId.isEmpty) &&
-          chatConversationResponse == null) {
+          !existsLocally) {
         // Note: createBroadcastConversation is provided by send_message_broadcast mixin
         conversationId = await _controller.createBroadcastConversation(
               groupcastImageUrl:
