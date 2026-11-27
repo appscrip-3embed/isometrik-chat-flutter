@@ -65,6 +65,35 @@ class IsmChatPageViewModel {
     bool isLoading = false,
     bool isBroadcast = false,
     IsmChatFeedType? feedType,
+  }) async =>
+      (await getChatMessagesPage(
+        conversationId: conversationId,
+        lastMessageTimestamp: lastMessageTimestamp,
+        limit: limit,
+        skip: skip,
+        searchText: searchText,
+        isLoading: isLoading,
+        isBroadcast: isBroadcast,
+        feedType: feedType,
+      ))
+          .messages;
+
+  /// Same as [getChatMessages], plus `rawCount`: rows the server returned
+  /// before client-side filtering (`null` when the request failed).
+  ///
+  /// Paging must advance `skip` by `rawCount`, not by visible rows — reactions,
+  /// banners and merged call events are dropped here but still occupy server
+  /// offsets.
+  Future<({List<IsmChatMessageModel> messages, int? rawCount})>
+      getChatMessagesPage({
+    required String conversationId,
+    int? lastMessageTimestamp,
+    int limit = 20,
+    int skip = 0,
+    String? searchText,
+    bool isLoading = false,
+    bool isBroadcast = false,
+    IsmChatFeedType? feedType,
   }) async {
     var messages = await _repository.getChatMessages(
       conversationId: conversationId,
@@ -77,8 +106,9 @@ class IsmChatPageViewModel {
     );
 
     if (messages == null) {
-      return [];
+      return (messages: <IsmChatMessageModel>[], rawCount: null);
     }
+    final rawCount = messages.length;
     // Keep thread-only replies out of the channel list and the local DB.
     messages.removeWhere(IsmChatThreadCoordinator.shouldHideFromTimeline);
     messages.removeWhere((e) => [
@@ -102,20 +132,33 @@ class IsmChatPageViewModel {
       }
 
       if (!isBroadcast) {
-        if (conversation != null) {
-          var messageMap = Map<String, IsmChatMessageModel>.from(
-            conversation.messages ?? {},
-          );
-          for (final message in messages) {
-            messageMap = IsmChatDBWrapper.mergeCallMessageIntoMap(
-              messageMap,
-              message,
+        final fetched = messages;
+        // Queued write so MQTT inserts/receipts landing meanwhile are kept.
+        // When this user has no stored row yet (newly added member, rejoined
+        // after exit-and-delete, not yet synced into the list), seed it from
+        // the open chat; otherwise API messages were dropped and the chat
+        // stayed empty for that user.
+        await IsmChatConfig.dbWrapper?.updateConversation(
+          conversationId: conversationId,
+          update: (latest) {
+            final openConversation = controller.conversation;
+            final base = latest ??
+                (openConversation?.conversationId == conversationId
+                    ? openConversation
+                    : null);
+            if (base == null) return null;
+            var messageMap = Map<String, IsmChatMessageModel>.from(
+              latest?.messages ?? {},
             );
-          }
-          conversation = conversation.copyWith(messages: messageMap);
-          await IsmChatConfig.dbWrapper
-              ?.saveConversation(conversation: conversation);
-        }
+            for (final message in fetched) {
+              messageMap = IsmChatDBWrapper.mergeCallMessageIntoMap(
+                messageMap,
+                message,
+              );
+            }
+            return base.copyWith(messages: messageMap);
+          },
+        );
       } else {
         messages = messages;
       }
@@ -123,7 +166,7 @@ class IsmChatPageViewModel {
       messages = messages;
     }
 
-    return messages;
+    return (messages: messages, rawCount: rawCount);
   }
 
   Future<List<IsmChatMessageModel>> getBroadcastMessages({

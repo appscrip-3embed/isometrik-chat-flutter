@@ -590,7 +590,10 @@ class _IsmChatPageView extends StatelessWidget {
                                                             child: ListView
                                                                 .builder(
                                                               physics:
-                                                                  const ClampingScrollPhysics(),
+                                                                  const AlwaysScrollableScrollPhysics(
+                                                                parent:
+                                                                    ClampingScrollPhysics(),
+                                                              ),
                                                               // Shared controller must only attach to the
                                                               // current (top) chat route. Stacked pages
                                                               // underneath keep `null` so scroll/pagination

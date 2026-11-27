@@ -42,6 +42,28 @@ mixin IsmChatPageVariablesMixin on GetxController {
   /// Same guard as [hasAttachedMessagesScrollListener] for search results.
   var hasAttachedSearchScrollListener = false;
 
+  /// Conversation id for which a one-shot post-open older prefetch already ran.
+  var postOpenOlderPrefetchConversationId = '';
+
+  /// Server-side offset (from newest) of the oldest page fetched so far,
+  /// counted in raw API rows. `null` until the first fetch of this chat.
+  int? olderPagingRawSkip;
+
+  /// Newest real `sentAt` when [olderPagingRawSkip] was last set. Local rows
+  /// newer than this arrived later (MQTT / sends) and shift server offsets.
+  int olderPagingAnchorSentAt = 0;
+
+  /// Set once a page comes back short; stops further older-page requests.
+  var hasReachedOldestMessage = false;
+
+  /// Clears paging state when a chat (re)opens.
+  void resetOlderMessagesPaging() {
+    olderPagingRawSkip = null;
+    olderPagingAnchorSentAt = 0;
+    hasReachedOldestMessage = false;
+    postOpenOlderPrefetchConversationId = '';
+  }
+
   final textEditingController = TextEditingController();
 
   final participnatsEditingController = TextEditingController();

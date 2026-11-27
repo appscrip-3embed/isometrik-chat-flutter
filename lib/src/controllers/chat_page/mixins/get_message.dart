@@ -18,8 +18,11 @@ mixin IsmChatPageGetMessageMixin on GetxController {
     return IsmChatUtility.chatPageController;
   }
 
+  /// Max immediate re-reads when a save lands during the Hive read.
+  static const int _maxStaleReadRetries = 3;
+
   Future<void> getMessagesFromDB(String conversationId,
-      [IsmChatDbBox dbBox = IsmChatDbBox.main]) async {
+      [IsmChatDbBox dbBox = IsmChatDbBox.main, int staleRetry = 0]) async {
     _controller.closeOverlay();
     final requestedConversationId = conversationId;
 
@@ -66,8 +69,7 @@ mixin IsmChatPageGetMessageMixin on GetxController {
       return;
     }
     if (generation != _controller.messagesGeneration) {
-      _controller.isMessagesLoading = false;
-      return;
+      return _retryStaleMessagesRead(conversationId, dbBox, staleRetry);
     }
     // If local cache is empty, continue with an empty map so we can still
     // render the base conversation-created row and let API sync fill messages.
@@ -104,11 +106,13 @@ mixin IsmChatPageGetMessageMixin on GetxController {
         messages: localMessages,
       );
     }
-    if (generation != _controller.messagesGeneration ||
-        (_controller.conversation?.conversationId ?? '') !=
-            requestedConversationId) {
+    if ((_controller.conversation?.conversationId ?? '') !=
+        requestedConversationId) {
       _controller.isMessagesLoading = false;
       return;
+    }
+    if (generation != _controller.messagesGeneration) {
+      return _retryStaleMessagesRead(conversationId, dbBox, staleRetry);
     }
     final merged = IsmChatThreadCoordinator.mergeThreadRootBadgesInList(
       localMessages,
@@ -122,6 +126,25 @@ mixin IsmChatPageGetMessageMixin on GetxController {
     _controller.isMessagesLoading = false;
     _controller._generateIndexedMessageList();
     update();
+  }
+
+  /// A save landed while Hive was being read, so that snapshot may be missing
+  /// rows. Dropping it used to leave the list empty after chat open (it is
+  /// cleared first), showing "No messages" with nothing to retry. Re-read
+  /// now; after a few tries fall back to a debounced reload.
+  Future<void> _retryStaleMessagesRead(
+    String conversationId,
+    IsmChatDbBox dbBox,
+    int staleRetry,
+  ) async {
+    if (staleRetry < _maxStaleReadRetries) {
+      return getMessagesFromDB(conversationId, dbBox, staleRetry + 1);
+    }
+    // Keep the loader while empty; the scheduled reload will fill the list.
+    if (_controller.messages.isNotEmpty) {
+      _controller.isMessagesLoading = false;
+    }
+    scheduleMessagesReload(conversationId);
   }
 
   /// Reloads [conversationId] once a short burst of MQTT messages settles.
@@ -207,14 +230,74 @@ mixin IsmChatPageGetMessageMixin on GetxController {
     return messages;
   }
 
-  /// Count of real chat rows (excludes UI-only date / conversation-created rows).
-  int _realMessageCount(List<IsmChatMessageModel> messages) => messages
-      .where(
-        (message) =>
-            message.customType != IsmChatCustomMessageType.date &&
-            message.customType != IsmChatCustomMessageType.conversationCreated,
-      )
-      .length;
+  /// Whether [message] is a row the server also has (counts toward `skip`).
+  ///
+  /// Excludes UI-only date / conversation-created rows, local block banners,
+  /// and pending sends (no `messageId` yet) — none of those occupy a server
+  /// offset, so counting them would skip real older messages.
+  bool _isServerBackedRow(IsmChatMessageModel message) =>
+      message.customType != IsmChatCustomMessageType.date &&
+      message.customType != IsmChatCustomMessageType.conversationCreated &&
+      !IsmChatBlockUnblockCoordinator.isBannerMessage(message) &&
+      (message.messageId ?? '').isNotEmpty;
+
+  /// Count of server-backed chat rows (see [_isServerBackedRow]).
+  int _realMessageCount(List<IsmChatMessageModel> messages) =>
+      messages.where(_isServerBackedRow).length;
+
+  /// `skip` for the next older page.
+  ///
+  /// Once a fetch has happened this is the raw server offset reached so far,
+  /// plus rows that arrived after it was recorded (they push older rows
+  /// further down on the server). Before any fetch, falls back to the local
+  /// row count.
+  int _olderPagingSkip(List<IsmChatMessageModel> messages) {
+    final rawSkip = _controller.olderPagingRawSkip;
+    if (rawSkip == null) return _realMessageCount(messages);
+    final anchor = _controller.olderPagingAnchorSentAt;
+    final arrivedSince = messages
+        .where((m) => _isServerBackedRow(m) && m.sentAt > anchor)
+        .length;
+    return rawSkip + arrivedSince;
+  }
+
+  /// Records how far into server history we are after a chat-messages fetch.
+  void _recordOlderPaging({
+    required ({int skip, int? lastMessageTimestamp}) paging,
+    required bool forPagination,
+    required List<IsmChatMessageModel> before,
+    required List<IsmChatMessageModel> fetched,
+    required int? rawCount,
+  }) {
+    if (rawCount == null) return; // request failed: keep the old cursor
+    const limit = IsmChatPageController.messagesApiPageLimit;
+    final skipBefore = _olderPagingSkip(before);
+    int nextSkip;
+    if (forPagination) {
+      nextSkip = paging.skip + rawCount;
+      if (rawCount < limit) _controller.hasReachedOldestMessage = true;
+    } else if (paging.lastMessageTimestamp == null) {
+      // Latest page from the newest message.
+      nextSkip = skipBefore > rawCount ? skipBefore : rawCount;
+      if (rawCount < limit) _controller.hasReachedOldestMessage = true;
+    } else if (rawCount >= limit) {
+      // Forward sync filled a whole page: there may be more new rows between
+      // this page and our cache (API sorts newest first, so we got the newest
+      // [limit]). Only this page is known to be contiguous from the newest
+      // message — page down from here so the gap is fetched, not skipped.
+      nextSkip = rawCount;
+    } else {
+      // Forward sync got every new row: they sit above what we counted.
+      nextSkip = skipBefore + rawCount;
+    }
+    var anchor = _newestRealMessageTimestamp(before) ?? 0;
+    for (final m in fetched) {
+      if (m.sentAt > anchor) anchor = m.sentAt;
+    }
+    _controller
+      ..olderPagingRawSkip = nextSkip
+      ..olderPagingAnchorSentAt = anchor;
+  }
 
   /// Newest real message [sentAt] (list is sorted oldest → newest).
   int? _newestRealMessageTimestamp(List<IsmChatMessageModel> messages) {
@@ -233,9 +316,10 @@ mixin IsmChatPageGetMessageMixin on GetxController {
   ///
   /// | Case | skip | lastMessageTimestamp |
   /// |------|------|----------------------|
-  /// | Scroll-up pagination | loaded count (20, 40, …) | omitted |
+  /// | Scroll-up pagination | raw server rows reached + newer arrivals | omitted |
   /// | Empty DB / no real msgs | 0 | omitted |
-  /// | Has DB messages (sync latest) | 0 | newest sentAt |
+  /// | Thin local cache (< [messagesApiPageLimit]) | 0 | omitted |
+  /// | Full local cache (sync latest) | 0 | newest sentAt |
   ({int skip, int? lastMessageTimestamp}) _resolveMessagesApiPaging({
     required bool forPagination,
     required List<IsmChatMessageModel> messages,
@@ -245,7 +329,7 @@ mixin IsmChatPageGetMessageMixin on GetxController {
 
     // Scroll up → older history via skip only (no timestamp).
     if (forPagination) {
-      return (skip: realCount, lastMessageTimestamp: null);
+      return (skip: _olderPagingSkip(messages), lastMessageTimestamp: null);
     }
 
     // Explicit caller timestamp (e.g. after group update).
@@ -259,22 +343,44 @@ mixin IsmChatPageGetMessageMixin on GetxController {
       return (skip: 0, lastMessageTimestamp: null);
     }
 
-    // Has DB messages → fetch anything newer than what we already have.
+    // List/MQTT often leave only the latest row in Hive. Forward-only sync
+    // (`lastMessageTimestamp`) would return nothing older; fetch a full window.
+    if (realCount < IsmChatPageController.messagesApiPageLimit) {
+      return (skip: 0, lastMessageTimestamp: null);
+    }
+
+    // Full local window → fetch anything newer than what we already have.
     return (skip: 0, lastMessageTimestamp: newest);
   }
 
+  /// Real chat rows for pagination (shared with scroll/lifecycle mixins).
+  int realMessageCountForPaging([List<IsmChatMessageModel>? messages]) =>
+      _realMessageCount(messages ?? _controller.messages);
+
+  /// Older pages fetched back-to-back when a page brings only rows we
+  /// already have (re-walking cached history after a gap reset).
+  static const int _maxDuplicatePageHops = 5;
+
+  /// Fetches chat messages: an open/sync page, or with [forPagination] the
+  /// next older page.
+  ///
+  /// [duplicateHops] is internal: how many all-duplicate older pages this
+  /// scroll trigger already followed.
   Future<void> getMessagesFromAPI({
     bool forPagination = false,
     int? lastMessageTimestamp,
     bool isBroadcast = false,
+    int duplicateHops = 0,
   }) async {
     if (IsmChatUtility.chatPageControllerRegistered) {
       final conversationID = _controller.conversation?.conversationId ?? '';
       if (conversationID.isEmpty) return;
 
+      if (forPagination && _controller.hasReachedOldestMessage) return;
       if (_controller.canCallCurrentApi) return;
       _controller.canCallCurrentApi = true;
       final requestedConversationId = conversationID;
+      var fetchNextOlderPage = false;
 
       try {
         if (_controller.messages.isEmpty) {
@@ -287,12 +393,14 @@ mixin IsmChatPageGetMessageMixin on GetxController {
           lastMessageTimestamp: lastMessageTimestamp,
         );
 
-        final data = await _controller.viewModel.getChatMessages(
+        final page = await _controller.viewModel.getChatMessagesPage(
           skip: paging.skip,
+          limit: IsmChatPageController.messagesApiPageLimit,
           conversationId: conversationID,
           lastMessageTimestamp: paging.lastMessageTimestamp,
           isBroadcast: isBroadcast,
         );
+        final data = page.messages;
         // Guard against race conditions: do not apply API results if active chat
         // changed before response came back.
         if ((_controller.conversation?.conversationId ?? '') !=
@@ -301,6 +409,28 @@ mixin IsmChatPageGetMessageMixin on GetxController {
             _controller.isMessagesLoading = false;
           }
           return;
+        }
+
+        _recordOlderPaging(
+          paging: paging,
+          forPagination: forPagination,
+          before: messagesList,
+          fetched: data,
+          rawCount: page.rawCount,
+        );
+
+        // An older page made only of rows we already hold adds nothing to
+        // the list, so no further scroll event would arrive — keep going.
+        if (forPagination &&
+            !_controller.hasReachedOldestMessage &&
+            (page.rawCount ?? 0) > 0 &&
+            duplicateHops < _maxDuplicatePageHops) {
+          final knownIds = {
+            for (final m in messagesList)
+              if ((m.messageId ?? '').isNotEmpty) m.messageId,
+          };
+          fetchNextOlderPage =
+              data.every((m) => knownIds.contains(m.messageId));
         }
 
         if (_controller.messages.isEmpty) {
@@ -330,6 +460,13 @@ mixin IsmChatPageGetMessageMixin on GetxController {
         // Always unlock so stacked-chat / failed requests cannot permanently
         // block older-message pagination (scroll-up load more).
         _controller.canCallCurrentApi = false;
+      }
+      if (fetchNextOlderPage) {
+        await getMessagesFromAPI(
+          forPagination: true,
+          isBroadcast: isBroadcast,
+          duplicateHops: duplicateHops + 1,
+        );
       }
     }
   }

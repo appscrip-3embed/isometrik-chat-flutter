@@ -148,6 +148,9 @@ class IsmChatPageController extends GetxController
   ///   and data access for this controller.
   IsmChatPageController(this.viewModel);
 
+  /// Default `limit` for `GET /chat/messages` (must match repository default).
+  static const int messagesApiPageLimit = 20;
+
   /// The view model instance for this controller.
   ///
   /// The view model provides business logic and coordinates with repositories

@@ -69,7 +69,8 @@ mixin IsmChatPageLifecycleInitializationMixin on GetxController {
         ..isActionAllowed = false
         ..isCoverationApiDetails = true
         ..canCallCurrentApi = false
-        ..isMessagesLoading = true;
+        ..isMessagesLoading = true
+        ..resetOlderMessagesPaging();
       // Reset previous chat data before loading another conversation to avoid
       // cross-chat message leakage when controller is reused (e.g. web/tab).
       // Without this, old messages can flash/show in a newly opened chat.
@@ -232,6 +233,12 @@ mixin IsmChatPageLifecycleInitializationMixin on GetxController {
       await _controller.getMessageForStatus();
       await _controller.readAllMessages();
       _controller.checkUserStatus();
+      unawaited(
+        _controller.maybePrefetchOlderMessagesAfterOpen(
+          conversationId,
+          openGeneration: openGeneration,
+        ),
+      );
     } else {
       await _controller.getBroadcastMessages(
           isBroadcast: _controller.isBroadcast);
