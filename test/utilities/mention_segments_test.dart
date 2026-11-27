@@ -476,4 +476,49 @@ void main() {
       expect(ids, {'u1'});
     });
   });
+
+  group('composer mention helpers', () {
+    UserDetails member(String id, String userName,
+            {String? firstName, String? lastName}) =>
+        UserDetails(
+          userProfileImageUrl: '',
+          userName: userName,
+          userIdentifier: '$id@test.com',
+          userId: id,
+          metaData: IsmChatMetaData(firstName: firstName, lastName: lastName),
+        );
+
+    test('display name collapses padding around "Mr." titles', () {
+      final ajay = member('u1', 'ajay', firstName: 'Mr. ', lastName: ' Ajay');
+      expect(ajay.displayName, 'Mr. Ajay');
+      expect(mentionLabelForUser(ajay), 'Mr. Ajay');
+      expect(
+        insertMentionIntoComposerText('hi @mr', mentionLabelForUser(ajay)),
+        'hi @Mr. Ajay ',
+      );
+    });
+
+    test('suggestions show only while typing an @ token', () {
+      final members = [member('u1', 'ajay'), member('u2', 'bob')];
+      expect(mentionSuggestionsForComposer('hello', members), isNull);
+      expect(
+        mentionSuggestionsForComposer('hello @aj', members)!
+            .map((e) => e.userId),
+        ['u1'],
+      );
+    });
+
+    test('resolveComposerMentions returns order and label word count', () {
+      final members = [
+        member('u1', 'ajay', firstName: 'Mr.', lastName: 'Ajay'),
+        member('u2', 'bob'),
+      ];
+      final mentions =
+          resolveComposerMentions('@Mr. Ajay and @bob hello', members);
+      expect(mentions.map((e) => e.userId), ['u1', 'u2']);
+      expect(mentions.first.wordCount, 2);
+      expect(mentions.map((e) => e.order), [0, 1]);
+    });
+  });
 }
+

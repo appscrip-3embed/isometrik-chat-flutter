@@ -356,6 +356,24 @@ void main() {
       expect(find.text('Show more'), findsNothing);
     });
 
+    testWidgets('root starting with @mention keeps body text color',
+        (tester) async {
+      final root = threadRoot(sentByMe: false)
+          .copyWith(body: '@Opponent please check this');
+      await pumpChatHost(
+        tester,
+        child: IsmChatThreadMessageTile(message: root, isRoot: true),
+      );
+      final rich = tester
+          .widgetList<RichText>(find.byType(RichText))
+          .firstWhere(
+            (w) => w.text.toPlainText() == '@Opponent please check this',
+          );
+      final rootStyle = (rich.text as TextSpan).style;
+      expect(rootStyle?.color, isNotNull);
+      expect(rootStyle?.color, isNot(IsmChatColors.whiteColor));
+    });
+
     testWidgets('long text replies can expand and collapse', (tester) async {
       final longBody = List.generate(20, (i) => 'Thread paragraph line $i.').join('\n');
       await pumpChatHost(
@@ -574,7 +592,7 @@ void main() {
       expect(body['showInConversation'], isTrue);
     });
 
-    testWidgets('tapping a reply targets it for a nested reply',
+    testWidgets('tapping a reply does not start a nested reply',
         (tester) async {
       await pumpThreadView(tester, replies: [
         threadReplyJson(messageId: 'r1', body: 'first reply', sentAt: 2000),
@@ -582,14 +600,11 @@ void main() {
 
       await tester.tap(find.text('first reply'));
       await tester.pump();
-      expect(
-        find.byKey(const Key('ism-thread-reply-to-chip')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('ism-thread-reply-to-chip')), findsNothing);
 
       await tester.enterText(
         find.byKey(const Key('ism-thread-composer-field')),
-        'answering r1',
+        'answering the thread',
       );
       await tester.tap(find.byKey(const Key('ism-thread-send-button')));
       await settle(tester);
@@ -598,8 +613,7 @@ void main() {
           .requestsForPath('/chat/message', method: 'POST')
           .last
           .json as Map<String, dynamic>;
-      expect(body['parentMessageId'], 'r1');
-      expect(find.byKey(const Key('ism-thread-reply-to-chip')), findsNothing);
+      expect(body['parentMessageId'], isNot('r1'));
     });
 
     testWidgets('the composer offers the channel attachment sheet',

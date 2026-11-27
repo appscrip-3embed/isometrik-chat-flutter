@@ -43,6 +43,45 @@ void main() {
         FakeResponse.json({'messageId': messageId}),
       );
 
+  group('mentions', () {
+    setUp(() {
+      IsmChatProperties.chatPageProperties = IsmChatPageProperties(
+        features: [IsmChatFeature.mentionMember],
+      );
+    });
+    tearDown(() {
+      IsmChatProperties.chatPageProperties = IsmChatPageProperties();
+    });
+
+    test('typing then sending a mention does not throw on clear', () async {
+      stubThread([]);
+      stubSend();
+      await controller.openThread(
+        root: threadRoot(conversationId: kGroupConversationId),
+        conversation: groupConversation(),
+      );
+
+      // No `@` yet: suggestions become empty (must stay a mutable list).
+      controller
+        ..replyController.text = 'hey'
+        ..handleComposerTextChanged('hey');
+      expect(controller.showMentionUserList, isFalse);
+
+      controller.replyController.text = 'hey @Opp';
+      controller.handleComposerTextChanged('hey @Opp');
+      expect(controller.showMentionUserList, isTrue);
+      expect(controller.mentionSuggestions.map((e) => e.userId),
+          [kOpponentId]);
+
+      controller.selectMention(controller.mentionSuggestions.first);
+      expect(controller.showMentionUserList, isFalse);
+
+      await controller.sendReply();
+      final sent = controller.replies.last;
+      expect(sent.mentionedUsers?.map((e) => e.userId), [kOpponentId]);
+    });
+  });
+
   group('openThread', () {
     test('loads replies oldest-first and keeps the root', () async {
       stubThread([

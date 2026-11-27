@@ -363,23 +363,10 @@ mixin IsmChatPageSendMessageCoreMixin {
         }
         return meta;
       }(),
-      mentionedUsers: _controller.userMentionedList.map(
-        (e) {
-          final member =
-              _controller.groupMembers.firstWhere((m) => m.userId == e.userId);
-          return UserDetails(
-            userProfileImageUrl: member.profileUrl,
-            userName: member.userName,
-            userIdentifier: member.userIdentifier,
-            userId: e.userId,
-            online: false,
-            lastSeen: 0,
-            metaData: member.metaData,
-            wordCount: e.wordCount,
-            order: e.order,
-          );
-        },
-      ).toList(),
+      mentionedUsers: mentionedUserDetailsFor(
+        _controller.userMentionedList,
+        _controller.groupMembers,
+      ),
     );
     _controller.messages.add(textMessage);
     unawaited(_controller.scrollDown());

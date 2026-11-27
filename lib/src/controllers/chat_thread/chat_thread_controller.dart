@@ -81,7 +81,12 @@ class IsmChatThreadController extends GetxController {
   // -------------------------------------------------------------- composer
 
   /// Text field behind the thread composer.
-  final replyController = TextEditingController();
+  /// Highlights picked `@mentions` while typing (same style as bubbles).
+  late final TextEditingController replyController =
+      IsmChatMentionTextEditingController(
+    membersProvider: () =>
+        isMentionEnabled ? mentionMembers : const <UserDetails>[],
+  );
 
   /// Focus node so opening a thread can put the caret in the composer.
   final replyFocusNode = FocusNode();
@@ -166,8 +171,8 @@ class IsmChatThreadController extends GetxController {
   /// Panel counterpart to [IsmChatPageController.onReplyTap]: targets the
   /// thread composer for a nested reply instead of the channel quote bar.
   ///
-  /// Reuse from tap-to-reply on thread rows
-  /// ([IsmChatThreadCoordinator.isMessageInOpenThreadPanel]).
+  /// Thread rows no longer start this on tap; kept for host composers and
+  /// the focus-menu path ([IsmChatThreadCoordinator.isMessageInOpenThreadPanel]).
   void beginReplyTo(IsmChatMessageModel message) {
     if (showEmojiBoard) {
       closeEmojiBoard();
@@ -223,9 +228,76 @@ class IsmChatThreadController extends GetxController {
 
   /// Keeps send vs mic in sync with the thread text field.
   void handleComposerTextChanged(String text) {
+    _refreshMentionSuggestions(text);
     if (isEnableRecordingAudio) return;
     final audioOn = IsmChatProperties.threadProperties.isAudioMessageEnabled;
     showComposerSendButton = audioOn ? text.trim().isNotEmpty : true;
+  }
+
+  // -------------------------------------------------------------- mentions
+
+  final _mentionSuggestions = <UserDetails>[].obs;
+
+  /// Members offered by the thread composer's `@` picker.
+  List<UserDetails> get mentionSuggestions => _mentionSuggestions;
+
+  final _showMentionUserList = false.obs;
+
+  /// Whether the thread composer's `@` picker is visible.
+  bool get showMentionUserList => _showMentionUserList.value;
+
+  /// Same gate as the channel composer: group chats with
+  /// [IsmChatFeature.mentionMember] on.
+  bool get isMentionEnabled =>
+      conversation?.isGroup == true &&
+      IsmChatProperties.chatPageProperties.features
+          .contains(IsmChatFeature.mentionMember);
+
+  /// Group members to mention / resolve: the chat page's loaded list when
+  /// available, else the conversation's members.
+  List<UserDetails> get mentionMembers {
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      final members = IsmChatUtility.chatPageController.groupMembers;
+      if (members.isNotEmpty) return members;
+    }
+    return conversation?.members ?? const <UserDetails>[];
+  }
+
+  void _refreshMentionSuggestions(String text) {
+    if (!isMentionEnabled) {
+      hideMentionSuggestions();
+      return;
+    }
+    final suggestions = mentionSuggestionsForComposer(text, mentionMembers);
+    // assignAll keeps the RxList backing list mutable (a const list would
+    // make the later clear() throw).
+    _mentionSuggestions.assignAll(suggestions ?? const <UserDetails>[]);
+    _showMentionUserList.value = suggestions != null;
+  }
+
+  /// Closes the `@` picker.
+  void hideMentionSuggestions() {
+    _showMentionUserList.value = false;
+    _mentionSuggestions.clear();
+  }
+
+  /// Inserts [member] for the partial `@query` in the thread composer.
+  void selectMention(UserDetails member) {
+    if (isCurrentChatUser(member.userId)) {
+      hideMentionSuggestions();
+      return;
+    }
+    final updatedText = insertMentionIntoComposerText(
+      replyController.text,
+      mentionLabelForUser(member),
+    );
+    hideMentionSuggestions();
+    replyController.value = replyController.value.copyWith(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: updatedText.length),
+    );
+    handleComposerTextChanged(updatedText);
+    replyFocusNode.requestFocus();
   }
 
   /// Starts the recording affordance (timer only — capture lives on the page).
@@ -387,6 +459,7 @@ class IsmChatThreadController extends GetxController {
     _alsoSendToChannel.value = false;
     _replyTo.value = null;
     replyController.clear();
+    hideMentionSuggestions();
     _clearComposerRecording();
     _showEmojiBoard.value = false;
     _emojiBoardTab.value = IsmChatEmojiBoardTab.emoji;
@@ -422,6 +495,7 @@ class IsmChatThreadController extends GetxController {
     _alsoSendToChannel.value = false;
     _replyTo.value = null;
     replyController.clear();
+    hideMentionSuggestions();
     _clearComposerRecording();
     _showEmojiBoard.value = false;
     _emojiBoardTab.value = IsmChatEmojiBoardTab.emoji;
@@ -539,15 +613,21 @@ class IsmChatThreadController extends GetxController {
     if (parentMessageId.isEmpty) return false;
 
     final sendToChannel = alsoSendToChannel;
+    final members = isMentionEnabled ? mentionMembers : const <UserDetails>[];
+    final mentions = members.isEmpty
+        ? const <MentionModel>[]
+        : resolveComposerMentions(body, members);
     final pending = buildLocalReply(
       body: body,
       parent: parent,
       conversationId: convId,
       alsoSendToChannel: sendToChannel,
+      mentionedUsers: mentionedUserDetailsFor(mentions, members),
     );
 
     _isSending.value = true;
     _sendError.value = '';
+    hideMentionSuggestions();
     replyController.clear();
     _replyTo.value = null;
     _replies.add(pending);
@@ -572,6 +652,9 @@ class IsmChatThreadController extends GetxController {
           senderUserName: _currentUser?.userName ?? '',
         ),
         notificationBody: body,
+        mentionedUsers: mentions.isEmpty
+            ? null
+            : mentions.map((e) => e.toMap()).toList(),
       );
       final accepted = result != null &&
           !result.response.hasError &&
@@ -631,6 +714,7 @@ class IsmChatThreadController extends GetxController {
     required IsmChatMessageModel parent,
     required String conversationId,
     required bool alsoSendToChannel,
+    List<UserDetails>? mentionedUsers,
   }) {
     final sentAt = DateTime.now().millisecondsSinceEpoch;
     return IsmChatMessageModel(
@@ -649,6 +733,8 @@ class IsmChatThreadController extends GetxController {
       ),
       deviceId: IsmChatConfig.communicationConfig.projectConfig.deviceId,
       metaData: IsmChatMetaData(messageSentAt: sentAt),
+      mentionedUsers:
+          (mentionedUsers?.isNotEmpty ?? false) ? mentionedUsers : null,
     );
   }
 

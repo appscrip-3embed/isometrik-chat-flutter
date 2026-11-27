@@ -291,8 +291,7 @@ class IsmChatThreadCoordinator {
   /// (root or reply in the open thread — not the channel timeline).
   ///
   /// Used to hide **Reply**, **Reply in thread**, and **View thread** on
-  /// long-press inside [IsmChatThreadView]; users answer via the composer or
-  /// tap-to-reply on thread rows.
+  /// long-press inside [IsmChatThreadView]; users answer via the composer.
   static bool isMessageInOpenThreadPanel(IsmChatMessageModel? message) {
     if (message == null) return false;
     if (!Get.isRegistered<IsmChatThreadController>()) return false;

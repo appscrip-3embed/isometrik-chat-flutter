@@ -51,7 +51,7 @@ class IsmChatMqttUserModel {
   /// Prefer "First Last" from [metaData]; fallback to [userName].
   String get displayName {
     final fullName =
-        '${metaData?.firstName ?? ''} ${metaData?.lastName ?? ''}'.trim();
+        ismChatJoinNameParts([metaData?.firstName, metaData?.lastName]);
     return fullName.isNotEmpty ? fullName : userName;
   }
 

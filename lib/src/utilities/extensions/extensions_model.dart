@@ -847,9 +847,9 @@ extension GroupSystemBannerText on IsmChatMessageModel {
 
 /// Label inserted after `@` when picking someone from the mention list.
 String mentionLabelForUser(UserDetails user) {
-  final display = user.displayName.trim();
+  final display = ismChatJoinNameParts([user.displayName]);
   if (display.isNotEmpty) return display;
-  return user.userName.trim();
+  return ismChatJoinNameParts([user.userName]);
 }
 
 /// Whether [userId] is the signed-in chat user.
@@ -1047,6 +1047,169 @@ Set<String> mentionUserIdsInComposerText(
     }
   }
   return resolvedIds;
+}
+
+/// Mention picker suggestions for [composerText], or `null` to hide the list.
+///
+/// Shared by the channel composer and the thread composer: the list shows while
+/// the last word contains `@`, filtered by the text after the last `@`, and
+/// skips the signed-in user plus members already mentioned.
+List<UserDetails>? mentionSuggestionsForComposer(
+  String composerText,
+  List<UserDetails> groupMembers,
+) {
+  if (!composerText.split(' ').last.contains('@')) return null;
+  final query = composerText.split('@').last.toLowerCase();
+  final alreadyMentioned =
+      mentionUserIdsInComposerText(composerText, groupMembers);
+  return groupMembers
+      .where((e) => !_isCurrentChatUserWhenConfigured(e.userId))
+      .where((e) => !alreadyMentioned.contains(e.userId.trim()))
+      .where(
+        (e) =>
+            e.userName.toLowerCase().contains(query) ||
+            mentionLabelForUser(e).toLowerCase().contains(query),
+      )
+      .toList();
+}
+
+/// Replaces the partial `@query` at the end of [composerText] with
+/// `@[mentionLabel] ` (trailing space so the user can keep typing).
+String insertMentionIntoComposerText(String composerText, String mentionLabel) {
+  final parts = composerText.split('@');
+  final remainingText = parts.sublist(0, parts.length - 1).join('@');
+  return '$remainingText@$mentionLabel ';
+}
+
+/// Mention rows (`userId` / `wordCount` / `order`) for an outgoing [body].
+///
+/// Matches each `@` segment against [mentionLabelForUser],
+/// [UserDetails.displayName] and [UserDetails.userName]; longest label wins so
+/// "@Rasika Flutter User" beats a "@Rasika" alias. [MentionModel.wordCount]
+/// follows the label inserted by the composer. Reuse for channel and thread sends.
+List<MentionModel> resolveComposerMentions(
+  String body,
+  List<UserDetails> groupMembers,
+) {
+  final result = <MentionModel>[];
+  final segments = body.split('@').toList()
+    ..removeWhere((e) => e.trim().isEmpty);
+  final seenUserIds = <String>{};
+
+  final membersByLabelLength = List<UserDetails>.from(groupMembers)
+    ..sort(
+      (a, b) =>
+          mentionLabelForUser(b).length.compareTo(mentionLabelForUser(a).length),
+    );
+
+  for (var mentionIndex = 0; mentionIndex < segments.length; mentionIndex++) {
+    final seg = segments[mentionIndex].trimLeft();
+    UserDetails? matchedMember;
+    int? bestMatchEnd;
+
+    for (final member in membersByLabelLength) {
+      if (_isCurrentChatUserWhenConfigured(member.userId)) continue;
+      final userName = member.userName.trim();
+      if (userName.isEmpty) continue;
+
+      final label = mentionLabelForUser(member);
+      final displayName = member.displayName.trim();
+      final matches = mentionSegmentMatchesMemberName(seg, label) ||
+          (displayName.isNotEmpty &&
+              mentionSegmentMatchesMemberName(seg, displayName)) ||
+          mentionSegmentMatchesMemberName(seg, userName);
+      if (!matches) continue;
+
+      final matchEnd = longestMentionNameEndInBody('@$seg', 0, member);
+      if (matchEnd == null || matchEnd <= 1) continue;
+      if (bestMatchEnd == null || matchEnd > bestMatchEnd) {
+        bestMatchEnd = matchEnd;
+        matchedMember = member;
+      }
+    }
+
+    if (matchedMember == null) continue;
+    if (!seenUserIds.add(matchedMember.userId.trim())) continue;
+
+    final wordCount = mentionLabelForUser(matchedMember)
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .length;
+    result.add(
+      MentionModel(
+        wordCount: wordCount,
+        userId: matchedMember.userId,
+        order: mentionIndex,
+      ),
+    );
+  }
+  return result;
+}
+
+/// [UserDetails] rows for a local echo so the sender sees highlighted mentions
+/// before the server copy arrives. Skips ids not found in [groupMembers].
+List<UserDetails> mentionedUserDetailsFor(
+  List<MentionModel> mentions,
+  List<UserDetails> groupMembers,
+) {
+  final out = <UserDetails>[];
+  for (final e in mentions) {
+    final member = groupMembers.firstWhereOrNull((m) => m.userId == e.userId);
+    if (member == null) continue;
+    out.add(
+      UserDetails(
+        userProfileImageUrl: member.profileUrl,
+        userName: member.userName,
+        userIdentifier: member.userIdentifier,
+        userId: e.userId,
+        online: false,
+        lastSeen: 0,
+        metaData: member.metaData,
+        wordCount: e.wordCount,
+        order: e.order,
+      ),
+    );
+  }
+  return out;
+}
+
+/// Mention span style used everywhere a mention is painted: message bubbles,
+/// reply previews and the composer. Bold plus [IsmChatThemeData.mentionColor]
+/// (set by the host app) on top of [base].
+TextStyle ismChatMentionTextStyle(TextStyle base) => base.copyWith(
+      fontWeight: FontWeight.bold,
+      color: IsmChatConfig.chatTheme.mentionColor,
+    );
+
+/// `[start, end)` ranges of completed `@mentions` in composer [text].
+///
+/// Only names that match one of [members] count, so a half-typed `@Opp` is not
+/// highlighted until the user picks (or fully types) a member. Longest name
+/// wins when members share a prefix.
+List<({int start, int end})> composerMentionRanges(
+  String text,
+  List<UserDetails> members,
+) {
+  final ranges = <({int start, int end})>[];
+  if (members.isEmpty || !text.contains('@')) return ranges;
+  var i = 0;
+  while (i < text.length) {
+    if (text[i] == '@' && _isComposerMentionAt(text, i)) {
+      int? best;
+      for (final member in members) {
+        if (_isCurrentChatUserWhenConfigured(member.userId)) continue;
+        final end = longestMentionNameEndInBody(text, i, member);
+        if (end != null && (best == null || end > best)) best = end;
+      }
+      if (best != null && best > i + 1) {
+        ranges.add((start: i, end: best));
+        i = best;
+        continue;
+      }
+    }
+    i++;
+  }
+  return ranges;
 }
 
 /// `@` that starts a composer mention (not an email local-part).

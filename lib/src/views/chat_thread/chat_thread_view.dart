@@ -313,19 +313,9 @@ class _IsmChatThreadViewState extends State<IsmChatThreadView> {
                 );
               }
               final reply = _controller.replies[index ~/ 2];
-              final tile = IsmChatThreadMessageTile(message: reply);
-              // Media rows handle their own taps (preview / open file). Text keeps
-              // the Slack-style "tap to reply to this message" gesture.
-              if (IsmChatThreadMessageTile.usesMediaTapBehavior(reply)) {
-                return tile;
-              }
-              return IsmChatTapHandler(
-                onTap: () {
-                  IsmChatUtility.hideKeyboard();
-                  _controller.beginReplyTo(reply);
-                },
-                child: tile,
-              );
+              // No row-level tap: media rows handle their own taps (preview /
+              // open file); text rows only react to @mention / link taps.
+              return IsmChatThreadMessageTile(message: reply);
             },
             childCount: childCount,
           ),

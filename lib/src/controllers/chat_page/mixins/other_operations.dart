@@ -130,6 +130,9 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
   }
 
   /// Resolves the user for [@mentionText] on [message] and opens their DM.
+  ///
+  /// From a thread panel row the panel is closed first: it is a route on top
+  /// of the chat page, and [openDirectChatWithUser] rebinds the page beneath.
   Future<void> onMentionLinkTapped(
     IsmChatMessageModel message,
     String mentionText,
@@ -141,6 +144,10 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
         ? user.userId.trim()
         : (user.memberId?.trim() ?? '');
     if (userId.isEmpty || isCurrentChatUser(userId)) return;
+    if (IsmChatThreadCoordinator.isMessageInOpenThreadPanel(message)) {
+      IsmChatUtility.hideKeyboard();
+      IsmChatRoute.goBack<void>();
+    }
     await openDirectChatWithUser(
       user.userId.trim().isNotEmpty ? user : user.copyWith(userId: userId),
     );

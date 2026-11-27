@@ -23,7 +23,15 @@ mixin IsmChatPageVariablesMixin on GetxController {
 
   var mediaFocusNode = FocusNode();
 
-  var chatInputController = TextEditingController();
+  /// Highlights picked `@mentions` while typing (same style as bubbles).
+  late TextEditingController chatInputController =
+      IsmChatMentionTextEditingController(
+    membersProvider: () => conversation?.isGroup == true &&
+            IsmChatProperties.chatPageProperties.features
+                .contains(IsmChatFeature.mentionMember)
+        ? groupMembers
+        : const <UserDetails>[],
+  );
 
   var groupTitleController = TextEditingController();
 

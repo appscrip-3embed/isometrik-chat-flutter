@@ -44,6 +44,15 @@ class IsmChatThreadComposer extends StatelessWidget {
                 style: threadTheme.errorTextStyle),
             IsmChatDimens.boxHeight4,
           ],
+          if (controller.showMentionUserList &&
+              controller.mentionSuggestions.isNotEmpty) ...[
+            IsmChatMentionSuggestionList(
+              key: const Key('ism-thread-mention-list'),
+              suggestions: controller.mentionSuggestions.toList(),
+              onSelect: controller.selectMention,
+            ),
+            IsmChatDimens.boxHeight4,
+          ],
           Row(
             mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.center,

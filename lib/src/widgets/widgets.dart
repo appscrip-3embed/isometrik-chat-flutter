@@ -13,6 +13,7 @@ export 'icon_and_text.dart';
 export 'input_field.dart';
 export 'link_preview/link_preview.dart';
 export 'loading_dialog.dart';
+export 'mention_text_editing_controller.dart';
 export 'no_message.dart';
 export 'page_dailog.dart';
 export 'refresh_head_footer.dart';

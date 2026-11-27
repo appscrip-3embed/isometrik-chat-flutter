@@ -46,26 +46,31 @@ class IsmChatMentionRichText extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => RichText(
-        textAlign: textAlign ?? TextAlign.start,
-        text: TextSpan(
-          style: style,
-          children: _segments.map(_spanForSegment).toList(),
-        ),
-        softWrap: true,
-        maxLines: maxLines,
-        overflow: overflow ?? TextOverflow.clip,
-      );
+  Widget build(BuildContext context) {
+    // [RichText] (unlike [Text]) ignores [DefaultTextStyle]. Styles without a
+    // color (e.g. the light thread theme's bodyStyle) would otherwise paint
+    // plain segments white while only mentions get an explicit color.
+    final resolvedStyle = DefaultTextStyle.of(context).style.merge(style);
+    return RichText(
+      textAlign: textAlign ?? TextAlign.start,
+      text: TextSpan(
+        style: resolvedStyle,
+        children: _segments
+            .map((e) => _spanForSegment(e, resolvedStyle))
+            .toList(),
+      ),
+      softWrap: true,
+      maxLines: maxLines,
+      overflow: overflow ?? TextOverflow.clip,
+    );
+  }
 
-  InlineSpan _spanForSegment(LocalMentionAndLinkData e) {
+  InlineSpan _spanForSegment(LocalMentionAndLinkData e, TextStyle style) {
     if (!e.isLink) {
       return TextSpan(text: e.text, style: style);
     }
 
-    final mentionStyle = style.copyWith(
-      fontWeight: FontWeight.bold,
-      color: IsmChatConfig.chatTheme.mentionColor,
-    );
+    final mentionStyle = ismChatMentionTextStyle(style);
 
     if (e.text.startsWith('@')) {
       return TextSpan(
@@ -140,12 +145,7 @@ class IsmChatMentionRichText extends StatelessWidget {
           .map(
             (e) => TextSpan(
               text: e.text,
-              style: e.isLink
-                  ? style.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: IsmChatConfig.chatTheme.mentionColor,
-                    )
-                  : style,
+              style: e.isLink ? ismChatMentionTextStyle(style) : style,
             ),
           )
           .toList();
