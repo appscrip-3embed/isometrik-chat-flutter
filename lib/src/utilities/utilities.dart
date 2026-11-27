@@ -3,6 +3,7 @@ export 'group_system_message_coordinator.dart';
 export 'leave_group_coordinator.dart';
 export 'call_meeting_liveness.dart';
 export 'chat_confirmation_helper.dart';
+export 'chat_wallpaper_decoration.dart';
 export 'chat_log.dart';
 export 'ism_chat_init_timer.dart';
 export 'image_attachment_dimensions.dart';

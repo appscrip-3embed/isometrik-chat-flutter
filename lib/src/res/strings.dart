@@ -189,6 +189,9 @@ class IsmChatStrings {
   static String get readby => IsmChatL10n.get('readby');
   static String get playedby => IsmChatL10n.get('playedby');
   static String get deliveredTo => IsmChatL10n.get('deliveredTo');
+  static String get read => IsmChatL10n.get('read');
+  static String get delivered => IsmChatL10n.get('delivered');
+  static String get played => IsmChatL10n.get('played');
   static String get deletedMessage => IsmChatL10n.get('deletedMessage');
   static String get wasDeletedMessage => IsmChatL10n.get('wasDeletedMessage');
   static String get noDataFound => IsmChatL10n.get('noDataFound');

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:custom_will_pop_scope/custom_will_pop_scope.dart';
 import 'package:flutter/material.dart';
@@ -396,37 +395,11 @@ class _IsmChatPageView extends StatelessWidget {
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
         builder: (controller) {
-          final hasImageWallpaper = controller.backgroundImage.isNotEmpty &&
-              controller.backgroundImage.isSupportedChatWallpaperUrl;
-          final hasColorWallpaper = controller.backgroundColor.isNotEmpty;
           final hasConversationWallpaper =
-              hasImageWallpaper || hasColorWallpaper;
+              IsmChatWallpaper.hasWallpaper(controller);
 
           return DecoratedBox(
-            decoration: BoxDecoration(
-              color: hasColorWallpaper
-                  ? controller.backgroundColor.toColor
-                  : hasImageWallpaper
-                      ? Colors.transparent
-                      : IsmChatColors.whiteColor,
-              image: hasImageWallpaper
-                  ? DecorationImage(
-                      image: controller.backgroundImage.isValidUrl
-                          ? NetworkImage(controller.backgroundImage)
-                          : IsmChatProperties.chatPageProperties
-                                  .backgroundImageUrl.isNullOrEmpty
-                              ? controller.backgroundImage.contains(
-                                      'packages/isometrik_chat_flutter/assets')
-                                  ? AssetImage(controller.backgroundImage)
-                                      as ImageProvider
-                                  : FileImage(
-                                      File(controller.backgroundImage),
-                                    )
-                              : AssetImage(controller.backgroundImage),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
+            decoration: IsmChatWallpaper.decoration(controller),
             child: Scaffold(
               drawerEnableOpenDragGesture: false,
               backgroundColor: hasConversationWallpaper

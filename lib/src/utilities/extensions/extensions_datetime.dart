@@ -239,6 +239,27 @@ extension DateConvertor on int {
     return dateFormat.format(timestamp);
   }
 
+  /// Date part of a Message Info row (read / delivered time).
+  ///
+  /// `today`, `yesterday`, else `dd/MM/yy` (`MM/dd/yy` when
+  /// [IsmChatConfig.isMonthFirst]). Pair with [toTimeString] for the time.
+  String get messageInfoDate {
+    if (this == 0 || this == -1) {
+      return '';
+    }
+    final now = _applyChatTimeZone(DateTime.now());
+    final date = toDate();
+    if (now.isSameDay(date)) {
+      return IsmChatStrings.today.toLowerCase();
+    }
+    if (now.subtract(const Duration(days: 1)).isSameDay(date)) {
+      return IsmChatStrings.yesterday.toLowerCase();
+    }
+    return DateFormat(
+      IsmChatConfig.isMonthFirst == true ? 'MM/dd/yy' : 'dd/MM/yy',
+    ).format(date);
+  }
+
   /// Converts a timestamp to a formatted time string with month and day.
   String get getTime {
     final timeStamp =
