@@ -176,9 +176,10 @@ class _MultipleAttachmentCaption extends StatelessWidget {
     }
     return Padding(
       padding: const EdgeInsets.only(left: 4, right: 4, top: 4),
-      child: Text(
-        caption,
+      child: IsmChatMentionRichText(
+        body: caption,
         style: message.style,
+        message: message,
         textAlign: TextAlign.start,
       ),
     );

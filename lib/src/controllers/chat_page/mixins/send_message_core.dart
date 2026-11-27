@@ -70,6 +70,9 @@ mixin IsmChatPageSendMessageCoreMixin {
     // Thread fields are read off the echo, never off the ambient target, so a
     // target that changes mid-upload cannot relabel a message already in
     // flight. All three are the pre-threading values for a channel send.
+    // Media captions carry their @mentions on the echo (see
+    // captionMentionedUsers); send them when the caller passed none.
+    mentionedUsers ??= _mentionMapsFromEcho(localEcho);
     final isThreadSend = IsmChatThreadCoordinator.isThreadReply(localEcho);
     final threadShowInConversation =
         isThreadSend ? localEcho!.showInConversation ?? false : true;
@@ -199,6 +202,24 @@ mixin IsmChatPageSendMessageCoreMixin {
         encrypted: encrypted,
       );
     }
+  }
+
+  /// Wire `mentionedUsers` (`userId` / `wordCount` / `order`) from
+  /// [localEcho], or `null` when it has none.
+  List<Map<String, dynamic>>? _mentionMapsFromEcho(
+    IsmChatMessageModel? localEcho,
+  ) {
+    final users = localEcho?.mentionedUsers;
+    if (users == null || users.isEmpty) return null;
+    return users
+        .map(
+          (e) => MentionModel(
+            userId: e.userId,
+            wordCount: e.wordCount ?? 0,
+            order: e.order ?? 0,
+          ).toMap(),
+        )
+        .toList();
   }
 
   /// Shared text-send path used by the default composer and host-app UI.

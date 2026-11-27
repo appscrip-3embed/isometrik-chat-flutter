@@ -298,9 +298,11 @@ void main() {
         child: IsmChatThreadMessageTile(message: imageReply),
       );
       await tester.pump();
-      expect(find.text(caption), findsOneWidget);
-      final captionText = tester.widget<Text>(find.text(caption));
-      expect(captionText.style?.color, isNot(IsmChatColors.whiteColor));
+      // Captions render as mention-aware RichText.
+      final captionFinder = find.text(caption, findRichText: true);
+      expect(captionFinder, findsOneWidget);
+      final captionText = tester.widget<RichText>(captionFinder);
+      expect(captionText.text.style?.color, isNot(IsmChatColors.whiteColor));
       await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
     });
 
@@ -320,7 +322,7 @@ void main() {
         child: IsmChatThreadMessageTile(message: imageReply),
       );
       await tester.pump();
-      expect(find.text(caption), findsOneWidget);
+      expect(find.text(caption, findRichText: true), findsOneWidget);
       await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
     });
 

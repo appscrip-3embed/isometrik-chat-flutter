@@ -160,6 +160,42 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
     );
   }
 
+  /// Refreshes the `@` picker for a media caption while the user types.
+  void refreshCaptionMentions(String text) {
+    final members = _controller.mentionableMembers;
+    final suggestions =
+        members.isEmpty ? null : mentionSuggestionsForComposer(text, members);
+    _controller.captionMentionSuggestions
+        .assignAll(suggestions ?? const <UserDetails>[]);
+  }
+
+  /// Hides the media caption `@` picker.
+  void hideCaptionMentions() => _controller.captionMentionSuggestions.clear();
+
+  /// Inserts [member] into the caption [field] and returns the new text so the
+  /// caller can store it on the picked media.
+  String selectCaptionMention(TextEditingController field, UserDetails member) {
+    final updatedText =
+        insertMentionIntoComposerText(field.text, mentionLabelForUser(member));
+    field.value = field.value.copyWith(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: updatedText.length),
+      composing: TextRange.empty,
+    );
+    hideCaptionMentions();
+    return updatedText;
+  }
+
+  /// Mentioned users for an outgoing media [caption], ready for the local
+  /// echo; `null` when nothing in it resolves to a group member.
+  List<UserDetails>? captionMentionedUsers(String caption) {
+    final members = _controller.mentionableMembers;
+    if (members.isEmpty || !caption.contains('@')) return null;
+    final mentions = resolveComposerMentions(caption, members);
+    if (mentions.isEmpty) return null;
+    return mentionedUserDetailsFor(mentions, members);
+  }
+
   /// Gets the list of mentioned users from the message data.
   ///
   /// See [resolveComposerMentions].

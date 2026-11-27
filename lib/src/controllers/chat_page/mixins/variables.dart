@@ -26,12 +26,17 @@ mixin IsmChatPageVariablesMixin on GetxController {
   /// Highlights picked `@mentions` while typing (same style as bubbles).
   late TextEditingController chatInputController =
       IsmChatMentionTextEditingController(
-    membersProvider: () => conversation?.isGroup == true &&
-            IsmChatProperties.chatPageProperties.features
-                .contains(IsmChatFeature.mentionMember)
-        ? groupMembers
-        : const <UserDetails>[],
+    membersProvider: () => mentionableMembers,
   );
+
+  /// Group members that can be `@mentioned` here: empty unless this is a group
+  /// with [IsmChatFeature.mentionMember] on. Shared by the composer and the
+  /// media caption field.
+  List<UserDetails> get mentionableMembers => conversation?.isGroup == true &&
+          IsmChatProperties.chatPageProperties.features
+              .contains(IsmChatFeature.mentionMember)
+      ? groupMembers
+      : const <UserDetails>[];
 
   var groupTitleController = TextEditingController();
 
@@ -72,7 +77,12 @@ mixin IsmChatPageVariablesMixin on GetxController {
     postOpenOlderPrefetchConversationId = '';
   }
 
-  final textEditingController = TextEditingController();
+  /// Media caption field (gallery, camera, web preview) and other one-off
+  /// inputs. Highlights picked `@mentions` like [chatInputController].
+  late final TextEditingController textEditingController =
+      IsmChatMentionTextEditingController(
+    membersProvider: () => mentionableMembers,
+  );
 
   final participnatsEditingController = TextEditingController();
 
@@ -219,6 +229,10 @@ mixin IsmChatPageVariablesMixin on GetxController {
   List<UserDetails> get deliverdMessageMembers => _deliverdMessageMembers;
   set deliverdMessageMembers(List<UserDetails> value) =>
       _deliverdMessageMembers.value = value;
+
+  /// `@` picker rows for the media caption field (empty → hidden). Kept
+  /// apart from [mentionSuggestions] so the composer overlay stays closed.
+  final RxList<UserDetails> captionMentionSuggestions = <UserDetails>[].obs;
 
   final RxList<UserDetails> _mentionSuggestions = <UserDetails>[].obs;
   List<UserDetails> get mentionSuggestions => _mentionSuggestions;

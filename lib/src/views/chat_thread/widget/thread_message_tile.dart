@@ -174,6 +174,7 @@ class IsmChatThreadMessageTile extends StatelessWidget {
                     textStyle: theme.bodyStyle,
                     toggleStyle: _threadExpandToggleStyle(theme),
                     collapsedMaxLines: 3,
+                    message: message,
                   ),
                 ],
               ] else if (label != null && body.isEmpty)

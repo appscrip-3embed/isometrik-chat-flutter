@@ -84,28 +84,25 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
       isWeb: IsmChatResponsive.isWeb(context),
     );
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      // Keep caption and grid left-aligned within bubble for both sides.
-      // Sender alignment is already handled by parent message bubble.
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 3),
-          child: SizedBox(
-            width: gridWidth,
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
-                mainAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
-                childAspectRatio: aspectRatio,
-              ),
-              itemCount: displayCount,
-              itemBuilder: (context, index) {
+    // Caption is left-aligned under the grid and capped at the grid width.
+    // Sender alignment is already handled by parent message bubble.
+    return IsmChatMediaCaptionLayout(
+      media: Padding(
+        padding: const EdgeInsets.only(bottom: 3),
+        child: SizedBox(
+          width: gridWidth,
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
+              mainAxisSpacing: IsmChatMediaGridLayout.crossAxisSpacing,
+              childAspectRatio: aspectRatio,
+            ),
+            itemCount: displayCount,
+            itemBuilder: (context, index) {
               final message = messages[index];
               final isImage =
                   message.customType == IsmChatCustomMessageType.image;
@@ -255,17 +252,17 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
                 ),
               );
             },
-            ),
           ),
         ),
-        // Caption from metadata only (captionMessage); body duplicates or holds
-        // batch placeholders and must not be shown here.
-        if (_hasCaption(messages))
-          Padding(
-            padding: const EdgeInsets.only(left: 4, right: 4, top: 0),
-            child: _buildCaption(context),
-          ),
-      ],
+      ),
+      // Caption from metadata only (captionMessage); body duplicates or holds
+      // batch placeholders and must not be shown here.
+      caption: _hasCaption(messages)
+          ? Padding(
+              padding: const EdgeInsets.only(left: 4, right: 4, top: 0),
+              child: _buildCaption(context, gridWidth - 8),
+            )
+          : null,
     );
   }
 
@@ -276,7 +273,7 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
     return messages.any((msg) => msg.mediaGridCaption.isNotEmpty);
   }
 
-  Widget _buildCaption(BuildContext context) {
+  Widget _buildCaption(BuildContext context, double captionWidth) {
     final messages = widget.messages;
     final host = widget.gridHostMessage;
     final hostCaption = host?.mediaGridCaption ?? '';
@@ -299,14 +296,19 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            caption,
+          IsmChatMentionRichText(
+            body: caption,
             style: messageWithCaption.style,
+            message: messageWithCaption,
             textAlign: TextAlign.start,
             overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
             maxLines: isExpanded ? null : 3,
           ),
-          if (_isCaptionOverflowing(context, caption, messageWithCaption.style))
+          if (_isCaptionOverflowing(
+            caption,
+            messageWithCaption,
+            captionWidth,
+          ))
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -331,16 +333,23 @@ class _IsmChatMediaGridMessageState extends State<IsmChatMediaGridMessage> {
 
   /// Returns true if caption exceeds 3 lines so we can show "Show more" button.
   bool _isCaptionOverflowing(
-    BuildContext context,
     String caption,
-    TextStyle style,
+    IsmChatMessageModel message,
+    double maxWidth,
   ) {
     if (caption.isEmpty) return false;
     final textPainter = TextPainter(
-      text: TextSpan(text: caption, style: style),
+      text: TextSpan(
+        style: message.style,
+        children: IsmChatMentionRichText.measurementSpans(
+          caption,
+          message.style,
+          message.mentionListForBody(caption),
+        ),
+      ),
       maxLines: 3,
       textDirection: TextDirection.ltr,
-    )..layout(maxWidth: MediaQuery.sizeOf(context).width * 0.7);
+    )..layout(maxWidth: maxWidth);
     return textPainter.didExceedMaxLines;
   }
 

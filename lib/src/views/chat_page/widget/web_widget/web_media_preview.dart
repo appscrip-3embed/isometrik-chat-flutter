@@ -62,6 +62,7 @@ class WebMediaPreview extends StatelessWidget {
                     onTap: () {
                       // IsmChatRoute.goBack<void>();
                       controller
+                        ..hideCaptionMentions()
                         ..webMedia.clear()
                         ..isVideoVisible = false
                         ..isCameraView = false;
@@ -141,7 +142,8 @@ class WebMediaPreview extends StatelessWidget {
                                     onTap: () async {
                                       controller
                                         ..assetsIndex = index
-                                        ..isVideoVisible = false;
+                                        ..isVideoVisible = false
+                                        ..hideCaptionMentions();
                                     },
                                     child: Stack(
                                       alignment: Alignment.center,
@@ -201,6 +203,17 @@ class WebMediaPreview extends StatelessWidget {
                       ],
                       Padding(
                         padding: IsmChatDimens.edgeInsets20_0,
+                        child: IsmChatCaptionMentionList(
+                          field: controller.textEditingController,
+                          onCaptionChanged: (value) {
+                            controller.webMedia[controller.assetsIndex] =
+                                controller.webMedia[controller.assetsIndex]
+                                    .copyWith(caption: value);
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: IsmChatDimens.edgeInsets20_0,
                         child: Row(
                           children: [
                             Expanded(
@@ -208,7 +221,9 @@ class WebMediaPreview extends StatelessWidget {
                                 focusNode: controller.mediaFocusNode,
                                 onKeyEvent: (event) async {
                                   if (event.logicalKey ==
-                                      LogicalKeyboardKey.enter) {
+                                          LogicalKeyboardKey.enter &&
+                                      controller
+                                          .captionMentionSuggestions.isEmpty) {
                                     if (await _shouldAllowWebMediaSend(
                                       context: context,
                                       controller: controller,
@@ -243,6 +258,7 @@ class WebMediaPreview extends StatelessWidget {
                                         controller
                                             .webMedia[controller.assetsIndex]
                                             .copyWith(caption: value);
+                                    controller.refreshCaptionMentions(value);
                                   },
                                 ),
                               ),

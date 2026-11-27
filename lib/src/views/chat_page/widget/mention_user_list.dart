@@ -93,3 +93,39 @@ class IsmChatMentionSuggestionList extends StatelessWidget {
               ),
       );
 }
+
+/// `@` picker above a media caption field (gallery, camera, web preview).
+///
+/// Reads [IsmChatPageController.captionMentionSuggestions]; feed it with
+/// [IsmChatPageController.refreshCaptionMentions] from the field's
+/// `onChanged`. A pick is written into [field] and the new caption is handed
+/// to [onCaptionChanged] so the caller can store it on the picked media.
+class IsmChatCaptionMentionList extends StatelessWidget {
+  const IsmChatCaptionMentionList({
+    required this.field,
+    required this.onCaptionChanged,
+    super.key,
+  });
+
+  final TextEditingController field;
+  final ValueChanged<String> onCaptionChanged;
+
+  @override
+  Widget build(BuildContext context) => Obx(() {
+        final controller = IsmChatUtility.chatPageController;
+        final suggestions = controller.captionMentionSuggestions.toList();
+        if (suggestions.isEmpty) return const SizedBox.shrink();
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: IsmChatDimens.edgeInsetsBottom10,
+            child: IsmChatMentionSuggestionList(
+              suggestions: suggestions,
+              onSelect: (member) => onCaptionChanged(
+                controller.selectCaptionMention(field, member),
+              ),
+            ),
+          ),
+        );
+      });
+}

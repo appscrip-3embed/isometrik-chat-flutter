@@ -62,6 +62,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       return;
     }
     final mediaList = List<WebMediaModel>.from(_controller.webMedia);
+    _controller.hideCaptionMentions();
     _controller.mediaProcessingGeneration++;
     _controller.isProcessingMedia = false;
     _controller.webMedia.clear();
@@ -104,6 +105,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       return;
     }
     final mediaList = List<WebMediaModel>.from(_controller.webMedia);
+    _controller.hideCaptionMentions();
     _controller.mediaProcessingGeneration++;
     _controller.isProcessingMedia = false;
     _controller.webMedia.clear();
@@ -328,6 +330,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       sentAt: sentAt,
       sentByMe: true,
       isUploading: true,
+      mentionedUsers: _controller.captionMentionedUsers(caption),
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
@@ -716,6 +719,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       sentAt: sentAt,
       sentByMe: true,
       isUploading: true,
+      mentionedUsers: _controller.captionMentionedUsers(caption),
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
@@ -885,6 +889,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       sentAt: sentAt,
       sentByMe: true,
       isUploading: true,
+      mentionedUsers: _controller.captionMentionedUsers(caption),
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
@@ -1748,6 +1753,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       sentAt: sentAt,
       sentByMe: true,
       isUploading: true,
+      mentionedUsers: _controller.captionMentionedUsers(caption),
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,

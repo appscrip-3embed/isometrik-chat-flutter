@@ -15,6 +15,7 @@ export 'forward_message.dart';
 export 'image_message.dart';
 export 'link_message.dart';
 export 'location_message.dart';
+export 'media_caption_layout.dart';
 export 'media_grid_message.dart';
 export 'multiple_attachments_message.dart';
 export 'member_leave_and_join.dart';

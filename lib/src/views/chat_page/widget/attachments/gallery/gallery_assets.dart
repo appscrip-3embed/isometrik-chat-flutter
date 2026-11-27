@@ -17,7 +17,9 @@ class IsmChatGalleryAssetsView extends StatelessWidget {
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
         initState: (state) {
-          state.controller?.selectAssets(mediaXFile);
+          state.controller
+            ?..hideCaptionMentions()
+            ..selectAssets(mediaXFile);
         },
         builder: (controller) {
           if (controller.isProcessingMedia) {
@@ -60,6 +62,7 @@ class IsmChatGalleryAssetsView extends StatelessWidget {
                     IsmChatRoute.goBack<void>();
                     controller.mediaProcessingGeneration++;
                     controller
+                      ..hideCaptionMentions()
                       ..isProcessingMedia = false
                       ..webMedia.clear()
                       ..isVideoVisible = false;
@@ -256,7 +259,8 @@ class IsmChatGalleryAssetsView extends StatelessWidget {
                       ..textEditingController.text =
                           controller.webMedia[value].caption ?? ''
                       ..assetsIndex = value
-                      ..isVideoVisible = false;
+                      ..isVideoVisible = false
+                      ..hideCaptionMentions();
                   },
                 ),
               ),
@@ -287,7 +291,8 @@ class IsmChatGalleryAssetsView extends StatelessWidget {
                                 ..textEditingController.text =
                                     media.caption ?? ''
                                 ..assetsIndex = index
-                                ..isVideoVisible = false;
+                                ..isVideoVisible = false
+                                ..hideCaptionMentions();
                               await controller.pageController.animateToPage(
                                   index,
                                   duration: const Duration(milliseconds: 100),
@@ -341,6 +346,13 @@ class IsmChatGalleryAssetsView extends StatelessWidget {
                         },
                       ),
                     ),
+                    IsmChatCaptionMentionList(
+                      field: controller.textEditingController,
+                      onCaptionChanged: (value) {
+                        controller.webMedia[controller.assetsIndex].caption =
+                            value;
+                      },
+                    ),
                     Padding(
                       padding: IsmChatDimens.edgeInsets10_0,
                       child: Row(
@@ -368,6 +380,7 @@ class IsmChatGalleryAssetsView extends StatelessWidget {
                                   onChanged: (value) {
                                     controller.webMedia[controller.assetsIndex]
                                         .caption = value;
+                                    controller.refreshCaptionMentions(value);
                                   },
                                 ),
                               ),
@@ -379,7 +392,9 @@ class IsmChatGalleryAssetsView extends StatelessWidget {
                               controller.webMedia[controller.assetsIndex]
                                       .caption =
                                   controller.textEditingController.text;
-                              controller.sendMedia();
+                              controller
+                                ..hideCaptionMentions()
+                                ..sendMedia();
                             },
                             icon: Icon(
                               Icons.send,
