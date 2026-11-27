@@ -65,6 +65,7 @@ class IsmChatPageViewModel {
     bool isLoading = false,
     bool isBroadcast = false,
     IsmChatFeedType? feedType,
+    bool showStatusEvents = false,
   }) async =>
       (await getChatMessagesPage(
         conversationId: conversationId,
@@ -75,6 +76,7 @@ class IsmChatPageViewModel {
         isLoading: isLoading,
         isBroadcast: isBroadcast,
         feedType: feedType,
+        showStatusEvents: showStatusEvents,
       ))
           .messages;
 
@@ -94,6 +96,7 @@ class IsmChatPageViewModel {
     bool isLoading = false,
     bool isBroadcast = false,
     IsmChatFeedType? feedType,
+    bool showStatusEvents = false,
   }) async {
     var messages = await _repository.getChatMessages(
       conversationId: conversationId,
@@ -103,6 +106,7 @@ class IsmChatPageViewModel {
       searchText: searchText,
       isLoading: isLoading,
       feedType: feedType ?? IsmChatThreadCoordinator.timelineFeedType,
+      showStatusEvents: showStatusEvents,
     );
 
     if (messages == null) {

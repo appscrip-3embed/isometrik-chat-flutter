@@ -150,7 +150,7 @@ class IsmChatConfig {
   /// - root messages show a tappable "N replies" footer
   ///   ([IsmChatThreadFooter]) built from `replyCount`,
   /// - the focus menu gains "Reply in thread", which opens [IsmChatThreadView],
-  /// - thread replies are sent with `messageType: 2`, `parentMessageId` and
+  /// - thread replies are sent with `messageType: 4`, `parentMessageId` and
   ///   `showInConversation: false` (or `true` for "also send to channel"),
   /// - incoming thread replies are routed to the open thread instead of the
   ///   channel list ([IsmChatThreadCoordinator]).

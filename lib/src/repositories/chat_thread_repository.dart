@@ -149,7 +149,7 @@ class IsmChatThreadRepository {
           : notificationBody;
       final payload = {
         'showInConversation': showInConversation,
-        'messageType': IsmChatMessageType.reply.value,
+        'messageType': IsmChatMessageType.threadReply.value,
         'encrypted': encrypted,
         'deviceId': deviceId,
         'conversationId': conversationId,

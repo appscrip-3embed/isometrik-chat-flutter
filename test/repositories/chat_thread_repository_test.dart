@@ -8,7 +8,7 @@ import '../helpers/test_bootstrap.dart';
 /// Pins the wire contract from `THREADING_API_HANDOFF.md`:
 /// thread fetch = `feedType=thread` + `threadRootId`, count =
 /// `/chat/messages/count?threadRootId=`, send = `POST /chat/message` with
-/// `messageType: 2`, `parentMessageId` and `showInConversation`.
+/// `messageType: 4`, `parentMessageId` and `showInConversation`.
 void main() {
   setUp(() {
     configureChatSdk();
@@ -262,7 +262,7 @@ void main() {
           notificationTitle: kMeName,
         );
 
-    test('posts messageType 2 with the immediate parent, thread-only',
+    test('posts messageType 4 with the immediate parent, thread-only',
         () async {
       api.on(
         'POST',
@@ -276,8 +276,8 @@ void main() {
 
       final body = api.requestsForPath('/chat/message', method: 'POST').last.json
           as Map<String, dynamic>;
-      expect(body['messageType'], IsmChatMessageType.reply.value);
-      expect(body['messageType'], 2);
+      expect(body['messageType'], IsmChatMessageType.threadReply.value);
+      expect(body['messageType'], 4);
       expect(body['parentMessageId'], 'root-1');
       expect(body['showInConversation'], isFalse);
       expect(body['conversationId'], kDirectConversationId);

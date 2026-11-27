@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
@@ -16,11 +17,11 @@ class IsmChatMessage extends StatefulWidget {
     bool isIgnorTap = false,
     bool isFromSearchMessage = false,
     super.key,
-  })  : _message = isFromSearchMessage &&
-                IsmChatUtility.chatPageControllerRegistered
-            ? IsmChatUtility.chatPageController.searchMessages.reversed
-                .toList()[index]
-            : message,
+  })  : _message =
+            isFromSearchMessage && IsmChatUtility.chatPageControllerRegistered
+                ? IsmChatUtility.chatPageController.searchMessages.reversed
+                    .toList()[index]
+                : message,
         _isIgnorTap = isIgnorTap;
 
   final IsmChatMessageModel? _message;
@@ -103,11 +104,12 @@ class _IsmChatMessageState extends State<IsmChatMessage>
       return false;
     }
 
-    final allMessages = controller.messages
-        .where((msg) => msg.customType != IsmChatCustomMessageType.date)
-        .toList();
-    final group = IsmChatMediaGridGrouping.collect(allMessages, message);
-    return IsmChatMediaGridGrouping.shouldHide(group, message);
+    final cache = _GridHideCache.forFrame(controller.messages);
+    return cache.results.putIfAbsent(message, () {
+      final group =
+          IsmChatMediaGridGrouping.collect(cache.chronologic, message);
+      return IsmChatMediaGridGrouping.shouldHide(group, message);
+    });
   }
 
   @override
@@ -288,6 +290,50 @@ class _IsmChatMessageState extends State<IsmChatMessage>
           ),
         );
       },
+    );
+  }
+}
+
+/// Shares the date-filtered message list and per-message "hide this grid tile"
+/// results across every row built in the same frame.
+///
+/// Without it, each media row re-filtered the whole conversation on every
+/// controller update. With many kept-alive rows in a busy group, that was
+/// O(rows x messages) work per incoming message and made scrolling stutter.
+/// The cache is keyed by frame, list instance and length, so it never outlives
+/// the build pass that produced it.
+class _GridHideCache {
+  _GridHideCache._(this._source, this._length, this._frame, this.chronologic);
+
+  final List<IsmChatMessageModel> _source;
+  final int _length;
+  final Duration? _frame;
+  final List<IsmChatMessageModel> chronologic;
+  final Map<IsmChatMessageModel, bool> results =
+      Map<IsmChatMessageModel, bool>.identity();
+
+  static _GridHideCache? _current;
+
+  static _GridHideCache forFrame(List<IsmChatMessageModel> messages) {
+    final scheduler = SchedulerBinding.instance;
+    final frame = scheduler.schedulerPhase == SchedulerPhase.idle
+        ? null
+        : scheduler.currentFrameTimeStamp;
+    final cached = _current;
+    if (cached != null &&
+        frame != null &&
+        cached._frame == frame &&
+        identical(cached._source, messages) &&
+        cached._length == messages.length) {
+      return cached;
+    }
+    return _current = _GridHideCache._(
+      messages,
+      messages.length,
+      frame,
+      messages
+          .where((msg) => msg.customType != IsmChatCustomMessageType.date)
+          .toList(),
     );
   }
 }

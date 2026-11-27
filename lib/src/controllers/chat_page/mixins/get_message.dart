@@ -399,6 +399,7 @@ mixin IsmChatPageGetMessageMixin on GetxController {
           conversationId: conversationID,
           lastMessageTimestamp: paging.lastMessageTimestamp,
           isBroadcast: isBroadcast,
+          showStatusEvents: true,
         );
         final data = page.messages;
         // Guard against race conditions: do not apply API results if active chat

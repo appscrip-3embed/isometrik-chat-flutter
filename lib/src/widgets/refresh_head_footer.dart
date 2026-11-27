@@ -107,16 +107,29 @@ class _IsmChatPullToRefreshState extends State<IsmChatPullToRefresh> {
       );
 }
 
+/// Height reserved by [RefreshHeader] / [RefreshFooter].
+///
+/// Must match the `height` passed to [CustomHeader] / [CustomFooter]. Every
+/// indicator state renders a box of exactly this height so the sliver never
+/// resizes between idle → loading → complete. A size change there is what made
+/// the last conversation "jump" up with the loader on load-more, and the header
+/// spinner stretch/pop on pull-to-refresh.
+const double _kIndicatorHeight = 60;
+
 class RefreshHeader extends StatelessWidget {
   const RefreshHeader({super.key});
 
   @override
   Widget build(BuildContext context) => CustomHeader(
+        height: _kIndicatorHeight,
+        completeDuration: const Duration(milliseconds: 300),
         builder: (_, mode) {
           switch (mode) {
-            case RefreshStatus.refreshing:
-            case RefreshStatus.idle:
-            case RefreshStatus.canRefresh:
+            case RefreshStatus.completed:
+            case RefreshStatus.failed:
+              // Spring back with an empty (same-size) box instead of a
+              // spinner that keeps spinning while the list settles.
+              return const SizedBox(height: _kIndicatorHeight);
             default:
               return const _SmartRefreshDialog();
           }
@@ -129,12 +142,15 @@ class RefreshFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CustomFooter(
+        height: _kIndicatorHeight,
         builder: (_, mode) {
           switch (mode) {
+            case LoadStatus.loading:
+              return const _SmartRefreshDialog();
             case LoadStatus.failed:
-              return Center(
-                child: Padding(
-                  padding: IsmChatDimens.edgeInsetsTop20,
+              return SizedBox(
+                height: _kIndicatorHeight,
+                child: Center(
                   child: Text(
                     'Load failed',
                     style: IsmChatStyles.w400Grey14,
@@ -142,24 +158,17 @@ class RefreshFooter extends StatelessWidget {
                 ),
               );
             case LoadStatus.noMore:
-              // Only reserve footer space when there is truly no more data.
+              // Don't show a "No more data" label at the end of the list.
+              // Host apps can still provide a custom footer if they want one.
               return IsmChatProperties.conversationProperties.refreshFooter ??
-                  Center(
-                    child: Padding(
-                      padding: IsmChatDimens.edgeInsetsTop20,
-                      child: Text(
-                        'No more data',
-                        style: IsmChatStyles.w400Grey14,
-                      ),
-                    ),
-                  );
+                  const SizedBox(height: _kIndicatorHeight);
             case LoadStatus.idle:
             case LoadStatus.canLoading:
-              // Idle/canLoading must not paint a tall placeholder — that
-              // created excessive empty space under short conversation lists.
-              return const SizedBox.shrink();
             default:
-              return const _SmartRefreshDialog();
+              // Same height as the loading state so the list doesn't shift
+              // when the spinner appears. Short lists don't get extra blank
+              // space because the refresher sets `hideFooterWhenNotFull`.
+              return const SizedBox(height: _kIndicatorHeight);
           }
         },
       );
@@ -170,12 +179,16 @@ class _SmartRefreshDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => StatusBarTransparent(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
+        child: SizedBox(
+          height: _kIndicatorHeight,
+          child: Center(
             child: IsmChatProperties.conversationProperties.refreshHeader ??
-                CircularProgressIndicator.adaptive(
-                  backgroundColor: IsmChatConfig.chatTheme.primaryColor,
+                SizedBox.square(
+                  dimension: 24,
+                  child: CircularProgressIndicator.adaptive(
+                    strokeWidth: 2.5,
+                    backgroundColor: IsmChatConfig.chatTheme.primaryColor,
+                  ),
                 ),
           ),
         ),

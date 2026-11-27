@@ -90,6 +90,8 @@ class IsmChatPageRepository {
   /// - `threadRootId`: with `feedType=thread`, returns the whole thread
   ///   (including replies-to-replies). Prefer [IsmChatThreadRepository] for
   ///   thread panels; this hook exists for host apps and search reuse.
+  /// - `showStatusEvents`: sends `showStatusEvents=true` so the server also
+  ///   returns status/action events (group timelines pass `true`).
   Future<List<IsmChatMessageModel>?> getChatMessages({
     required String conversationId,
     int? lastMessageTimestamp,
@@ -99,6 +101,7 @@ class IsmChatPageRepository {
     bool isLoading = false,
     IsmChatFeedType? feedType,
     String? threadRootId,
+    bool showStatusEvents = false,
   }) async {
     try {
       String? url;
@@ -107,6 +110,7 @@ class IsmChatPageRepository {
         if (feedType != null) '&feedType=${feedType.queryValue}',
         if ((threadRootId ?? '').trim().isNotEmpty)
           '&threadRootId=${threadRootId!.trim()}',
+        if (showStatusEvents) '&showStatusEvents=true',
       ].join();
       if (searchText != null && searchText.isNotEmpty) {
         url =

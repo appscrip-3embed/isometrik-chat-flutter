@@ -55,11 +55,14 @@ class IsmChatThreadCoordinator {
 
   /// Whether [message] is a reply that belongs to a thread.
   ///
-  /// Requires both `messageType: 2` and a non-empty `threadRootId`, so legacy
-  /// inline quotes (reply type, no `threadRootId`) are *not* treated as thread
-  /// replies and keep rendering inline as they do today.
+  /// `messageType: 4` ([IsmChatMessageType.threadReply]) always is. Older
+  /// thread replies were sent as `messageType: 2` and are recognized by a
+  /// non-empty `threadRootId`, so legacy inline quotes (reply type, no
+  /// `threadRootId`) are *not* treated as thread replies and keep rendering
+  /// inline as they do today.
   static bool isThreadReply(IsmChatMessageModel? message) {
     if (message == null) return false;
+    if (message.messageType == IsmChatMessageType.threadReply) return true;
     if (message.messageType != IsmChatMessageType.reply) return false;
     return (message.threadRootId ?? '').trim().isNotEmpty;
   }
@@ -436,7 +439,7 @@ class IsmChatThreadCoordinator {
   ) {
     if (!isEnabled || target == null || !target.isValid) return message;
     return message
-      ..messageType = IsmChatMessageType.reply
+      ..messageType = IsmChatMessageType.threadReply
       ..parentMessageId = target.parentMessageId
       ..threadRootId = target.threadRootId
       ..showInConversation = target.showInConversation;

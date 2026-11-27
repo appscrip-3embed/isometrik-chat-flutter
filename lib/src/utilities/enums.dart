@@ -7,7 +7,10 @@ enum IsmChatMessageType {
   normal(0),
   forward(1),
   reply(2),
-  admin(3);
+  admin(3),
+
+  /// A reply posted inside a thread (sent with `parentMessageId`).
+  threadReply(4);
 
   /// Creates an [IsmChatMessageType] with the given integer value.
   const IsmChatMessageType(this.value);
@@ -41,6 +44,8 @@ enum IsmChatMessageType {
         return IsmChatMessageType.reply;
       case 3:
         return IsmChatMessageType.admin;
+      case 4:
+        return IsmChatMessageType.threadReply;
       default:
         return IsmChatMessageType.normal;
     }

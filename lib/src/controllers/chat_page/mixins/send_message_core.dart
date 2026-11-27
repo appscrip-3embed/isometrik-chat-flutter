@@ -76,7 +76,7 @@ mixin IsmChatPageSendMessageCoreMixin {
     final threadParentMessageId =
         isThreadSend ? localEcho!.parentMessageId : parentMessageId;
     final threadMessageType = isThreadSend
-        ? IsmChatMessageType.reply.value
+        ? IsmChatMessageType.threadReply.value
         : messageType;
     // Same as local MQTT notifications: conversationTitle, else full name.
     notificationTitle = IsmChatUtility.resolveSendNotificationTitle(

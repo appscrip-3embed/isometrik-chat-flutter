@@ -212,6 +212,8 @@ class _ConversationPullRefreshState extends State<_ConversationPullRefresh> {
 
     return RefreshConfiguration(
       enableScrollWhenRefreshCompleted: true,
+      // Don't reserve footer space when the list is shorter than the screen.
+      hideFooterWhenNotFull: true,
       child: IsmChatPullToRefresh(
         header: const RefreshHeader(),
         footer: const RefreshFooter(),

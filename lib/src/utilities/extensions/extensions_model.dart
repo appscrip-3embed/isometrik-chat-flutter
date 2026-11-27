@@ -2656,6 +2656,7 @@ extension IsmChatMessageMediaExtension on IsmChatMessageModel {
       return bubble;
     }
     if (messageType == IsmChatMessageType.reply ||
+        messageType == IsmChatMessageType.threadReply ||
         type == IsmChatCustomMessageType.reply) {
       return metaData?.replyMessage?.parentMessageMessageType;
     }

@@ -519,7 +519,7 @@ void main() {
       // Stamped in place: the row in the list, the queued copy and the request
       // all read the same object.
       expect(identical(stamped, echo), isTrue);
-      expect(echo.messageType, IsmChatMessageType.reply);
+      expect(echo.messageType, IsmChatMessageType.threadReply);
       expect(echo.parentMessageId, 'root-1');
       expect(echo.threadRootId, 'root-1');
       expect(echo.showInConversation, isFalse);

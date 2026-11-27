@@ -566,7 +566,7 @@ void main() {
           .last
           .json as Map<String, dynamic>;
       expect(body['body'], 'typed in the panel');
-      expect(body['messageType'], 2);
+      expect(body['messageType'], 4);
       expect(body['parentMessageId'], 'root-1');
       expect(body['showInConversation'], isFalse);
       expect(find.text('typed in the panel'), findsOneWidget);

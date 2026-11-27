@@ -705,7 +705,7 @@ class IsmChatThreadController extends GetxController {
 
   /// Builds the optimistic local row for a reply that is being sent.
   ///
-  /// Mirrors what the server will store: `messageType: 2`, the immediate
+  /// Mirrors what the server will store: `messageType: 4`, the immediate
   /// `parentMessageId`, the derived `threadRootId` and the `showInConversation`
   /// the send used. Exposed for tests and host-built composers.
   @visibleForTesting
@@ -725,7 +725,7 @@ class IsmChatThreadController extends GetxController {
       conversationId: conversationId,
       senderInfo: _currentUser,
       messageId: '',
-      messageType: IsmChatMessageType.reply,
+      messageType: IsmChatMessageType.threadReply,
       parentMessageId: parent.messageId,
       threadRootId: IsmChatThreadCoordinator.resolveThreadRootId(parent),
       showInConversation: IsmChatThreadCoordinator.showInConversationForReply(

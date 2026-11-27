@@ -381,7 +381,7 @@ void main() {
           .requestsForPath('/chat/message', method: 'POST')
           .last
           .json as Map<String, dynamic>;
-      expect(body['messageType'], 2);
+      expect(body['messageType'], 4);
       expect(body['parentMessageId'], 'root-1');
       expect(body['showInConversation'], isFalse);
       expect(body['attachments'], isNotEmpty);
@@ -431,7 +431,7 @@ void main() {
           .requestsForPath('/chat/message', method: 'POST')
           .last
           .json as Map<String, dynamic>;
-      expect(body['messageType'], 2);
+      expect(body['messageType'], 4);
       expect(body['showInConversation'], isTrue);
     }, setUpApi: (api) => api.registerSendDefaults());
 
@@ -823,7 +823,7 @@ void main() {
           .requestsForPath('/chat/message', method: 'POST')
           .last
           .json as Map<String, dynamic>;
-      expect(body['messageType'], 2);
+      expect(body['messageType'], 4);
       expect(body['parentMessageId'], 'root-1');
       expect(body['showInConversation'], isTrue);
       expect(body['body'], 'from the host app');

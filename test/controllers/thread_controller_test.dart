@@ -348,7 +348,7 @@ void main() {
       final reply = controller.replies.single;
       expect(reply.messageId, 'server-reply');
       expect(reply.body, 'on it');
-      expect(reply.messageType, IsmChatMessageType.reply);
+      expect(reply.messageType, IsmChatMessageType.threadReply);
       expect(reply.threadRootId, 'root-1');
       expect(reply.parentMessageId, 'root-1');
       expect(reply.showInConversation, isFalse);
@@ -741,7 +741,7 @@ void main() {
       // Stored as a thread reply, so the retry re-sends it as one.
       expect(queuedReply.threadRootId, 'root-1');
       expect(queuedReply.showInConversation, isFalse);
-      expect(queuedReply.messageType, IsmChatMessageType.reply);
+      expect(queuedReply.messageType, IsmChatMessageType.threadReply);
 
       // 2. Reopening the thread still shows it (the server does not have it).
       await controller.openThread(
@@ -1055,7 +1055,7 @@ void main() {
         alsoSendToChannel: true,
       );
       expect(pending.messageId, isEmpty);
-      expect(pending.messageType, IsmChatMessageType.reply);
+      expect(pending.messageType, IsmChatMessageType.threadReply);
       expect(pending.parentMessageId, 'r1');
       expect(pending.threadRootId, 'root-1');
       expect(pending.showInConversation, isTrue);
