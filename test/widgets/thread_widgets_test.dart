@@ -375,21 +375,28 @@ void main() {
     });
 
     testWidgets('long text replies can expand and collapse', (tester) async {
-      final longBody = List.generate(20, (i) => 'Thread paragraph line $i.').join('\n');
+      // 20 lines exceeds collapsedMaxLines (15). Host in a scroll view like the
+      // real thread SliverList so expanding past the 800px test viewport does
+      // not RenderFlex-overflow the Scaffold body.
+      final longBody =
+          List.generate(20, (i) => 'Thread paragraph line $i.').join('\n');
       await pumpChatHost(
         tester,
-        child: IsmChatThreadMessageTile(
-          message: threadReply(body: longBody),
+        child: SingleChildScrollView(
+          child: IsmChatThreadMessageTile(
+            message: threadReply(body: longBody),
+          ),
         ),
       );
       await tester.pump();
       expect(find.text('Show more'), findsOneWidget);
       await tester.tap(find.text('Show more'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.text('Show less'), findsOneWidget);
       expect(find.textContaining('Thread paragraph line 19'), findsOneWidget);
+      await tester.ensureVisible(find.text('Show less'));
       await tester.tap(find.text('Show less'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.text('Show more'), findsOneWidget);
     });
 

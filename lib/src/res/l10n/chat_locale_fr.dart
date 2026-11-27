@@ -14,6 +14,7 @@ const Map<String, String> kIsmChatLocaleFr = {
   'fetchingPreview': 'Chargement de l\'aperçu du lien',
   'errorLoadingImage': 'Erreur lors du chargement de l\'image',
   'typing': 'Écrit…',
+  'draft': 'Brouillon',
   'online': 'En ligne',
   'lastSeen': 'Vu dernièrement',
   'today': 'Aujourd\'hui',

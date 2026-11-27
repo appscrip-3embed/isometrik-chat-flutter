@@ -115,7 +115,11 @@ class _IsmChatPageViewState extends State<IsmChatPageView>
     if (attachMessagesScrollController && !_wasCurrentRoute) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        unawaited(_restoreChatAfterReturningToStack());
+        unawaited(_restoreChatAfterReturningToStack().then((_) async {
+          if (!mounted || !IsmChatUtility.chatPageControllerRegistered) return;
+          await IsmChatUtility.chatPageController
+              .syncComposerDraftWithConversation();
+        }));
       });
     }
     _wasCurrentRoute = attachMessagesScrollController;
@@ -256,6 +260,14 @@ class _IsmChatPageViewState extends State<IsmChatPageView>
       }
     }
 
+    if (AppLifecycleState.paused == state &&
+        IsmChatUtility.chatPageControllerRegistered) {
+      unawaited(IsmChatUtility.chatPageController.flushComposerDraft());
+    }
+    if (AppLifecycleState.paused == state &&
+        Get.isRegistered<IsmChatThreadController>()) {
+      unawaited(Get.find<IsmChatThreadController>().flushComposerDraft());
+    }
     if (AppLifecycleState.paused == state) {
       // Don't set isAppInBackground to avoid disconnection
       // mqttController.isAppInBackground = true;

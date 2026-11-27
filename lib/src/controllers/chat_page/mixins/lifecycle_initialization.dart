@@ -43,6 +43,8 @@ mixin IsmChatPageLifecycleInitializationMixin on GetxController {
     bool isBroadcasts = false,
   }) async {
     final generation = ++_controller.chatOpenGeneration;
+    // Save the previous chat's draft before the shared composer is cleared.
+    _controller._detachComposerDraft();
     // Stacked chat routes share this controller. Writing Rx (loading, messages)
     // from the new route's initState runs during Navigator.build and makes
     // the underneath GetX call setState → crash. Wait until that frame ends.
@@ -100,6 +102,12 @@ mixin IsmChatPageLifecycleInitializationMixin on GetxController {
         _controller.isBroadcast = isBroadcasts;
       }
 
+      if (!await _controller._restoreComposerDraft(
+        openGeneration: generation,
+      )) {
+        return;
+      }
+
       if (_controller.conversation?.conversationId?.isNotEmpty == true) {
         await _controller.callFunctionsWithConversationId(
           _controller.conversation?.conversationId ?? '',
@@ -124,6 +132,7 @@ mixin IsmChatPageLifecycleInitializationMixin on GetxController {
 
   /// Disposes of all resources used by the controller.
   void _dispose() {
+    _controller._disposeComposerDraft();
     if (_controller.areCamerasInitialized) {
       try {
         _controller._frontCameraController.dispose();

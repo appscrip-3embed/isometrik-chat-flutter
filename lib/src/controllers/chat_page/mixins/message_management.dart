@@ -52,6 +52,8 @@ mixin IsmChatPageMessageManagementMixin on GetxController {
 
   /// Updates the last message in the conversation.
   Future<bool> updateLastMessage() async {
+    // Runs on every back press from the chat page.
+    await _controller.flushComposerDraft();
     if (!_controller.didReactedLast) {
       var chatConversation = await IsmChatConfig.dbWrapper
           ?.getConversation(_controller.conversation?.conversationId ?? '');

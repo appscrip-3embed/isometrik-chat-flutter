@@ -10,6 +10,24 @@ class IsmChatConfig {
   static late GlobalKey<NavigatorState> kNavigatorKey;
   static late BuildContext context;
   static bool configInitilized = false;
+
+  /// Navigator context, falling back to [context] when a chat host has set it.
+  ///
+  /// Returns `null` in headless unit tests where neither is available — prefer
+  /// this over `kNavigatorKey.currentContext ?? context`, which throws if
+  /// [context] was never assigned.
+  ///
+  /// **Reuse:** any controller/utility that only needs an optional BuildContext
+  /// (keyboard insets, hide-keyboard side effects, etc.) should call this.
+  static BuildContext? get contextOrNull {
+    final navContext = kNavigatorKey.currentContext;
+    if (navContext != null) return navContext;
+    try {
+      return context;
+    } catch (_) {
+      return null;
+    }
+  }
   static IsmChatThemeData? _chatLightTheme;
   static IsmChatThemeData? _chatDarkTheme;
   static IsmChatDBWrapper? dbWrapper;

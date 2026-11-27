@@ -137,6 +137,11 @@ class IsmChatThreadComposer extends StatelessWidget {
                             cursorColor: _textFiledTheme?.cursorColor ??
                                 IsmChatConfig.chatTheme.primaryColor,
                             onSubmitted: (_) => _sendText(),
+                            // Tapping the field while the emoji panel is
+                            // open must swap it for the keyboard; the focus
+                            // listener alone misses this when the field
+                            // already has focus.
+                            onTap: controller.hideEmojiBoardForKeyboard,
                             onTapOutside: (_) => IsmChatUtility.hideKeyboard(),
                             onChanged: controller.handleComposerTextChanged,
                             decoration: InputDecoration(

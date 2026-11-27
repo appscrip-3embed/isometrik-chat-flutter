@@ -84,8 +84,19 @@ class IsmChatThreadCoordinator {
       isUiEnabled && isAlsoSentThreadReply(message);
 
   /// Channel row shows **replied to a thread: …** above the bubble.
+  ///
+  /// Skipped for `messageType: 2` rows whose `customType` is
+  /// `AttachmentMessage:Reply` — those are inline quote replies and render
+  /// their own reply preview instead.
   static bool shouldShowChannelThreadContext(IsmChatMessageModel? message) =>
-      isUiEnabled && isAlsoSentThreadReply(message);
+      isUiEnabled &&
+      isAlsoSentThreadReply(message) &&
+      !isInlineQuoteReply(message);
+
+  /// `messageType: 2` with `customType` `AttachmentMessage:Reply`.
+  static bool isInlineQuoteReply(IsmChatMessageModel? message) =>
+      message?.messageType == IsmChatMessageType.reply &&
+      message?.customType == IsmChatCustomMessageType.reply;
 
   /// Whether [message] must be kept out of the channel timeline.
   ///

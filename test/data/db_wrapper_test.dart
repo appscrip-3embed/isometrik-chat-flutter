@@ -368,4 +368,68 @@ void main() {
       expect(pending?.keys, containsAll(['1', '5']));
     });
   });
+
+  group('drafts', () {
+    test('save + get round-trips text and the reply message', () async {
+      final reply = message(body: 'original');
+      await db.saveDraft(
+        kDirectConversationId,
+        IsmChatDraftModel(text: 'hello @Mr. Ajay', replyMessage: reply),
+      );
+      final draft = await db.getDraft(kDirectConversationId);
+      expect(draft?.text, 'hello @Mr. Ajay');
+      expect(draft?.replyMessage?.messageId, reply.messageId);
+      expect(draft?.replyMessage?.body, 'original');
+    });
+
+    test('a reply with no text is still a draft', () async {
+      await db.saveDraft(
+        kDirectConversationId,
+        IsmChatDraftModel(text: '', replyMessage: message()),
+      );
+      expect(await db.getDraft(kDirectConversationId), isNotNull);
+    });
+
+    test('empty or null draft deletes the stored one', () async {
+      await db.saveDraft(
+        kDirectConversationId,
+        const IsmChatDraftModel(text: 'hi'),
+      );
+      await db.saveDraft(
+        kDirectConversationId,
+        const IsmChatDraftModel(text: '   '),
+      );
+      expect(await db.getDraft(kDirectConversationId), isNull);
+      await db.saveDraft(
+        kDirectConversationId,
+        const IsmChatDraftModel(text: 'hi'),
+      );
+      await db.saveDraft(kDirectConversationId, null);
+      expect(await db.getDraft(kDirectConversationId), isNull);
+    });
+
+    test('getAllDrafts returns only drafts, keyed by conversation id',
+        () async {
+      await db.userDetailsBox.put(IsmChatStrings.userData, '{}');
+      await db.saveDraft('a', const IsmChatDraftModel(text: 'one'));
+      await db.saveDraft('b', const IsmChatDraftModel(text: 'two'));
+      final drafts = await db.getAllDrafts();
+      expect(drafts.keys, unorderedEquals(['a', 'b']));
+      expect(drafts['b']?.text, 'two');
+    });
+
+    test('removeConversation and clearChatLocalDb drop drafts', () async {
+      await db.saveConversation(conversation: directConversation());
+      await db.saveDraft(
+        kDirectConversationId,
+        const IsmChatDraftModel(text: 'x'),
+      );
+      await db.removeConversation(kDirectConversationId);
+      expect(await db.getDraft(kDirectConversationId), isNull);
+
+      await db.saveDraft('other', const IsmChatDraftModel(text: 'y'));
+      await db.clearChatLocalDb();
+      expect(await db.getAllDrafts(), isEmpty);
+    });
+  });
 }

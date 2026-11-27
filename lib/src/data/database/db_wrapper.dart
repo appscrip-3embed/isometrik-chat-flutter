@@ -164,8 +164,8 @@ class IsmChatDBWrapper {
     } else {
       // coverage:ignore-end
       try {
-        final basePath = directoryPath ??
-            (await getApplicationDocumentsDirectory()).path;
+        final basePath =
+            directoryPath ?? (await getApplicationDocumentsDirectory()).path;
         final path = '$basePath/$dbName';
         collection = await BoxCollection.open(
           dbName,
@@ -216,6 +216,100 @@ class IsmChatDBWrapper {
     await chatConversationBox.clear();
     await pendingMessageBox.clear();
     IsmChatLog.success('[CLEARED] - All entries are removed from database');
+  }
+
+  String _draftKey(String conversationId) =>
+      '${IsmChatStrings.draftKeyPrefix}$conversationId';
+
+  /// Storage key of the thread composer draft for one thread.
+  static String threadDraftKey(String conversationId, String threadRootId) =>
+      '${IsmChatStrings.threadDraftKeyPrefix}${conversationId}_$threadRootId';
+
+  /// Composer draft saved for [conversationId], if any.
+  ///
+  /// Stored in the existing user box: adding a new box would not reach users
+  /// on web, where Hive's IndexedDB schema is fixed at version 1.
+  Future<IsmChatDraftModel?> getDraft(String conversationId) =>
+      conversationId.isEmpty
+          ? Future.value()
+          : getDraftByKey(_draftKey(conversationId));
+
+  /// Saves [draft] for [conversationId]. A null or empty draft deletes it.
+  Future<void> saveDraft(
+    String conversationId,
+    IsmChatDraftModel? draft,
+  ) async {
+    if (conversationId.isEmpty) return;
+    await saveDraftByKey(_draftKey(conversationId), draft);
+  }
+
+  /// Draft stored under [key] ([threadDraftKey] or a channel draft key).
+  Future<IsmChatDraftModel?> getDraftByKey(String key) async {
+    try {
+      final raw = await userDetailsBox.get(key);
+      if (raw == null || raw.isEmpty) return null;
+      final draft = IsmChatDraftModel.fromJson(raw);
+      return draft.isEmpty ? null : draft;
+    } catch (e, st) {
+      IsmChatLog.error('IsmChat getDraft error :- $e', st);
+      return null;
+    }
+  }
+
+  /// Saves [draft] under [key]. A null or empty draft deletes it.
+  Future<void> saveDraftByKey(String key, IsmChatDraftModel? draft) async {
+    try {
+      if (draft == null || draft.isEmpty) {
+        await userDetailsBox.delete(key);
+      } else {
+        await userDetailsBox.put(key, draft.toJson());
+      }
+    } catch (e, st) {
+      IsmChatLog.error('IsmChat saveDraft error :- $e', st);
+    }
+  }
+
+  /// All saved channel composer drafts, keyed by conversation id.
+  ///
+  /// Thread drafts are not included.
+  Future<Map<String, IsmChatDraftModel>> getAllDrafts() async {
+    final drafts = <String, IsmChatDraftModel>{};
+    try {
+      final keys = (await userDetailsBox.getAllKeys())
+          .where((key) => key.startsWith(IsmChatStrings.draftKeyPrefix))
+          .toList();
+      if (keys.isEmpty) return drafts;
+      final values = await userDetailsBox.getAll(keys);
+      for (var i = 0; i < keys.length; i++) {
+        final raw = values[i];
+        if (raw == null || raw.isEmpty) continue;
+        try {
+          final draft = IsmChatDraftModel.fromJson(raw);
+          if (draft.isEmpty) continue;
+          drafts[keys[i].substring(IsmChatStrings.draftKeyPrefix.length)] =
+              draft;
+        } catch (_) {}
+      }
+    } catch (e, st) {
+      IsmChatLog.error('IsmChat getAllDrafts error :- $e', st);
+    }
+    return drafts;
+  }
+
+  /// Deletes the channel draft and every thread draft of [conversationId].
+  Future<void> removeDraftsOfConversation(String conversationId) async {
+    if (conversationId.isEmpty) return;
+    try {
+      final threadPrefix =
+          '${IsmChatStrings.threadDraftKeyPrefix}${conversationId}_';
+      final keys = (await userDetailsBox.getAllKeys())
+          .where((key) =>
+              key == _draftKey(conversationId) || key.startsWith(threadPrefix))
+          .toList();
+      if (keys.isNotEmpty) await userDetailsBox.deleteAll(keys);
+    } catch (e, st) {
+      IsmChatLog.error('IsmChat removeDrafts error :- $e', st);
+    }
   }
 
   ///  clear all messages for perticular user
@@ -548,8 +642,7 @@ class IsmChatDBWrapper {
     Map<String, IsmChatMessageModel> messages,
     IsmChatMessageModel incoming,
   ) {
-    if (!incoming.isSdkCallBubbleMessage ||
-        incoming.meetingId.isNullOrEmpty) {
+    if (!incoming.isSdkCallBubbleMessage || incoming.meetingId.isNullOrEmpty) {
       messages[incoming.key] = incoming;
       return messages;
     }
@@ -584,16 +677,16 @@ class IsmChatDBWrapper {
           _firstNonEmpty(incoming.conversationId, existing.conversationId),
       senderInfo: incoming.senderInfo ?? existing.senderInfo,
       initiatorId: _firstNonEmpty(incoming.initiatorId, existing.initiatorId),
-      callDurations:
-          incomingDurations.isNotEmpty ? incoming.callDurations : existing.callDurations,
+      callDurations: incomingDurations.isNotEmpty
+          ? incoming.callDurations
+          : existing.callDurations,
     );
     merged = merged.copyWith(
       sentByMe: IsmChatMessageModel.resolveSentByMe(merged),
     );
 
     messages.removeWhere((_, value) =>
-        value.meetingId == incoming.meetingId &&
-        value.isSdkCallBubbleMessage);
+        value.meetingId == incoming.meetingId && value.isSdkCallBubbleMessage);
     messages[merged.key] = merged;
     return messages;
   }
@@ -623,9 +716,7 @@ class IsmChatDBWrapper {
         incomingMeetingId.isNotEmpty &&
         (lastMeetingId == incomingMeetingId ||
             (lastMeetingId.isEmpty && _isCallCustomType(last.customType)));
-    if (last != null &&
-        lastIsSameCall &&
-        (message.action ?? '').isNotEmpty) {
+    if (last != null && lastIsSameCall && (message.action ?? '').isNotEmpty) {
       last = last.copyWith(
         action: message.action,
         meetingId: incomingMeetingId,
@@ -787,6 +878,7 @@ class IsmChatDBWrapper {
         if (conversation != null) {
           await chatConversationBox.delete(conversationId);
         }
+        await removeDraftsOfConversation(conversationId);
 
         break;
       case IsmChatDbBox.pending:

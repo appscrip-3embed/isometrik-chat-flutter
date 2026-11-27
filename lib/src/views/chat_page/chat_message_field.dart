@@ -237,6 +237,14 @@ class IsmChatMessageField extends StatelessWidget {
                                       maxLines: 4,
                                       minLines: 1,
                                       focusNode: controller.messageFocusNode,
+                                      // Swap the emoji panel for the keyboard
+                                      // on tap; the focus listener misses this
+                                      // when the field already has focus.
+                                      onTap: () {
+                                        if (controller.showEmojiBoard) {
+                                          controller.showEmojiBoard = false;
+                                        }
+                                      },
                                       controller:
                                           controller.chatInputController,
                                       cursorColor: IsmChatConfig

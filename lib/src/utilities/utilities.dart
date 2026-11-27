@@ -16,6 +16,7 @@ export 'show_context.dart';
 export 'same_name_attachment_upload.dart';
 export 'storage_quota_guard.dart';
 export 'thread_coordinator.dart';
+export 'draft_tracker.dart';
 export 'self_chat_status_coordinator.dart';
 export 'typedef.dart';
 export 'utility.dart';

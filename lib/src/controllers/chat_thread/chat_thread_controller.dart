@@ -120,6 +120,59 @@ class IsmChatThreadController extends GetxController {
   /// Clears the nested-reply target.
   void clearReplyTo() => replyTo = null;
 
+  // ------------------------------------------------------------------ draft
+
+  /// Unsent text and nested-reply target, saved per thread. Detached while
+  /// threads are switched, so clearing the composer never wipes a draft.
+  late final IsmChatDraftTracker _draftTracker = IsmChatDraftTracker(
+    save: (key, draft) async =>
+        IsmChatConfig.dbWrapper?.saveDraftByKey(key, draft),
+  );
+  Worker? _replyToDraftWorker;
+
+  void _onComposerDraftChanged() {
+    // The edited body is not a draft.
+    if (isEditing) return;
+    _draftTracker.onChanged(
+      IsmChatDraftModel(
+        text: replyController.text,
+        replyMessage: replyTo,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+
+  /// Writes any unsaved thread composer change right away.
+  Future<void> flushComposerDraft() => _draftTracker.flush();
+
+  /// Fills the composer with the saved draft of the open thread and starts
+  /// tracking it. Call after the composer was cleared for that thread.
+  Future<void> _restoreComposerDraft() async {
+    final rootMessage = root;
+    final convId = conversationId;
+    final rootId = threadRootId;
+    if (rootMessage == null || convId.isEmpty || rootId.isEmpty) return;
+    final key = IsmChatDBWrapper.threadDraftKey(convId, rootId);
+    await _draftTracker.idle;
+    final draft = await IsmChatConfig.dbWrapper?.getDraftByKey(key);
+    // Another thread was opened (or this one closed) while reading.
+    if (root != rootMessage || threadRootId != rootId) return;
+    if (draft != null) {
+      _replyTo.value = draft.replyMessage;
+      syncSendTarget();
+      replyController.value = TextEditingValue(
+        text: draft.text,
+        selection: TextSelection.collapsed(offset: draft.text.length),
+      );
+      if (!isEnableRecordingAudio) {
+        final audioOn =
+            IsmChatProperties.threadProperties.isAudioMessageEnabled;
+        showComposerSendButton = audioOn ? draft.text.trim().isNotEmpty : true;
+      }
+    }
+    _draftTracker.attach(key, draft);
+  }
+
   final _isEditing = false.obs;
   bool get isEditing => _isEditing.value;
   set isEditing(bool value) => _isEditing.value = value;
@@ -354,9 +407,8 @@ class IsmChatThreadController extends GetxController {
       return;
     }
     final audioOn = IsmChatProperties.threadProperties.isAudioMessageEnabled;
-    showComposerSendButton = audioOn
-        ? replyController.text.trim().isNotEmpty
-        : true;
+    showComposerSendButton =
+        audioOn ? replyController.text.trim().isNotEmpty : true;
   }
 
   // ----------------------------------------------------------- emoji board
@@ -379,15 +431,24 @@ class IsmChatThreadController extends GetxController {
         replyFocusNode.requestFocus();
       }
     } else {
-      final context =
-          IsmChatConfig.kNavigatorKey.currentContext ?? IsmChatConfig.context;
-      IsmChatUtility.rememberKeyboardViewInset(context);
+      // contextOrNull stays null in headless unit tests (no chat host mounted).
+      IsmChatUtility.rememberKeyboardViewInset(IsmChatConfig.contextOrNull);
       IsmChatUtility.hideKeyboard();
     }
     _showEmojiBoard.value = showEmoji ?? !showEmojiBoard;
   }
 
   void closeEmojiBoard() => toggleEmojiBoard(false, false);
+
+  /// Hides the emoji panel without touching focus, so the soft keyboard can
+  /// take its place (e.g. when the user taps the reply field).
+  void hideEmojiBoardForKeyboard() {
+    if (showEmojiBoard) _showEmojiBoard.value = false;
+  }
+
+  void _onReplyFocusChanged() {
+    if (replyFocusNode.hasFocus) hideEmojiBoardForKeyboard();
+  }
 
   // -------------------------------------------------------------- lifecycle
 
@@ -421,10 +482,25 @@ class IsmChatThreadController extends GetxController {
   int _skip = 0;
 
   @override
+  void onInit() {
+    super.onInit();
+    replyFocusNode.addListener(_onReplyFocusChanged);
+    replyController.addListener(_onComposerDraftChanged);
+    _replyToDraftWorker =
+        ever<IsmChatMessageModel?>(_replyTo, (_) => _onComposerDraftChanged());
+  }
+
+  @override
   void onClose() {
     _recordTimer?.cancel();
-    replyController.dispose();
-    replyFocusNode.dispose();
+    _draftTracker.detach();
+    _replyToDraftWorker?.dispose();
+    replyController
+      ..removeListener(_onComposerDraftChanged)
+      ..dispose();
+    replyFocusNode
+      ..removeListener(_onReplyFocusChanged)
+      ..dispose();
     super.onClose();
   }
 
@@ -446,6 +522,8 @@ class IsmChatThreadController extends GetxController {
       timeline,
     );
     if (!IsmChatThreadCoordinator.canOpenThread(panelRoot)) return;
+    // Save the previous thread's draft before the composer is cleared.
+    _draftTracker.detach();
     this.root = panelRoot;
     this.conversation = conversation ??
         (IsmChatUtility.chatPageControllerRegistered
@@ -465,11 +543,14 @@ class IsmChatThreadController extends GetxController {
     _emojiBoardTab.value = IsmChatEmojiBoardTab.emoji;
     // From here on, attachments picked in the panel are thread replies.
     syncSendTarget();
+    await _restoreComposerDraft();
     await loadReplies();
   }
 
   /// Clears the panel state (called when the thread view is popped).
   void closeThread() {
+    // Save the draft before the composer is cleared below.
+    _draftTracker.detach();
     final rootMessage = root;
     if (rootMessage != null) {
       // Pop/dispose locks the widget tree; syncing the channel timeline touches
@@ -652,9 +733,8 @@ class IsmChatThreadController extends GetxController {
           senderUserName: _currentUser?.userName ?? '',
         ),
         notificationBody: body,
-        mentionedUsers: mentions.isEmpty
-            ? null
-            : mentions.map((e) => e.toMap()).toList(),
+        mentionedUsers:
+            mentions.isEmpty ? null : mentions.map((e) => e.toMap()).toList(),
       );
       final accepted = result != null &&
           !result.response.hasError &&
@@ -669,8 +749,8 @@ class IsmChatThreadController extends GetxController {
         // The server rejected it: drop the queued copy so it is not retried
         // forever, and show why.
         await _dequeuePendingReply(pending);
-        _replies.removeWhere((e) => e.sentAt == pending.sentAt &&
-            (e.messageId ?? '').isEmpty);
+        _replies.removeWhere(
+            (e) => e.sentAt == pending.sentAt && (e.messageId ?? '').isEmpty);
         if (sendToChannel) {
           _removeAlsoSendFromChannel(pending.sentAt);
         }
@@ -802,8 +882,8 @@ class IsmChatThreadController extends GetxController {
     final convId = conversationId;
     if (rootId.isEmpty || convId.isEmpty) return;
     if (!IsmChatConfig.shouldPendingMessageSend) return;
-    final queued = await IsmChatConfig.dbWrapper
-        ?.getMessage(convId, IsmChatDbBox.pending);
+    final queued =
+        await IsmChatConfig.dbWrapper?.getMessage(convId, IsmChatDbBox.pending);
     if (queued == null || queued.isEmpty) return;
     for (final reply in queued.values) {
       if ((reply.threadRootId ?? '').trim() != rootId) continue;
@@ -879,8 +959,7 @@ class IsmChatThreadController extends GetxController {
   }
 
   /// Drops a locally-built reply whose send failed for good.
-  void removeLocalReply(int sentAt) =>
-      _replies.removeWhere(
+  void removeLocalReply(int sentAt) => _replies.removeWhere(
         (row) => row.sentAt == sentAt && (row.messageId ?? '').isEmpty,
       );
 
@@ -974,7 +1053,7 @@ class IsmChatThreadController extends GetxController {
     final id = messageId.trim();
     final key = emojiKey.trim();
     if (id.isEmpty || key.isEmpty) return false;
-  final uid =
+    final uid =
         (userId ?? IsmChatConfig.communicationConfig.userConfig.userId).trim();
     if (uid.isEmpty) return false;
 
@@ -1165,9 +1244,10 @@ class IsmChatThreadController extends GetxController {
 
   // --------------------------------------------------------------- internals
 
-  UserDetails? get _currentUser => IsmChatUtility.conversationControllerRegistered
-      ? IsmChatUtility.conversationController.userDetails
-      : null;
+  UserDetails? get _currentUser =>
+      IsmChatUtility.conversationControllerRegistered
+          ? IsmChatUtility.conversationController.userDetails
+          : null;
 
   /// Inserts [reply] in `sentAt` order, replacing an existing row with the same
   /// `messageId` (so an echo of our own send does not duplicate).
@@ -1219,7 +1299,8 @@ class IsmChatThreadController extends GetxController {
   /// the "N replies" footer survives a chat reload. Pass `false` for realtime
   /// replies, whose cached root is written by the MQTT handler — otherwise the
   /// badge would be counted twice.
-  Future<void> _bumpRoot(IsmChatMessageModel reply, {required bool persist}) async {
+  Future<void> _bumpRoot(IsmChatMessageModel reply,
+      {required bool persist}) async {
     final rootMessage = root;
     if (rootMessage == null) return;
     final updated = IsmChatThreadCoordinator.applyReplyToRoot(

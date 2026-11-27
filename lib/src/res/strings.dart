@@ -18,6 +18,12 @@ class IsmChatStrings {
 
   /// Key used to store last active user id in local DB.
   static const String activeUserIdKey = 'activeUserId';
+
+  /// Prefix for per-conversation composer drafts in the local user box.
+  static const String draftKeyPrefix = 'draft_';
+
+  /// Prefix for thread composer drafts: `threadDraft_<conversationId>_<rootId>`.
+  static const String threadDraftKeyPrefix = 'threadDraft_';
   static const String user = 'user';
   static const String controllerTag = 'ism-chat-page';
 
@@ -40,6 +46,7 @@ class IsmChatStrings {
   static String get fetchingPreview => IsmChatL10n.get('fetchingPreview');
   static String get errorLoadingImage => IsmChatL10n.get('errorLoadingImage');
   static String get typing => IsmChatL10n.get('typing');
+  static String get draft => IsmChatL10n.get('draft');
   static String get online => IsmChatL10n.get('online');
   static String get lastSeen => IsmChatL10n.get('lastSeen');
   static String get today => IsmChatL10n.get('today');
