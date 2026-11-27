@@ -243,6 +243,7 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
     BuildContext context,
     IsmChatMessageModel message,
   ) async {
+    final anchorRect = _focusAnchorRect(context, message);
     await Navigator.push(
       context,
       PageRouteBuilder(
@@ -258,6 +259,7 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
             message,
             pageController: _controller,
             animation: animation,
+            anchorRect: anchorRect,
           );
         },
         fullscreenDialog: true,
@@ -266,6 +268,49 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
         reverseTransitionDuration: IsmChatConstants.transitionDuration,
       ),
     );
+  }
+
+  /// Where [message]'s bubble sits, in the navigator's coordinates, so the
+  /// focus menu can open it in place (WhatsApp-style) instead of re-centering.
+  ///
+  /// [context] may be the whole row (above the bubble's [Hero]) or a widget
+  /// inside the bubble (e.g. an image), so look both ways for the Hero; fall
+  /// back to [context]'s own box (e.g. thread tiles have no Hero).
+  Rect? _focusAnchorRect(BuildContext context, IsmChatMessageModel message) {
+    if (!context.mounted) return null;
+    Element? hero;
+    bool isBubbleHero(Element element) {
+      final widget = element.widget;
+      return widget is Hero && widget.tag == message;
+    }
+
+    context.visitAncestorElements((element) {
+      if (!isBubbleHero(element)) return true;
+      hero = element;
+      return false;
+    });
+    if (hero == null) {
+      void visit(Element element) {
+        if (hero != null) return;
+        if (isBubbleHero(element)) {
+          hero = element;
+          return;
+        }
+        element.visitChildElements(visit);
+      }
+
+      context.visitChildElements(visit);
+    }
+
+    final box = (hero ?? context).findRenderObject();
+    final navigatorBox = Navigator.of(context).context.findRenderObject();
+    if (box is! RenderBox ||
+        !box.attached ||
+        !box.hasSize ||
+        navigatorBox is! RenderBox) {
+      return null;
+    }
+    return box.localToGlobal(Offset.zero, ancestor: navigatorBox) & box.size;
   }
 
   /// Shows overlay for message focus menu (web).

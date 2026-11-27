@@ -36,13 +36,19 @@ class _IsmChatImageMessageState extends State<IsmChatImageMessage> {
     final message = widget.message;
     final isSticker = message.isStickerMessage;
     final isGif = message.isGifMessage;
+    final isWeb = IsmChatResponsive.isWeb(context);
     final maxWidth = isSticker
         ? IsmChatDimens.hundredFourty
-        : (IsmChatResponsive.isWeb(context)
-            ? context.width * .35
-            : context.width * .6);
-    final maxHeight =
-        isSticker ? IsmChatDimens.hundredFourty : IsmChatDimens.twoHundredFifty;
+        : IsmChatMediaGridLayout.chatMediaBubbleMaxWidth(
+            context.width,
+            isWeb: isWeb,
+          );
+    final maxHeight = isSticker
+        ? IsmChatDimens.hundredFourty
+        : IsmChatMediaGridLayout.chatMediaMaxHeight(
+            context.width,
+            isWeb: isWeb,
+          );
     final data = IsmChatProperties.chatPageProperties.isShowMessageBlur
         ?.call(context, message);
     return Material(
@@ -393,16 +399,18 @@ class _MessageMediaImageState extends State<_MessageMediaImage> {
         !hasNetworkUrl &&
         mediaUrl.isNotEmpty &&
         File(mediaUrl).existsSync();
-    final fit = isSticker || isGif ? BoxFit.contain : BoxFit.cover;
+    // Cover: the mobile frame clamps extreme ratios, so the image is
+    // center-cropped into it (WhatsApp-style) instead of letterboxed.
+    final fit = isSticker ? BoxFit.contain : BoxFit.cover;
     final borderRadius = isSticker
         ? BorderRadius.zero
         : BorderRadius.circular(IsmChatDimens.eight);
     final layoutAspect = _layoutAspectRatio(attachment);
     final reservedSize = isSticker
         ? null
-        : IsmChatMediaGridLayout.constrainedMediaDisplaySize(
-            maxWidth: maxWidth,
-            maxHeight: maxHeight,
+        : IsmChatMediaGridLayout.chatMediaFrameSize(
+            screenWidth: context.width,
+            isWeb: IsmChatResponsive.isWeb(context),
             aspectRatio: layoutAspect,
           );
     final placeholderUrl = isGif ? _gifPlaceholderUrl(attachment) : null;

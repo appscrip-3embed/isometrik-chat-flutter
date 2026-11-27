@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
@@ -15,10 +18,50 @@ class _IsmChatVideoMessageState extends State<IsmChatVideoMessage> {
   /// Tracks expand/collapse state for long captions (show more / show less).
   late final ValueNotifier<bool> _isExpandedNotifier;
 
+  /// Video shape (width / height); null until known (frame is square).
+  double? _aspectRatio;
+
+  /// Thumbnail currently being measured, so each one is read only once.
+  String? _measuringThumbnail;
+
   @override
   void initState() {
     super.initState();
     _isExpandedNotifier = ValueNotifier(false);
+    _syncAspectRatio();
+  }
+
+  @override
+  void didUpdateWidget(covariant IsmChatVideoMessage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_aspectRatio == null) _syncAspectRatio();
+  }
+
+  /// Attachment metadata first; otherwise measure the thumbnail, which keeps
+  /// the video's shape (local bytes before upload, network URL after).
+  void _syncAspectRatio() {
+    final attachment = widget.message.attachments?.firstOrNull;
+    final meta = attachment?.mediaAspectRatio;
+    if (meta != null && meta > 0) {
+      _aspectRatio = meta;
+      return;
+    }
+    final thumbnail = attachment?.thumbnailUrl ?? '';
+    if (thumbnail.isEmpty || thumbnail == _measuringThumbnail) return;
+    _measuringThumbnail = thumbnail;
+    final ratio = thumbnail.isValidUrl
+        ? IsmChatImageAttachmentDimensions.aspectRatioFromProvider(
+            CachedNetworkImageProvider(thumbnail),
+          )
+        : IsmChatImageAttachmentDimensions.aspectRatioFromBytesCodec(
+            thumbnail.strigToUnit8List,
+          );
+    unawaited(ratio.then((value) {
+      if (!mounted || _aspectRatio != null || value == null || value <= 0) {
+        return;
+      }
+      setState(() => _aspectRatio = value);
+    }));
   }
 
   @override
@@ -34,6 +77,7 @@ class _IsmChatVideoMessageState extends State<IsmChatVideoMessage> {
         ?.call(context, message);
     final thumbnailUrl = message.attachments?.first.thumbnailUrl ?? '';
     final isNetworkThumbnail = thumbnailUrl.isValidUrl;
+    final frame = _frameSize(context);
     return Material(
       color: Colors.transparent,
       child: BlurFilter(
@@ -57,9 +101,11 @@ class _IsmChatVideoMessageState extends State<IsmChatVideoMessage> {
             },
             child: Container(
               margin: IsmChatDimens.edgeInsetsBottom4,
-              child: SizedBox.square(
-                // Keep a stable thumbnail size during upload so height doesn't jump.
-                dimension: _thumbnailDimension(context),
+              // Tight frame: IsmChatImage fills it with BoxFit.cover, so
+              // out-of-range shapes are center-cropped like images.
+              child: SizedBox(
+                width: frame.width,
+                height: frame.height,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -151,18 +197,23 @@ class _IsmChatVideoMessageState extends State<IsmChatVideoMessage> {
       ),
       maxLines: 3,
       textDirection: TextDirection.ltr,
-    )..layout(maxWidth: _thumbnailDimension(context));
+    )..layout(maxWidth: _frameSize(context).width);
 
     return textPainter.didExceedMaxLines;
   }
 
-  double _thumbnailDimension(BuildContext context) {
-    final maxByScreen = IsmChatResponsive.isWeb(context)
-        ? context.width * .25
-        : context.width * .6;
-    final maxByTheme = IsmChatResponsive.isWeb(context)
-        ? IsmChatDimens.twoHundredTwenty
-        : IsmChatDimens.twoHundredFifty;
-    return maxByScreen < maxByTheme ? maxByScreen : maxByTheme;
+  /// Mobile: same frame as image bubbles (3/4 width, height from the video's
+  /// shape clamped to 3:4…16:9). Web keeps its square thumbnail.
+  Size _frameSize(BuildContext context) {
+    if (IsmChatResponsive.isWeb(context)) {
+      final byScreen = context.width * .25;
+      final byTheme = IsmChatDimens.twoHundredTwenty;
+      return Size.square(byScreen < byTheme ? byScreen : byTheme);
+    }
+    return IsmChatMediaGridLayout.chatMediaFrameSize(
+      screenWidth: context.width,
+      isWeb: false,
+      aspectRatio: _aspectRatio,
+    );
   }
 }

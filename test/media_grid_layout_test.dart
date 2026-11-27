@@ -1,3 +1,5 @@
+import 'dart:ui' show Size;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
@@ -59,6 +61,59 @@ void main() {
         IsmChatMediaGridLayout.childAspectRatioForDisplayCount(4),
         IsmChatMediaGridLayout.baseAspectRatio,
       );
+    });
+
+    group('chatMediaFrameSize (mobile)', () {
+      const screenWidth = 400.0;
+      // 3/4 of the screen minus the reduction: 300 - 30 = 270.
+      const frameWidth = screenWidth * .75 -
+          IsmChatMediaGridLayout.mobileMediaWidthReduction;
+
+      Size frame(double? aspectRatio) =>
+          IsmChatMediaGridLayout.chatMediaFrameSize(
+            screenWidth: screenWidth,
+            isWeb: false,
+            aspectRatio: aspectRatio,
+          );
+
+      test('width is 3/4 of the screen minus the reduction', () {
+        for (final ar in [null, 0.3, 0.75, 1.0, 1.5, 4.0]) {
+          expect(frame(ar).width, frameWidth, reason: 'aspectRatio $ar');
+        }
+      });
+
+      test('in-range ratios keep their true shape', () {
+        expect(frame(1.0).height, frameWidth);
+        expect(frame(1.5).height, closeTo(frameWidth / 1.5, 0.001));
+        expect(frame(0.75).height, closeTo(frameWidth / 0.75, 0.001));
+      });
+
+      test('tall portrait is capped at 3:4', () {
+        final size = frame(9 / 16);
+        expect(size.height, closeTo(frameWidth * 4 / 3, 0.001));
+        expect(
+          size.height,
+          IsmChatMediaGridLayout.chatMediaMaxHeight(screenWidth, isWeb: false),
+        );
+      });
+
+      test('wide panorama is capped at 16:9', () {
+        expect(frame(3).height, closeTo(frameWidth * 9 / 16, 0.001));
+      });
+
+      test('unknown ratio falls back to square', () {
+        expect(frame(null), const Size(frameWidth, frameWidth));
+      });
+
+      test('web keeps the fit-inside-a-box frame', () {
+        final size = IsmChatMediaGridLayout.chatMediaFrameSize(
+          screenWidth: 1200,
+          isWeb: true,
+          aspectRatio: 9 / 16,
+        );
+        expect(size.height, IsmChatMediaGridLayout.webMediaMaxHeight);
+        expect(size.width, closeTo(250 * 9 / 16, 0.001));
+      });
     });
 
     group('constrainedMediaDisplaySize', () {

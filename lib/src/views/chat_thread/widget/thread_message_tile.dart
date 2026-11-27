@@ -121,7 +121,11 @@ class IsmChatThreadMessageTile extends StatelessWidget {
       children: [
         IsmChatImage.profile(
           message.senderInfo?.userProfileImageUrl ?? '',
-          name: message.senderInfo?.userName,
+          // Match the label beside it: own rows read "You", so the
+          // fallback initials are "Y" rather than the user's real name.
+          name: message.sentByMe
+              ? IsmChatStrings.you
+              : message.senderInfo?.userName,
           dimensions: isRoot ? IsmChatDimens.thirtyFive : IsmChatDimens.thirty,
         ),
         IsmChatDimens.boxWidth8,

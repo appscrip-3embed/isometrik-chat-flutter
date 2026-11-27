@@ -90,7 +90,28 @@ class MessageBubble extends StatelessWidget {
     if (_message.customType == IsmChatCustomMessageType.reply) {
       return base.copyWith(minWidth: 0);
     }
-    return base;
+    return _widenForMedia(context, base);
+  }
+
+  /// Images, GIFs, videos and media grids are wider than the text-bubble max
+  /// on mobile ([IsmChatMediaGridLayout.chatMediaBubbleMaxWidth]); let the
+  /// bubble grow to hold them plus its padding and border instead of cropping.
+  BoxConstraints _widenForMedia(BuildContext context, BoxConstraints base) {
+    if (IsmChatResponsive.isWeb(context) || !_message.isWideMediaBubble) {
+      return base;
+    }
+    final padding = IsmChatPageTheme.resolveBubblePadding(
+      custom: IsmChatConfig.chatTheme.chatPageTheme?.messageBubblePadding,
+    );
+    // Border.all(width: 1) in the bubble decoration also insets the content.
+    final border = _message.borderColor != null ? 2.0 : 0.0;
+    final needed = IsmChatMediaGridLayout.chatMediaBubbleMaxWidth(
+          context.width,
+          isWeb: false,
+        ) +
+        padding.horizontal +
+        border;
+    return needed > base.maxWidth ? base.copyWith(maxWidth: needed) : base;
   }
 
   /// Gets the bottom position for time/status indicator

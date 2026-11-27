@@ -669,6 +669,10 @@ mixin IsmChatPageSendMessageMediaMixin {
     }
     final sentAt = preAssignedSentAt ?? _controller.nextUniqueMediaSentAt();
     final thumbnailBytes = webMediaModel.platformFile.thumbnailBytes;
+    // Thumbnails keep the video's shape; sent so receivers size the bubble
+    // before the thumbnail downloads.
+    final thumbnailSize =
+        IsmChatImageAttachmentDimensions.headerDimensions(thumbnailBytes);
     final nameWithExtension = webMediaModel.platformFile.name;
     final mediaId = '$sentAt';
     final extension = webMediaModel.platformFile.extension;
@@ -704,6 +708,8 @@ mixin IsmChatPageSendMessageMediaMixin {
               kIsWeb ? webMediaModel.platformFile.bytes.toString() : localPath,
           mediaId: mediaId,
           extension: extension,
+          mediaWidth: thumbnailSize?.width,
+          mediaHeight: thumbnailSize?.height,
         )
       ],
       deliveredToAll: false,

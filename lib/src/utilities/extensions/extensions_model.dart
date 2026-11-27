@@ -2252,6 +2252,14 @@ extension MentionMessage on IsmChatMessageModel {
       customType == IsmChatCustomMessageType.video ||
       (isGridEligibleMedia && customType == IsmChatCustomMessageType.image);
 
+  /// Bubble sized by [IsmChatMediaGridLayout.chatMediaBubbleMaxWidth] on mobile:
+  /// still image, GIF, video or media grid (not stickers).
+  bool get isWideMediaBubble =>
+      (customType == IsmChatCustomMessageType.image && !isStickerMessage) ||
+      isGridDisplayableMedia ||
+      (customType == IsmChatCustomMessageType.multipleAttachments &&
+          multipleAttachmentLayout == MultipleAttachmentLayout.mediaGrid);
+
   bool sharesMediaGridWith(IsmChatMessageModel other) {
     if (!isGridDisplayableMedia || !other.isGridDisplayableMedia) {
       return false;

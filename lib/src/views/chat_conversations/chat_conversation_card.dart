@@ -188,7 +188,14 @@ class _IsmChatConversationCardState extends State<IsmChatConversationCard>
                         ),
                   ),
                   IsmChatDimens.boxHeight2,
+                  // Host apps often set [subtitleBuilder] (e.g. custom call
+                  // subtitles). That path used to skip every Rx read and GetX
+                  // threw "improper use of a GetX" — always touch drafts first.
                   Obx(() {
+                    if (IsmChatUtility.conversationControllerRegistered) {
+                      IsmChatUtility
+                          .conversationController.conversationDrafts.length;
+                    }
                     final draft = _visibleDraft;
                     return draft != null
                         ? _draftSubtitle(draft)

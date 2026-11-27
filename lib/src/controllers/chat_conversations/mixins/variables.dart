@@ -80,6 +80,13 @@ mixin IsmChatConversationsVariablesMixin on GetxController {
   set isConversationsLoading(bool value) =>
       _isConversationsLoading.value = value;
 
+  /// Rx handle for list UI workers ([ever] / [Obx]).
+  ///
+  /// Reuse when empty-state loader must clear after load even if
+  /// [conversations] stays `[]` (assigning the loading flag alone does not
+  /// notify a conversations-only worker).
+  RxBool get isConversationsLoadingRx => _isConversationsLoading;
+
   /// This variabel use for store user details which is login or signup
   final Rx<UserDetails?> _userDetails = Rx<UserDetails?>(null);
   UserDetails? get userDetails => _userDetails.value;
