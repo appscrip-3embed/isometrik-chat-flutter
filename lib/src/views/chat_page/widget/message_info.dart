@@ -353,24 +353,15 @@ class _StatusSection extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
+          IsmChatSectionHeader(
+            title: title,
+            style: theme.captionTextStyle.copyWith(letterSpacing: 0.5),
+            leading: _StatusTick(isRead: isRead),
             padding: EdgeInsets.fromLTRB(
               IsmChatDimens.sixteen,
               IsmChatDimens.twentyFour,
               IsmChatDimens.sixteen,
               IsmChatDimens.eight,
-            ),
-            child: Row(
-              children: [
-                _StatusTick(isRead: isRead),
-                IsmChatDimens.boxWidth8,
-                Expanded(
-                  child: Text(
-                    title.toUpperCase(),
-                    style: theme.captionTextStyle.copyWith(letterSpacing: 0.5),
-                  ),
-                ),
-              ],
             ),
           ),
           _SectionCard(
@@ -383,7 +374,7 @@ class _StatusSection extends StatelessWidget {
       );
 }
 
-/// Rounded surface with hairline dividers between rows (none after the last).
+/// [IsmChatSectionCard] in the group-info theme colours.
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.theme,
@@ -396,27 +387,13 @@ class _SectionCard extends StatelessWidget {
   final double dividerIndent;
 
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) => IsmChatSectionCard(
         color: theme.surfaceBackgroundColor,
-        borderRadius: BorderRadius.circular(IsmChatDimens.sixteen),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              if (i > 0)
-                Divider(
-                  height: 1,
-                  thickness: 0.5,
-                  indent: dividerIndent,
-                  endIndent: IsmChatDimens.sixteen,
-                  color: theme.dividerColor,
-                ),
-              children[i],
-            ],
-          ],
-        ),
+        dividerColor: theme.dividerColor,
+        dividerIndent: dividerIndent,
+        dividerEndIndent: IsmChatDimens.sixteen,
+        borderRadius: IsmChatDimens.sixteen,
+        children: children,
       );
 }
 

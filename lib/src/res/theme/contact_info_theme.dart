@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-
-import 'package:isometrik_chat_flutter/src/res/colors.dart';
+import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 /// Theme for the shared-contact screen ([IsmChatContactsInfoView]).
 ///
 /// Omit in app config for SDK light/dark defaults ([IsmChatThemeResolver]).
-/// Pass a full instance only when customizing.
+/// Pass a full instance, or tweak a default with
+/// `IsmChatContactInfoTheme.light().copyWith(...)`.
 class IsmChatContactInfoTheme {
   const IsmChatContactInfoTheme({
     required this.scaffoldBackgroundColor,
@@ -19,60 +19,27 @@ class IsmChatContactInfoTheme {
     required this.dividerColor,
   });
 
-  factory IsmChatContactInfoTheme.light() => const IsmChatContactInfoTheme(
-        scaffoldBackgroundColor: IsmChatColors.backgroundColorLight,
-        cardBackgroundColor: IsmChatColors.whiteColor,
-        nameTextStyle: TextStyle(
-          color: IsmChatColors.blackColor,
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
-        identifierTextStyle: TextStyle(
-          color: IsmChatColors.blackColor,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-        addButtonBackgroundColor: IsmChatColors.primaryColorLight,
-        addButtonTextStyle: TextStyle(
-          color: IsmChatColors.whiteColor,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-        actionIconColor: IsmChatColors.primaryColorLight,
-        actionLabelTextStyle: TextStyle(
-          color: IsmChatColors.blackColor,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-        dividerColor: IsmChatColors.greyColor,
-      );
+  factory IsmChatContactInfoTheme.light() => IsmChatContactInfoTheme.fromTokens(
+      IsmChatDesignTokens.forBrightness(Brightness.light));
 
-  factory IsmChatContactInfoTheme.dark() => const IsmChatContactInfoTheme(
-        scaffoldBackgroundColor: IsmChatColors.backgroundColorDark,
-        cardBackgroundColor: Color(0xFF353535),
-        nameTextStyle: TextStyle(
-          color: IsmChatColors.whiteColor,
-          fontSize: 14,
+  factory IsmChatContactInfoTheme.dark() => IsmChatContactInfoTheme.fromTokens(
+      IsmChatDesignTokens.forBrightness(Brightness.dark));
+
+  /// SDK default built from [IsmChatDesignTokens] (carries the host font family).
+  factory IsmChatContactInfoTheme.fromTokens(IsmChatDesignTokens tokens) =>
+      IsmChatContactInfoTheme(
+        scaffoldBackgroundColor: tokens.canvas,
+        cardBackgroundColor: tokens.surface,
+        nameTextStyle: tokens.bodyStrong,
+        identifierTextStyle: tokens.footnote,
+        addButtonBackgroundColor: tokens.accent,
+        addButtonTextStyle: tokens.button,
+        actionIconColor: tokens.accent,
+        actionLabelTextStyle: tokens.footnote.copyWith(
+          color: tokens.accent,
           fontWeight: FontWeight.w600,
         ),
-        identifierTextStyle: TextStyle(
-          color: IsmChatColors.whiteColor,
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-        ),
-        addButtonBackgroundColor: IsmChatColors.primaryColorDark,
-        addButtonTextStyle: TextStyle(
-          color: IsmChatColors.whiteColor,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-        actionIconColor: IsmChatColors.primaryColorDark,
-        actionLabelTextStyle: TextStyle(
-          color: IsmChatColors.whiteColor,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-        dividerColor: IsmChatColors.greyColor,
+        dividerColor: tokens.hairline,
       );
 
   final Color scaffoldBackgroundColor;
@@ -84,4 +51,29 @@ class IsmChatContactInfoTheme {
   final Color actionIconColor;
   final TextStyle actionLabelTextStyle;
   final Color dividerColor;
+
+  IsmChatContactInfoTheme copyWith({
+    Color? scaffoldBackgroundColor,
+    Color? cardBackgroundColor,
+    TextStyle? nameTextStyle,
+    TextStyle? identifierTextStyle,
+    Color? addButtonBackgroundColor,
+    TextStyle? addButtonTextStyle,
+    Color? actionIconColor,
+    TextStyle? actionLabelTextStyle,
+    Color? dividerColor,
+  }) =>
+      IsmChatContactInfoTheme(
+        scaffoldBackgroundColor:
+            scaffoldBackgroundColor ?? this.scaffoldBackgroundColor,
+        cardBackgroundColor: cardBackgroundColor ?? this.cardBackgroundColor,
+        nameTextStyle: nameTextStyle ?? this.nameTextStyle,
+        identifierTextStyle: identifierTextStyle ?? this.identifierTextStyle,
+        addButtonBackgroundColor:
+            addButtonBackgroundColor ?? this.addButtonBackgroundColor,
+        addButtonTextStyle: addButtonTextStyle ?? this.addButtonTextStyle,
+        actionIconColor: actionIconColor ?? this.actionIconColor,
+        actionLabelTextStyle: actionLabelTextStyle ?? this.actionLabelTextStyle,
+        dividerColor: dividerColor ?? this.dividerColor,
+      );
 }

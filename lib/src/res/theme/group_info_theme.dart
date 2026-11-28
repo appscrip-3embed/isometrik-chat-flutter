@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:isometrik_chat_flutter/src/res/colors.dart';
-import 'package:isometrik_chat_flutter/src/res/styles.dart';
+import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
-/// Theme for group / conversation info ([IsmChatConverstaionInfoView]).
+/// Theme for group / conversation info ([IsmChatConverstaionInfoView]) and
+/// message info ([IsmChatMessageInfo]).
 ///
 /// Omit on [IsmChatPageTheme] to use SDK light/dark defaults via [IsmChatThemeResolver].
-/// Pass a full instance only when customizing.
+/// Pass a full instance, or tweak a default with
+/// `IsmChatGroupInfoTheme.light().copyWith(...)`.
 class IsmChatGroupInfoTheme {
   const IsmChatGroupInfoTheme({
     required this.scaffoldBackgroundColor,
@@ -26,52 +27,40 @@ class IsmChatGroupInfoTheme {
     required this.searchIconColor,
     required this.adminBadgeTextStyle,
     required this.dividerColor,
+    this.destructiveColor,
   });
 
-  factory IsmChatGroupInfoTheme.light() => IsmChatGroupInfoTheme(
-        scaffoldBackgroundColor: IsmChatColors.backgroundColorLight,
-        surfaceBackgroundColor: IsmChatColors.whiteColor,
-        primaryTitleTextStyle: IsmChatStyles.w600Black27,
-        secondaryTextStyle: IsmChatStyles.w500GreyLight17,
-        captionTextStyle: IsmChatStyles.w400Grey12,
-        metaTextStyle: IsmChatStyles.w400Black14,
-        sectionTitleTextStyle: IsmChatStyles.w500Black16,
-        bodyTextStyle: IsmChatStyles.w400Black16,
-        listTileTitleTextStyle: IsmChatStyles.w500Black16,
-        listTileSubtitleTextStyle: IsmChatStyles.w400Black12,
-        actionIconColor: IsmChatColors.greyColorLight,
-        menuIconColor: IsmChatColors.blackColor,
-        inputTextStyle: IsmChatStyles.w400Black16,
-        searchFillColor: IsmChatColors.whiteColor,
-        searchHintTextStyle: IsmChatStyles.w400Grey14,
-        searchIconColor: IsmChatColors.primaryColorLight,
-        adminBadgeTextStyle: IsmChatStyles.w600Black12,
-        dividerColor: IsmChatColors.greyColorLight,
-      );
+  factory IsmChatGroupInfoTheme.light() => IsmChatGroupInfoTheme.fromTokens(
+      IsmChatDesignTokens.forBrightness(Brightness.light));
 
-  factory IsmChatGroupInfoTheme.dark() => IsmChatGroupInfoTheme(
-        scaffoldBackgroundColor: IsmChatColors.backgroundColorDark,
-        surfaceBackgroundColor: const Color(0xFF353535),
-        primaryTitleTextStyle: IsmChatStyles.w600White16.copyWith(fontSize: 27),
-        secondaryTextStyle: IsmChatStyles.w400White12.copyWith(fontSize: 17),
-        captionTextStyle: IsmChatStyles.w400White12,
-        metaTextStyle: IsmChatStyles.w400White14,
-        sectionTitleTextStyle: IsmChatStyles.w400White16,
-        bodyTextStyle: IsmChatStyles.w400White14,
-        listTileTitleTextStyle: IsmChatStyles.w400White16,
-        listTileSubtitleTextStyle: IsmChatStyles.w400White12,
-        actionIconColor: IsmChatColors.greyColorLight,
-        menuIconColor: IsmChatColors.whiteColor,
-        inputTextStyle: IsmChatStyles.w400White16,
-        searchFillColor: const Color(0xFF454545),
-        searchHintTextStyle: IsmChatStyles.w400White12.copyWith(
-          color: IsmChatColors.greyColorLight,
-        ),
-        searchIconColor: IsmChatColors.greyColorLight,
-        adminBadgeTextStyle: IsmChatStyles.w400White12.copyWith(
+  factory IsmChatGroupInfoTheme.dark() => IsmChatGroupInfoTheme.fromTokens(
+      IsmChatDesignTokens.forBrightness(Brightness.dark));
+
+  /// SDK default built from [IsmChatDesignTokens].
+  factory IsmChatGroupInfoTheme.fromTokens(IsmChatDesignTokens tokens) =>
+      IsmChatGroupInfoTheme(
+        scaffoldBackgroundColor: tokens.canvas,
+        surfaceBackgroundColor: tokens.surface,
+        primaryTitleTextStyle: tokens.headline,
+        secondaryTextStyle: tokens.subhead,
+        captionTextStyle: tokens.caption,
+        metaTextStyle: tokens.footnote,
+        sectionTitleTextStyle: tokens.body,
+        bodyTextStyle: tokens.body,
+        listTileTitleTextStyle: tokens.bodyStrong,
+        listTileSubtitleTextStyle: tokens.footnote,
+        actionIconColor: tokens.textTertiary,
+        menuIconColor: tokens.textPrimary,
+        inputTextStyle: tokens.body,
+        searchFillColor: tokens.surfaceMuted,
+        searchHintTextStyle: tokens.body.copyWith(color: tokens.textTertiary),
+        searchIconColor: tokens.textTertiary,
+        adminBadgeTextStyle: tokens.micro.copyWith(
+          color: tokens.accent,
           fontWeight: FontWeight.w600,
         ),
-        dividerColor: IsmChatColors.greyColor,
+        dividerColor: tokens.hairline,
+        destructiveColor: tokens.danger,
       );
 
   final Color scaffoldBackgroundColor;
@@ -92,4 +81,56 @@ class IsmChatGroupInfoTheme {
   final Color searchIconColor;
   final TextStyle adminBadgeTextStyle;
   final Color dividerColor;
+
+  /// Clear chat / exit / delete / block rows. Null → SDK danger red.
+  final Color? destructiveColor;
+
+  IsmChatGroupInfoTheme copyWith({
+    Color? scaffoldBackgroundColor,
+    Color? surfaceBackgroundColor,
+    TextStyle? primaryTitleTextStyle,
+    TextStyle? secondaryTextStyle,
+    TextStyle? captionTextStyle,
+    TextStyle? metaTextStyle,
+    TextStyle? sectionTitleTextStyle,
+    TextStyle? bodyTextStyle,
+    TextStyle? listTileTitleTextStyle,
+    TextStyle? listTileSubtitleTextStyle,
+    Color? actionIconColor,
+    Color? menuIconColor,
+    TextStyle? inputTextStyle,
+    Color? searchFillColor,
+    TextStyle? searchHintTextStyle,
+    Color? searchIconColor,
+    TextStyle? adminBadgeTextStyle,
+    Color? dividerColor,
+    Color? destructiveColor,
+  }) =>
+      IsmChatGroupInfoTheme(
+        scaffoldBackgroundColor:
+            scaffoldBackgroundColor ?? this.scaffoldBackgroundColor,
+        surfaceBackgroundColor:
+            surfaceBackgroundColor ?? this.surfaceBackgroundColor,
+        primaryTitleTextStyle:
+            primaryTitleTextStyle ?? this.primaryTitleTextStyle,
+        secondaryTextStyle: secondaryTextStyle ?? this.secondaryTextStyle,
+        captionTextStyle: captionTextStyle ?? this.captionTextStyle,
+        metaTextStyle: metaTextStyle ?? this.metaTextStyle,
+        sectionTitleTextStyle:
+            sectionTitleTextStyle ?? this.sectionTitleTextStyle,
+        bodyTextStyle: bodyTextStyle ?? this.bodyTextStyle,
+        listTileTitleTextStyle:
+            listTileTitleTextStyle ?? this.listTileTitleTextStyle,
+        listTileSubtitleTextStyle:
+            listTileSubtitleTextStyle ?? this.listTileSubtitleTextStyle,
+        actionIconColor: actionIconColor ?? this.actionIconColor,
+        menuIconColor: menuIconColor ?? this.menuIconColor,
+        inputTextStyle: inputTextStyle ?? this.inputTextStyle,
+        searchFillColor: searchFillColor ?? this.searchFillColor,
+        searchHintTextStyle: searchHintTextStyle ?? this.searchHintTextStyle,
+        searchIconColor: searchIconColor ?? this.searchIconColor,
+        adminBadgeTextStyle: adminBadgeTextStyle ?? this.adminBadgeTextStyle,
+        dividerColor: dividerColor ?? this.dividerColor,
+        destructiveColor: destructiveColor ?? this.destructiveColor,
+      );
 }
