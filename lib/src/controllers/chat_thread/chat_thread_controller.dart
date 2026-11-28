@@ -1059,16 +1059,16 @@ class IsmChatThreadController extends GetxController {
 
     IsmChatMessageModel patchRow(IsmChatMessageModel row) {
       var reactions = List<MessageReactionModel>.from(row.reactions ?? []);
+      // Same dedupe contract as MessageReactionModel.addUserIfAbsent — keep
+      // panel patches aligned with chat DB / MQTT reaction writes.
       if (added) {
         var matched = false;
         for (var i = 0; i < reactions.length; i++) {
           final entry = reactions[i];
           if (entry.emojiKey != key) continue;
           final users = List<String>.from(entry.userIds);
-          if (!users.contains(uid)) {
-            users.add(uid);
-          }
-          reactions[i] = entry.copyWith(userIds: users);
+          final patched = entry.copyWith(userIds: users)..addUserIfAbsent(uid);
+          reactions[i] = patched;
           matched = true;
           break;
         }
@@ -1080,9 +1080,9 @@ class IsmChatThreadController extends GetxController {
           final entry = reactions[i];
           if (entry.emojiKey != key) continue;
           if (entry.userIds.length > 1 && entry.userIds.contains(uid)) {
-            reactions[i] = entry.copyWith(
-              userIds: entry.userIds.where((e) => e != uid).toList(),
-            );
+            final users = List<String>.from(entry.userIds);
+            final patched = entry.copyWith(userIds: users)..removeUser(uid);
+            reactions[i] = patched;
           } else {
             reactions.removeAt(i);
           }

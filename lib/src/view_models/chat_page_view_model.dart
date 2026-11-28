@@ -785,10 +785,13 @@ class IsmChatPageViewModel {
         );
 
     if (message != null) {
+      // Dedupe: MQTT may have already applied this reaction before HTTP
+      // returned — see MessageReactionModel.addUserIfAbsent.
+      final myUserId = IsmChatConfig.communicationConfig.userConfig.userId;
       var isEmoji = false;
       for (var x in message.reactions ?? <MessageReactionModel>[]) {
         if (x.emojiKey == reaction.reactionType.value) {
-          x.userIds.add(IsmChatConfig.communicationConfig.userConfig.userId);
+          x.addUserIfAbsent(myUserId);
           isEmoji = true;
           break;
         }
@@ -798,7 +801,7 @@ class IsmChatPageViewModel {
         message.reactions?.add(
           MessageReactionModel(
             emojiKey: reaction.reactionType.value,
-            userIds: [IsmChatConfig.communicationConfig.userConfig.userId],
+            userIds: [myUserId],
           ),
         );
       }
@@ -849,11 +852,12 @@ class IsmChatPageViewModel {
 
     if (message != null) {
       var reactionMap = message.reactions ?? [];
+      final myUserId = IsmChatConfig.communicationConfig.userConfig.userId;
       var isEmoji = false;
       for (var x in reactionMap) {
         if (x.emojiKey == reaction.reactionType.value && x.userIds.length > 1) {
-          x.userIds.remove(IsmChatConfig.communicationConfig.userConfig.userId);
-          x.userIds.toSet().toList();
+          // removeUser clears duplicates if a prior race left the same id twice
+          x.removeUser(myUserId);
           isEmoji = true;
         }
       }

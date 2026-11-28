@@ -49,12 +49,12 @@ mixin IsmChatMqttEventReactionsMixin
       }
       var isEmoji = false;
 
+      // Prefer MessageReactionModel.addUserIfAbsent / removeUser so API success
+      // and MQTT echo never double-list the same reactor on the sender device.
       if (actionModel.action == IsmChatActionEvents.reactionAdd) {
         for (var x in message.value.reactions ?? <MessageReactionModel>[]) {
           if (x.emojiKey == actionModel.reactionType) {
-            if (!x.userIds.contains(actorUserId)) {
-              x.userIds.add(actorUserId);
-            }
+            x.addUserIfAbsent(actorUserId);
             isEmoji = true;
             break;
           }
@@ -71,7 +71,7 @@ mixin IsmChatMqttEventReactionsMixin
       } else {
         for (var x in message.value.reactions ?? <MessageReactionModel>[]) {
           if (x.emojiKey == actionModel.reactionType && x.userIds.length > 1) {
-            x.userIds.remove(actorUserId);
+            x.removeUser(actorUserId);
             isEmoji = true;
           }
         }

@@ -22,6 +22,7 @@ export 'member_leave_and_join.dart';
 export 'mention_rich_text.dart';
 export 'message_bubble.dart';
 export 'message_card.dart';
+export 'message_time_status.dart';
 export 'observer_join_leave.dart';
 export 'ont_to_one_call_message.dart';
 export 'reply_message.dart';
