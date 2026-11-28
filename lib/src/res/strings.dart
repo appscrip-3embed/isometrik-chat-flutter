@@ -345,4 +345,49 @@ class IsmChatStrings {
   static String get sameNameUploadTitle => IsmChatL10n.get('sameNameUploadTitle');
   static String get reshareOlderFile => IsmChatL10n.get('reshareOlderFile');
   static String get uploadACopy => IsmChatL10n.get('uploadACopy');
+
+  // In-chat secondary screens (media, info, pickers, wallpaper).
+  static String get mediaEmptyHint => IsmChatL10n.get('mediaEmptyHint');
+  static String get linksEmptyHint => IsmChatL10n.get('linksEmptyHint');
+  static String get docsEmptyHint => IsmChatL10n.get('docsEmptyHint');
+
+  /// "3 of 12" under the sender in the media viewer.
+  static String mediaCounter(int current, int total) =>
+      IsmChatL10n.get('mediaCounter')
+          .replaceAll('{current}', '$current')
+          .replaceAll('{total}', '$total');
+  static String get saveMedia => IsmChatL10n.get('saveMedia');
+  static String get deleteMedia => IsmChatL10n.get('deleteMedia');
+  static String get searchMessagesHint => IsmChatL10n.get('searchMessagesHint');
+  static String get searchMessagesEmptyHint =>
+      IsmChatL10n.get('searchMessagesEmptyHint');
+  static String get searchParticipantsHint =>
+      IsmChatL10n.get('searchParticipantsHint');
+  static String get sms => IsmChatL10n.get('sms');
+  static String get call => IsmChatL10n.get('call');
+  static String get viewInfo => IsmChatL10n.get('viewInfo');
+  static String get makeAdmin => IsmChatL10n.get('makeAdmin');
+  static String get revokeAdmin => IsmChatL10n.get('revokeAdmin');
+  static String get removeFromGroup => IsmChatL10n.get('removeFromGroup');
+
+  static String removeFromGroupConfirm({
+    required String name,
+    required String group,
+  }) =>
+      IsmChatL10n.get('removeFromGroupConfirm')
+          .replaceAll('{name}', name)
+          .replaceAll('{group}', group);
+  static String get sendLocation => IsmChatL10n.get('sendLocation');
+  static String get sendCurrentLocation =>
+      IsmChatL10n.get('sendCurrentLocation');
+  static String get nearbyPlaces => IsmChatL10n.get('nearbyPlaces');
+  static String get preview => IsmChatL10n.get('preview');
+  static String get setWallpaper => IsmChatL10n.get('setWallpaper');
+  static String get wallpaperSampleIncoming =>
+      IsmChatL10n.get('wallpaperSampleIncoming');
+  static String get wallpaperSampleOutgoing =>
+      IsmChatL10n.get('wallpaperSampleOutgoing');
+  static String get done => IsmChatL10n.get('done');
+  static String get cameraHint => IsmChatL10n.get('cameraHint');
+  static String get groupLabel => IsmChatL10n.get('groupLabel');
 }

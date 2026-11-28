@@ -60,312 +60,285 @@ class _WebMessageMediaPreviewState extends State<IsmWebMessageMediaPreview> {
     }
   }
 
+  Future<void> _saveCurrent() async {
+    final attachment =
+        messageData[chatPageController.assetsIndex].attachments?.first;
+    if (attachment?.mediaUrl?.isValidUrl ?? false) {
+      IsmChatBlob.fileDownloadWithUrl(attachment?.mediaUrl ?? '');
+    } else {
+      IsmChatBlob.fileDownloadWithBytes(
+          attachment?.mediaUrl?.strigToUnit8List ?? [],
+          downloadName: '${attachment!.name}.${attachment.extension}');
+      IsmChatUtility.showToast('Save your media');
+    }
+  }
+
+  Future<void> _goTo(int index) async {
+    chatPageController.assetsIndex = index;
+    initiated = messageData[index].sentByMe;
+    mediaTime = messageData[index].sentAt.deliverTime;
+    updateState();
+    await pageController?.animateToPage(
+      index,
+      curve: Curves.easeOutCubic,
+      duration: const Duration(milliseconds: 180),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          shadowColor: Colors.grey,
-          elevation: IsmChatDimens.one,
-          leading: const SizedBox.shrink(),
-          leadingWidth: IsmChatDimens.zero,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                initiated ? IsmChatStrings.you : mediaUserName,
-                style:
-                    IsmChatConfig.chatTheme.chatPageHeaderTheme?.titleStyle ??
-                        IsmChatStyles.w400Black16,
-              ),
-              Text(
-                mediaTime,
-                style:
-                    IsmChatConfig.chatTheme.chatPageHeaderTheme?.subtileStyle ??
-                        IsmChatStyles.w400Black14,
-              )
-            ],
-          ),
-          centerTitle: true,
-          actions: [
-            Tooltip(
-              message: 'Save media',
-              triggerMode: TooltipTriggerMode.tap,
-              child: IconButton(
-                onPressed: () async {
-                  if (messageData[chatPageController.assetsIndex]
-                          .attachments
-                          ?.first
-                          .mediaUrl
-                          ?.isValidUrl ??
-                      false) {
-                    IsmChatBlob.fileDownloadWithUrl(
-                        messageData[chatPageController.assetsIndex]
-                                .attachments
-                                ?.first
-                                .mediaUrl ??
-                            '');
-                  } else {
-                    IsmChatBlob.fileDownloadWithBytes(
-                        messageData[chatPageController.assetsIndex]
-                                .attachments
-                                ?.first
-                                .mediaUrl
-                                ?.strigToUnit8List ??
-                            [],
-                        downloadName:
-                            '${messageData[chatPageController.assetsIndex].attachments!.first.name}.${messageData[chatPageController.assetsIndex].attachments!.first.extension}');
-                    IsmChatUtility.showToast('Save your media');
-                  }
-                },
-                icon: const Icon(Icons.save_rounded),
-              ),
+  Widget build(BuildContext context) {
+    final mediaTheme = IsmChatThemeResolver.mediaFromConfig(context);
+    final headerTheme = IsmChatConfig.chatTheme.chatPageHeaderTheme;
+    final tokens = IsmChatDesignTokens.of(context);
+    final hostTheme = IsmChatThemeResolver.hasCustomMediaTheme;
+    final background = mediaTheme.previewBackgroundColor;
+    final foreground = hostTheme
+        ? headerTheme?.iconColor ?? mediaTheme.appBarIconColor
+        : IsmChatDesignTokens.viewerForeground;
+    final index = chatPageController.assetsIndex;
+    final total = messageData.length;
+    final subtitle = total > 1
+        ? '$mediaTime  ·  ${IsmChatStrings.mediaCounter(index + 1, total)}'
+        : mediaTime;
+
+    return Scaffold(
+      backgroundColor: background,
+      appBar: AppBar(
+        backgroundColor: background,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: const SizedBox.shrink(),
+        leadingWidth: IsmChatDimens.zero,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              initiated ? IsmChatStrings.you : mediaUserName,
+              style: mediaTheme.previewTitleTextStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            IsmChatDimens.boxWidth8,
-            Tooltip(
-              message: 'Delete media',
-              triggerMode: TooltipTriggerMode.tap,
-              child: IconButton(
-                onPressed: () async {
-                  await chatPageController.showDialogForMessageDelete(
-                      messageData[chatPageController.assetsIndex],
-                      fromMediaPrivew: true);
-                },
-                icon: const Icon(Icons.delete_rounded),
-              ),
+            Text(
+              subtitle,
+              style: mediaTheme.previewSubtitleTextStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const IconButton(
-              alignment: Alignment.center,
-              icon: Icon(
-                Icons.close_rounded,
-                color: IsmChatColors.blackColor,
-              ),
-              onPressed: IsmChatRoute.goBack,
-            ),
-            IsmChatDimens.boxWidth32
           ],
         ),
-        body: Column(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              height: IsmChatDimens.percentHeight(.75),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  PageView.builder(
-                    controller: pageController,
-                    itemCount: messageData.length,
-                    itemBuilder: (
-                      BuildContext context,
-                      int index,
-                    ) {
-                      var media = messageData[index];
-                      var url = media.attachments?.first.mediaUrl ?? '';
-                      final customType = media.mediaPreviewContentType;
-                      return customType == IsmChatCustomMessageType.image
-                          ? PhotoView(
-                              backgroundDecoration: const BoxDecoration(
-                                  color: Colors.transparent),
-                              imageProvider: url.isValidUrl
-                                  ? NetworkImage(url)
-                                  : kIsWeb
-                                      ? MemoryImage(url.strigToUnit8List)
-                                          as ImageProvider
-                                      : FileImage(File(url)),
-                              loadingBuilder: (context, event) =>
-                                  const IsmChatLoadingDialog(),
-                              wantKeepAlive: true,
-                            )
-                          : VideoViewPage(path: url);
-                    },
-                    onPageChanged: (index) {
-                      var media = messageData[index];
-                      initiated = media.sentByMe;
-                      mediaTime = media.sentAt.deliverTime;
-                      chatPageController.assetsIndex = index;
-                      mediaSize = IsmChatUtility.formatBytes(
-                        int.parse('${media.attachments?.first.size}'),
-                      );
-                      updateState();
-                    },
-                  ),
-                  Padding(
-                    padding: IsmChatDimens.edgeInsets20_0,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Opacity(
-                          opacity: chatPageController.assetsIndex != 0 ? 1 : 0,
-                          child: IsmChatTapHandler(
-                            onTap: () async {
-                              chatPageController.assetsIndex--;
-                              initiated =
-                                  messageData[chatPageController.assetsIndex]
-                                      .sentByMe;
-                              mediaTime =
-                                  messageData[chatPageController.assetsIndex]
-                                      .sentAt
-                                      .deliverTime;
-                              updateState();
-                              await pageController?.animateToPage(
-                                  chatPageController.assetsIndex,
-                                  curve: Curves.linear,
-                                  duration: const Duration(milliseconds: 100));
-                            },
-                            child: Container(
-                              padding: IsmChatDimens.edgeInsets5,
-                              decoration: BoxDecoration(
-                                borderRadius:
-                                    BorderRadius.circular(IsmChatDimens.fifty),
-                                color: IsmChatColors.whiteColor,
-                                border: Border.all(
-                                  color: IsmChatColors.blackColor,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.chevron_left_rounded,
-                                color: IsmChatColors.blackColor,
-                                size: IsmChatDimens.fifty,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Opacity(
-                          opacity: (chatPageController.assetsIndex ==
-                                  (messageData.length) - 1)
-                              ? 0
-                              : 1,
-                          child: IsmChatTapHandler(
-                            onTap: () async {
-                              chatPageController.assetsIndex++;
-                              initiated =
-                                  messageData[chatPageController.assetsIndex]
-                                      .sentByMe;
-                              mediaTime =
-                                  messageData[chatPageController.assetsIndex]
-                                      .sentAt
-                                      .deliverTime;
-                              updateState();
-                              await pageController?.animateToPage(
-                                chatPageController.assetsIndex,
-                                curve: Curves.linear,
-                                duration: const Duration(milliseconds: 100),
-                              );
-                            },
-                            child: Container(
-                              padding: IsmChatDimens.edgeInsets5,
-                              decoration: BoxDecoration(
-                                borderRadius:
-                                    BorderRadius.circular(IsmChatDimens.fifty),
-                                color: IsmChatColors.whiteColor,
-                                border: Border.all(
-                                  color: IsmChatColors.blackColor,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.chevron_right_rounded,
-                                color: IsmChatColors.blackColor,
-                                size: IsmChatDimens.fifty,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                ],
-              ),
-            ),
-            Container(
-              width: IsmChatDimens.percentWidth(1),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: IsmChatStrings.saveMedia,
+            onPressed: _saveCurrent,
+            icon: Icon(Icons.download_rounded, color: foreground),
+          ),
+          IconButton(
+            tooltip: IsmChatStrings.deleteMedia,
+            onPressed: () async {
+              await chatPageController.showDialogForMessageDelete(
+                  messageData[chatPageController.assetsIndex],
+                  fromMediaPrivew: true);
+            },
+            icon: Icon(Icons.delete_outline_rounded, color: foreground),
+          ),
+          IconButton(
+            alignment: Alignment.center,
+            icon: Icon(Icons.close_rounded, color: foreground),
+            onPressed: IsmChatRoute.goBack,
+          ),
+          IsmChatDimens.boxWidth16,
+        ],
+      ),
+      body: Column(
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Stack(
               alignment: Alignment.center,
-              height: IsmChatDimens.sixty,
-              margin: IsmChatDimens.edgeInsets10,
+              children: [
+                PageView.builder(
+                  controller: pageController,
+                  itemCount: messageData.length,
+                  itemBuilder: (
+                    BuildContext context,
+                    int index,
+                  ) {
+                    var media = messageData[index];
+                    var url = media.attachments?.first.mediaUrl ?? '';
+                    final customType = media.mediaPreviewContentType;
+                    return customType == IsmChatCustomMessageType.image
+                        ? PhotoView(
+                            backgroundDecoration:
+                                BoxDecoration(color: background),
+                            imageProvider: url.isValidUrl
+                                ? NetworkImage(url)
+                                : kIsWeb
+                                    ? MemoryImage(url.strigToUnit8List)
+                                        as ImageProvider
+                                    : FileImage(File(url)),
+                            loadingBuilder: (context, event) =>
+                                const IsmChatLoadingDialog(),
+                            wantKeepAlive: true,
+                          )
+                        : VideoViewPage(path: url);
+                  },
+                  onPageChanged: (index) {
+                    var media = messageData[index];
+                    initiated = media.sentByMe;
+                    mediaTime = media.sentAt.deliverTime;
+                    chatPageController.assetsIndex = index;
+                    mediaSize = IsmChatUtility.formatBytes(
+                      int.parse('${media.attachments?.first.size}'),
+                    );
+                    updateState();
+                  },
+                ),
+                Padding(
+                  padding: IsmChatDimens.edgeInsets20_0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _NavButton(
+                        icon: Icons.chevron_left_rounded,
+                        visible: index != 0,
+                        foreground: foreground,
+                        onTap: () => _goTo(index - 1),
+                      ),
+                      _NavButton(
+                        icon: Icons.chevron_right_rounded,
+                        visible: index != total - 1,
+                        foreground: foreground,
+                        onTap: () => _goTo(index + 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 76,
+            child: Center(
               child: ListView.separated(
                 shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: IsmChatDesignTokens.gutter,
+                  vertical: 10,
+                ),
                 physics: const BouncingScrollPhysics(),
                 scrollDirection: Axis.horizontal,
                 separatorBuilder: (context, index) => IsmChatDimens.boxWidth8,
                 itemCount: messageData.length,
                 itemBuilder: (context, index) {
                   var media = messageData[index].attachments;
-                  var mediaMessage = messageData[index];
                   var isVideo = IsmChatConstants.videoExtensions.contains(
                     media?.first.extension,
                   );
-                  return InkWell(
-                    onTap: () async {
-                      initiated = mediaMessage.sentByMe;
-                      mediaTime = mediaMessage.sentAt.deliverTime;
-                      chatPageController.assetsIndex = index;
-                      chatPageController.isVideoVisible = false;
-                      await pageController?.animateToPage(index,
-                          curve: Curves.linear,
-                          duration: const Duration(milliseconds: 100));
-                      updateState();
-                    },
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          height: IsmChatDimens.sixty,
+                  final selected = chatPageController.assetsIndex == index;
+                  final url = isVideo
+                      ? media?.first.thumbnailUrl ?? ''
+                      : media?.first.mediaUrl ?? '';
+                  return Semantics(
+                    button: true,
+                    selected: selected,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () async {
+                        chatPageController.isVideoVisible = false;
+                        await _goTo(index);
+                      },
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 150),
+                        opacity: selected ? 1 : .6,
+                        child: Container(
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
-                              borderRadius: BorderRadius.all(
-                                Radius.circular(IsmChatDimens.ten),
-                              ),
-                              border: chatPageController.assetsIndex == index
-                                  ? Border.all(
-                                      color: IsmChatColors.blackColor,
-                                      width: IsmChatDimens.two)
-                                  : null),
-                          width: IsmChatDimens.sixty,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.all(
-                              Radius.circular(IsmChatDimens.ten),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color:
+                                  selected ? tokens.accent : Colors.transparent,
+                              width: 2,
                             ),
-                            child: isVideo
-                                ? IsmChatImage(
-                                    media?.first.thumbnailUrl ?? '',
-                                    isNetworkImage:
-                                        media?.first.thumbnailUrl?.isValidUrl ??
-                                            false,
-                                    isBytes: !(media
-                                            ?.first.thumbnailUrl?.isValidUrl ??
-                                        false),
-                                  )
-                                : IsmChatImage(
-                                    media?.first.mediaUrl ?? '',
-                                    isNetworkImage:
-                                        media?.first.mediaUrl?.isValidUrl ??
-                                            false,
-                                    isBytes:
-                                        !(media?.first.mediaUrl?.isValidUrl ??
-                                            false),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Positioned.fill(
+                                child: IsmChatImage(
+                                  url,
+                                  radius: 8,
+                                  isNetworkImage: url.isValidUrl,
+                                  isBytes: !url.isValidUrl,
+                                ),
+                              ),
+                              if (isVideo)
+                                Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: .45),
+                                    shape: BoxShape.circle,
                                   ),
+                                  child: const Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                        if (isVideo)
-                          Container(
-                            alignment: Alignment.center,
-                            width: IsmChatDimens.thirtyTwo,
-                            height: IsmChatDimens.thirtyTwo,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey),
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.play_arrow,
-                                color: Colors.black),
-                          ),
-                      ],
+                      ),
                     ),
                   );
                 },
               ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Previous / next arrow over the web viewer, hidden at either end.
+class _NavButton extends StatelessWidget {
+  const _NavButton({
+    required this.icon,
+    required this.visible,
+    required this.foreground,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool visible;
+  final Color foreground;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: visible ? 1 : 0,
+          child: Material(
+            color: foreground.withValues(alpha: .14),
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(icon, color: foreground, size: 32),
+              ),
+            ),
+          ),
         ),
       );
 }

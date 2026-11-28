@@ -4,7 +4,9 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 /// Conversation documents tab ([IsmMedia]).
 ///
-/// Text colors from [IsmChatConfig.chatTheme.chatPageTheme.mediaTheme].
+/// Date sections of document rows in cards; text from
+/// [IsmChatMediaTheme.docTitleTextStyle] / `docSubtitleTextStyle` /
+/// `docTrailingTextStyle`.
 class IsmDocsView extends StatefulWidget {
   const IsmDocsView({super.key, required this.mediaListDocs});
 
@@ -14,8 +16,7 @@ class IsmDocsView extends StatefulWidget {
   State<IsmDocsView> createState() => _IsmDocsViewState();
 }
 
-class _IsmDocsViewState extends State<IsmDocsView>
-    with TickerProviderStateMixin {
+class _IsmDocsViewState extends State<IsmDocsView> {
   List<Map<String, List<IsmChatMessageModel>>> storeWidgetDocsList = [];
 
   final chatPageController = IsmChatUtility.chatPageController;
@@ -29,6 +30,7 @@ class _IsmDocsViewState extends State<IsmDocsView>
             .sortMessages(widget.mediaListDocs);
         storeWidgetDocsList =
             chatPageController.sortMediaList(storeSortDocs).reversed.toList();
+        if (mounted) setState(() {});
       },
     );
   }
@@ -36,77 +38,140 @@ class _IsmDocsViewState extends State<IsmDocsView>
   @override
   Widget build(BuildContext context) {
     final mediaTheme = IsmChatThemeResolver.mediaFromConfig(context);
-        return Padding(
-          padding: IsmChatDimens.edgeInsets10,
-          child: widget.mediaListDocs.isEmpty
-              ? Center(
-                  child: Text(
-                    IsmChatStrings.noDocs,
-                    style: mediaTheme.emptyStateTextStyle,
+    final tokens = IsmChatDesignTokens.of(context);
+    if (widget.mediaListDocs.isEmpty) {
+      return IsmChatEmptyState(
+        icon: Icons.description_outlined,
+        title: IsmChatStrings.noDocs,
+        subtitle: IsmChatStrings.docsEmptyHint,
+        titleStyle: mediaTheme.emptyStateTextStyle,
+        subtitleStyle: mediaTheme.docSubtitleTextStyle,
+      );
+    }
+    final sections = ismChatMediaSections(storeWidgetDocsList);
+    return CustomScrollView(
+      key: const PageStorageKey<String>('ism-media-docs'),
+      slivers: [
+        for (final section in sections)
+          SliverMainAxisGroup(
+            slivers: [
+              IsmChatMediaSectionHeader.sliver(
+                context,
+                title: section.title,
+                style: mediaTheme.sectionTitleTextStyle,
+                backgroundColor: mediaTheme.scaffoldBackgroundColor,
+              ),
+              SliverToBoxAdapter(
+                child: IsmChatSectionCard(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: IsmChatDesignTokens.gutter,
                   ),
-                )
-              : ListView.separated(
-                  physics: const ClampingScrollPhysics(),
-                  shrinkWrap: true,
-                  itemCount: storeWidgetDocsList.length,
-                  separatorBuilder: (_, index) => IsmChatDimens.boxHeight10,
-                  itemBuilder: (context, index) {
-                    var media = storeWidgetDocsList[index];
-                    var value = media.values.toList().first;
-                    var key = media.keys
-                        .toString()
-                        .replaceAll(RegExp(r'\(|\)'), '');
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          key,
-                          style: mediaTheme.sectionTitleTextStyle,
-                        ),
-                        ListView.separated(
-                          physics: const ClampingScrollPhysics(),
-                          addAutomaticKeepAlives: true,
-                          shrinkWrap: true,
-                          itemBuilder: (_, index) => ListTile(
-                            onTap: () {
-                              chatPageController
-                                  .tapForMediaPreview(value[index]);
-                            },
-                            contentPadding: IsmChatDimens.edgeInsets0,
-                            dense: true,
-                            title: Text(
-                              value[index].attachments?.first.name ?? '',
-                              style: mediaTheme.docTitleTextStyle,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              IsmChatUtility.formatBytes(
-                                  value[index].attachments?.first.size ?? 0),
-                              style: mediaTheme.docSubtitleTextStyle,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: Text(
-                              value[index].sentAt.toLastMessageTimeString,
-                              style: mediaTheme.docTrailingTextStyle,
-                            ),
-                            leading: SvgPicture.asset(
-                              IsmChatDocumentIcon.assetFor(
-                                value[index].attachments?.first,
-                              ),
-                              height: IsmChatDimens.thirtyTwo,
-                              width: IsmChatDimens.thirtyTwo,
-                            ),
-                          ),
-                          separatorBuilder: (_, index) => Divider(
-                            color: mediaTheme.dividerColor.applyIsmOpacity(.5),
-                          ),
-                          itemCount: value.length,
-                        )
-                      ],
-                    );
-                  },
+                  color: mediaTheme.cardBackgroundColor ?? tokens.surface,
+                  dividerColor: mediaTheme.dividerColor,
+                  dividerIndent: _DocRow.dividerIndent,
+                  children: [
+                    for (final message in section.items)
+                      _DocRow(
+                        message: message,
+                        mediaTheme: mediaTheme,
+                        onTap: () =>
+                            chatPageController.tapForMediaPreview(message),
+                      ),
+                  ],
                 ),
-        );
+              ),
+            ],
+          ),
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      ],
+    );
+  }
+}
+
+class _DocRow extends StatelessWidget {
+  const _DocRow({
+    required this.message,
+    required this.mediaTheme,
+    required this.onTap,
+  });
+
+  final IsmChatMessageModel message;
+  final IsmChatMediaTheme mediaTheme;
+  final VoidCallback onTap;
+
+  static const double _iconTile = 44;
+  static const double dividerIndent =
+      IsmChatDesignTokens.gutter + _iconTile + 12;
+
+  /// "PDF · 1.2 MB"
+  String _meta(AttachmentModel? attachment) {
+    final name = attachment?.name ?? '';
+    var ext = (attachment?.extension ?? '').replaceAll('.', '').trim();
+    if (ext.isEmpty && name.contains('.')) ext = name.split('.').last;
+    final size = IsmChatUtility.formatBytes(attachment?.size ?? 0);
+    return [if (ext.isNotEmpty) ext.toUpperCase(), size].join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = IsmChatDesignTokens.of(context);
+    final attachment = message.attachments?.firstOrNull;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: IsmChatDesignTokens.gutter,
+            vertical: 12,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: _iconTile,
+                height: _iconTile,
+                decoration: BoxDecoration(
+                  color: tokens.surfaceMuted,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: SvgPicture.asset(
+                  IsmChatDocumentIcon.assetFor(attachment),
+                  height: 26,
+                  width: 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      attachment?.name ?? '',
+                      style: mediaTheme.docTitleTextStyle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _meta(attachment),
+                      style: mediaTheme.docSubtitleTextStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                message.sentAt.toLastMessageTimeString,
+                style: mediaTheme.docTrailingTextStyle,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -3,7 +3,8 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 /// Conversation media grid tab ([IsmMedia]).
 ///
-/// Section headers use [IsmChatConfig.chatTheme.chatPageTheme.mediaTheme].
+/// Edge-to-edge square grid grouped by date with sticky headers
+/// ([IsmChatMediaTheme.sectionTitleTextStyle]). Column count grows with width.
 class IsmMediaView extends StatefulWidget {
   const IsmMediaView({super.key, required this.mediaList});
 
@@ -13,8 +14,7 @@ class IsmMediaView extends StatefulWidget {
   State<IsmMediaView> createState() => _IsmMediaViewState();
 }
 
-class _IsmMediaViewState extends State<IsmMediaView>
-    with TickerProviderStateMixin {
+class _IsmMediaViewState extends State<IsmMediaView> {
   List<Map<String, List<IsmChatMessageModel>>> storeWidgetMediaList = [];
 
   final chatPageController = IsmChatUtility.chatPageController;
@@ -28,94 +28,122 @@ class _IsmMediaViewState extends State<IsmMediaView>
             chatPageController.commonController.sortMessages(widget.mediaList);
         storeWidgetMediaList =
             chatPageController.sortMediaList(storeSortMedia).reversed.toList();
-        setState(() {});
+        if (mounted) setState(() {});
       },
     );
+  }
+
+  /// 3 columns on phones, more on tablets / the web panel.
+  static int columnsFor(double width) {
+    if (width >= 900) return 6;
+    if (width >= 640) return 5;
+    if (width >= 440) return 4;
+    return 3;
   }
 
   @override
   Widget build(BuildContext context) {
     final mediaTheme = IsmChatThemeResolver.mediaFromConfig(context);
-        return Padding(
-        padding: IsmChatDimens.edgeInsets10,
-        child: widget.mediaList.isEmpty
-            ? Center(
-                child: Text(
-                  IsmChatStrings.noMedia,
-                  style: mediaTheme.emptyStateTextStyle,
-                ),
-              )
-            : ListView.separated(
-                physics: const ScrollPhysics(),
-                shrinkWrap: true,
-                itemCount: storeWidgetMediaList.length,
-                separatorBuilder: (_, index) => IsmChatDimens.boxHeight10,
-                itemBuilder: (context, index) {
-                  var media = storeWidgetMediaList[index];
-                  var value = media.values.toList().first;
-                  var key =
-                      media.keys.toString().replaceAll(RegExp(r'\(|\)'), '');
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        key,
-                        style: mediaTheme.sectionTitleTextStyle,
-                      ),
-                      IsmChatDimens.boxHeight10,
-                      GridView.builder(
-                        physics: const ScrollPhysics(),
-                        shrinkWrap: true,
-                        itemCount: value.length,
-                        addAutomaticKeepAlives: true,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          mainAxisSpacing: 6,
-                          crossAxisSpacing: 6,
-                        ),
-                        itemBuilder: (context, valueIndex) {
-                          var url = value[valueIndex].customType ==
-                                  IsmChatCustomMessageType.image
-                              ? value[valueIndex].attachments?.first.mediaUrl ??
-                                  ''
-                              : value[valueIndex]
-                                      .attachments!
-                                      .first
-                                      .thumbnailUrl ??
-                                  '';
-                          var iconData = value[valueIndex].customType ==
-                                  IsmChatCustomMessageType.audio
-                              ? Icons.audio_file_rounded
-                              : Icons.description_rounded;
-
-                          return IsmChatTapHandler(
-                            onTap: () => IsmChatUtility.chatPageController
-                                .tapForMediaPreview(value[valueIndex]),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                ConversationMediaWidget(
-                                  media: value[valueIndex],
-                                  iconData: iconData,
-                                  url: url,
-                                ),
-                                if (value[valueIndex].customType ==
-                                    IsmChatCustomMessageType.video)
-                                  Icon(
-                                    Icons.play_circle_outline_outlined,
-                                    color: IsmChatColors.whiteColor,
-                                    size: IsmChatDimens.thirty,
-                                  )
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  );
-                },
-              ),
+    if (widget.mediaList.isEmpty) {
+      return IsmChatEmptyState(
+        icon: Icons.photo_library_outlined,
+        title: IsmChatStrings.noMedia,
+        subtitle: IsmChatStrings.mediaEmptyHint,
+        titleStyle: mediaTheme.emptyStateTextStyle,
+        subtitleStyle: mediaTheme.docSubtitleTextStyle,
       );
+    }
+    final sections = ismChatMediaSections(storeWidgetMediaList);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = columnsFor(constraints.maxWidth);
+        return CustomScrollView(
+          key: const PageStorageKey<String>('ism-media-grid'),
+          slivers: [
+            for (final section in sections)
+              SliverMainAxisGroup(
+                slivers: [
+                  IsmChatMediaSectionHeader.sliver(
+                    context,
+                    title: section.title,
+                    style: mediaTheme.sectionTitleTextStyle,
+                    backgroundColor: mediaTheme.scaffoldBackgroundColor,
+                  ),
+                  SliverGrid(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      mainAxisSpacing: 2,
+                      crossAxisSpacing: 2,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _MediaTile(
+                        message: section.items[index],
+                        onTap: () => chatPageController
+                            .tapForMediaPreview(section.items[index]),
+                      ),
+                      childCount: section.items.length,
+                    ),
+                  ),
+                ],
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MediaTile extends StatelessWidget {
+  const _MediaTile({required this.message, required this.onTap});
+
+  final IsmChatMessageModel message;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final attachment = message.attachments?.firstOrNull;
+    final url = message.customType == IsmChatCustomMessageType.image
+        ? attachment?.mediaUrl ?? ''
+        : attachment?.thumbnailUrl ?? '';
+    final iconData = message.customType == IsmChatCustomMessageType.audio
+        ? Icons.audio_file_rounded
+        : Icons.description_rounded;
+    final isVideo = message.customType == IsmChatCustomMessageType.video;
+
+    return Semantics(
+      button: true,
+      label: isVideo ? IsmChatStrings.video : IsmChatStrings.image,
+      child: IsmChatTapHandler(
+        onTap: onTap,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ConversationMediaWidget(
+              media: message,
+              iconData: iconData,
+              url: url,
+              borderRadius: 0,
+            ),
+            if (isVideo)
+              Center(
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: .45),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }

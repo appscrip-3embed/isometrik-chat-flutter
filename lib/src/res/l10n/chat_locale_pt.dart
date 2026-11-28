@@ -260,4 +260,33 @@ const Map<String, String> kIsmChatLocalePt = {
   'deleteForMeFailed': 'Não foi possível eliminar as mensagens.',
   'deleteRetryFailed':
       'Ainda não foi possível concluir a eliminação. Tente mais tarde.',
+  // In-chat secondary screens (media, info, pickers, wallpaper).
+  'mediaEmptyHint':
+      'As fotos e vídeos partilhados nesta conversa aparecerão aqui',
+  'linksEmptyHint': 'As ligações partilhadas nesta conversa aparecerão aqui',
+  'docsEmptyHint': 'Os documentos partilhados nesta conversa aparecerão aqui',
+  'mediaCounter': '{current} de {total}',
+  'saveMedia': 'Guardar multimédia',
+  'deleteMedia': 'Eliminar multimédia',
+  'searchMessagesHint': 'Pesquisar mensagens',
+  'searchMessagesEmptyHint':
+      'Escreva uma palavra para a encontrar nesta conversa',
+  'searchParticipantsHint': 'Pesquisar por nome ou e-mail',
+  'sms': 'SMS',
+  'call': 'Ligar',
+  'viewInfo': 'Ver informações',
+  'makeAdmin': 'Tornar administrador',
+  'revokeAdmin': 'Remover como administrador',
+  'removeFromGroup': 'Remover do grupo',
+  'removeFromGroupConfirm': 'Remover "{name}" de {group}?',
+  'sendLocation': 'Enviar localização',
+  'sendCurrentLocation': 'Enviar a sua localização atual',
+  'nearbyPlaces': 'Locais próximos',
+  'preview': 'Pré-visualização',
+  'setWallpaper': 'Definir imagem de fundo',
+  'wallpaperSampleIncoming': 'Olá! Como fica?',
+  'wallpaperSampleOutgoing': 'Fica ótimo 👍',
+  'done': 'Concluído',
+  'cameraHint': 'Mantenha premido para vídeo, toque para foto',
+  'groupLabel': 'Grupo',
 };

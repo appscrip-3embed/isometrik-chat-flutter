@@ -23,7 +23,53 @@ class IsmChatLinkPreviewCache {
   static void set(String url, PreviewData data) => _cache[url] = data;
 
   static void clear() => _cache.clear();
+
+  /// Cache key [LinkPreviewView] uses for a raw link / message body.
+  static String keyFor(String raw) =>
+      raw.trim().toLowerCase().convertToValidUrl;
+
+  /// Cached preview for [key] (see [keyFor]), fetched and cached on a miss.
+  /// Null when the fetch fails.
+  static Future<PreviewData?> resolve(String key) async {
+    final cached = get(key);
+    if (cached != null) return cached;
+    try {
+      final data = await getPreviewData(key);
+      set(key, data);
+      return data;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Title / description / image of an already cached preview, if any.
+  static IsmChatLinkPreviewSummary? summaryOf(String key) => _summarize(get(key));
+
+  /// Like [resolve], reduced to an [IsmChatLinkPreviewSummary].
+  static Future<IsmChatLinkPreviewSummary?> resolveSummary(String key) async =>
+      _summarize(await resolve(key));
+
+  static IsmChatLinkPreviewSummary? _summarize(PreviewData? data) {
+    if (data == null) return null;
+    String? clean(String? value) {
+      final trimmed = value?.trim() ?? '';
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    return (
+      title: clean(data.title),
+      description: clean(data.description),
+      imageUrl: clean(data.image?.url),
+    );
+  }
 }
+
+/// Text and image of a link preview ([IsmChatLinkPreviewCache.summaryOf]).
+typedef IsmChatLinkPreviewSummary = ({
+  String? title,
+  String? description,
+  String? imageUrl,
+});
 
 /// Link preview for chat messages.
 ///
