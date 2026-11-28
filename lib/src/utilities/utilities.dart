@@ -8,6 +8,7 @@ export 'chat_log.dart';
 export 'ism_chat_init_timer.dart';
 export 'image_attachment_dimensions.dart';
 export 'media_grid_layout.dart';
+export 'media_image_provider.dart';
 export 'config/config.dart';
 export 'debouncer.dart';
 export 'enums.dart';

@@ -39,6 +39,8 @@ class IsmChatMediaTheme {
   /// [IsmChatThemeData.chatPageHeaderTheme] → primary colour, like the chat header.
   factory IsmChatMediaTheme.fromTokens(IsmChatDesignTokens tokens) {
     final header = IsmChatConfig.chatTheme.chatPageHeaderTheme;
+    final previewBg = chatScreenBackground(tokens);
+    final previewFg = IsmChatDesignTokens.foregroundFor(previewBg);
     return IsmChatMediaTheme(
       scaffoldBackgroundColor: tokens.canvas,
       appBarBackgroundColor: header?.backgroundColor ??
@@ -46,12 +48,11 @@ class IsmChatMediaTheme {
           tokens.accent,
       appBarIconColor:
           header?.iconColor ?? IsmChatDesignTokens.viewerForeground,
-      previewBackgroundColor: IsmChatDesignTokens.viewerBackground,
-      previewTitleTextStyle: tokens.bodyStrong.copyWith(
-        color: IsmChatDesignTokens.viewerForeground,
-      ),
+      // Match chat screen: light canvas / white-ish in light, dark in dark.
+      previewBackgroundColor: previewBg,
+      previewTitleTextStyle: tokens.bodyStrong.copyWith(color: previewFg),
       previewSubtitleTextStyle: tokens.footnote.copyWith(
-        color: IsmChatDesignTokens.viewerForeground.withValues(alpha: .72),
+        color: previewFg.withValues(alpha: .72),
       ),
       tabBarContainerColor: tokens.segmentTrack,
       tabSelectedBackgroundColor: tokens.segmentThumb,
@@ -73,6 +74,15 @@ class IsmChatMediaTheme {
       cardBackgroundColor: tokens.surface,
     );
   }
+
+  /// Same fill as the chat page scaffold (page theme → theme → canvas).
+  ///
+  /// Reuse for [previewBackgroundColor] so the full-screen viewer matches the
+  /// conversation screen in light and dark — not a forced black film strip.
+  static Color chatScreenBackground(IsmChatDesignTokens tokens) =>
+      IsmChatConfig.chatTheme.chatPageTheme?.backgroundColor ??
+      IsmChatConfig.chatTheme.backgroundColor ??
+      tokens.canvas;
 
   final Color scaffoldBackgroundColor;
   final Color appBarBackgroundColor;

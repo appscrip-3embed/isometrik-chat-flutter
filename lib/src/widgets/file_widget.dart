@@ -18,28 +18,27 @@ class _IsmChatPdfViewState extends State<IsmChatPdfView> {
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      final isNetowrk = widget.filePath?.contains('http');
-      if (isNetowrk ?? false) {
-        _pdfController = PdfController(
-          document: PdfDocument.openData(
-            IsmChatUtility.getUint8ListFromUrl(
-              widget.filePath ?? '',
-            ),
-          ),
-          initialPage: 1,
-        );
-      } else {
-        _pdfController = PdfController(
-          document: PdfDocument.openData(
-            widget.filePath?.strigToUnit8List ?? Uint8List(0),
-          ),
-          initialPage: 1,
-        );
-      }
+    // Remote / local file paths are not Flutter asset-bundle keys.
+    // `openAsset` only works for packages/... paths and was showing the
+    // empty/error placeholder while the chat bubble thumbnail still worked.
+    final path = (widget.filePath ?? '').trim();
+    if (path.isValidUrl) {
+      _pdfController = PdfController(
+        document: PdfDocument.openData(
+          IsmChatUtility.getUint8ListFromUrl(path),
+        ),
+        initialPage: 1,
+      );
+    } else if (kIsWeb) {
+      _pdfController = PdfController(
+        document: PdfDocument.openData(
+          Future<Uint8List>.value(path.strigToUnit8List),
+        ),
+        initialPage: 1,
+      );
     } else {
       _pdfController = PdfController(
-        document: PdfDocument.openAsset(widget.filePath ?? ''),
+        document: PdfDocument.openFile(path),
         initialPage: 1,
       );
     }

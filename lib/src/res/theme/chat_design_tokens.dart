@@ -95,10 +95,12 @@ class IsmChatDesignTokens {
   /// Leading icon box size in settings rows.
   static const double iconBoxSize = 30;
 
-  /// Full-screen media viewer background (both modes, like most messengers).
+  /// Legacy always-black media viewer fill. SDK defaults now use the chat
+  /// screen background via [IsmChatMediaTheme.chatScreenBackground]; keep this
+  /// for hosts that still opt into a cinema-style black preview.
   static const Color viewerBackground = Color(0xFF000000);
 
-  /// Icons / text over [viewerBackground].
+  /// Icons / text over [viewerBackground] (cinema-style black preview).
   static const Color viewerForeground = Color(0xFFFFFFFF);
 
   final Brightness brightness;

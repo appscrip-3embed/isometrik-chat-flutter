@@ -76,8 +76,9 @@ class _IsmMediaViewState extends State<IsmMediaView> {
                       crossAxisSpacing: 2,
                     ),
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _MediaTile(
+                      (context, index) => IsmChatMediaThumbnail(
                         message: section.items[index],
+                        borderRadius: 0,
                         onTap: () => chatPageController
                             .tapForMediaPreview(section.items[index]),
                       ),
@@ -90,60 +91,6 @@ class _IsmMediaViewState extends State<IsmMediaView> {
           ],
         );
       },
-    );
-  }
-}
-
-class _MediaTile extends StatelessWidget {
-  const _MediaTile({required this.message, required this.onTap});
-
-  final IsmChatMessageModel message;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final attachment = message.attachments?.firstOrNull;
-    final url = message.customType == IsmChatCustomMessageType.image
-        ? attachment?.mediaUrl ?? ''
-        : attachment?.thumbnailUrl ?? '';
-    final iconData = message.customType == IsmChatCustomMessageType.audio
-        ? Icons.audio_file_rounded
-        : Icons.description_rounded;
-    final isVideo = message.customType == IsmChatCustomMessageType.video;
-
-    return Semantics(
-      button: true,
-      label: isVideo ? IsmChatStrings.video : IsmChatStrings.image,
-      child: IsmChatTapHandler(
-        onTap: onTap,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            ConversationMediaWidget(
-              media: message,
-              iconData: iconData,
-              url: url,
-              borderRadius: 0,
-            ),
-            if (isVideo)
-              Center(
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: .45),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -87,17 +87,15 @@ class _MediaPreviewState extends State<IsmMediaPreview> {
     final headerTheme = IsmChatConfig.chatTheme.chatPageHeaderTheme;
     final tokens = IsmChatDesignTokens.of(context);
 
-    // Host media theme → colours exactly as before. SDK default → black
-    // viewer with white chrome, whatever the chat header colours are.
+    // Same fill as the chat page (light/dark). Host [mediaTheme] still wins
+    // when set. Chrome contrasts against that background.
     final hostTheme = IsmChatThemeResolver.hasCustomMediaTheme;
-    final isDark = IsmChatThemeResolver.brightness(context) == Brightness.dark;
     final background = mediaTheme.previewBackgroundColor;
     final iconColor = hostTheme
         ? headerTheme?.iconColor ?? mediaTheme.appBarIconColor
-        : IsmChatDesignTokens.viewerForeground;
-    final lightStatusIcons = hostTheme
-        ? isDark
-        : IsmChatDesignTokens.foregroundFor(background) == Colors.white;
+        : IsmChatDesignTokens.foregroundFor(background);
+    final lightStatusIcons =
+        IsmChatDesignTokens.foregroundFor(background) == Colors.white;
     final menuLabelStyle =
         hostTheme ? mediaTheme.docTitleTextStyle : tokens.body;
     final total = widget.messageData.length;
@@ -109,12 +107,11 @@ class _MediaPreviewState extends State<IsmMediaPreview> {
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarIconBrightness:
             lightStatusIcons ? Brightness.light : Brightness.dark,
-        statusBarColor: hostTheme ? background : Colors.transparent,
+        statusBarColor: background,
         statusBarBrightness:
             lightStatusIcons ? Brightness.dark : Brightness.light,
       ),
-      backgroundColor:
-          hostTheme ? background : background.withValues(alpha: .55),
+      backgroundColor: background,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -188,7 +185,6 @@ class _MediaPreviewState extends State<IsmMediaPreview> {
 
     return Scaffold(
       backgroundColor: background,
-      extendBodyBehindAppBar: !hostTheme,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: AnimatedOpacity(
@@ -212,28 +208,39 @@ class _MediaPreviewState extends State<IsmMediaPreview> {
               controller: pageController,
               itemBuilder: (BuildContext context, int index) {
                 final media = widget.messageData[index];
-                var url = media.attachments?.first.mediaUrl ?? '';
+                final attachment = media.attachments?.firstOrNull;
+                final url = attachment?.mediaUrl ?? '';
                 final customType = media.mediaPreviewContentType;
-                return customType == IsmChatCustomMessageType.image
-                    ? PhotoView(
-                        backgroundDecoration: BoxDecoration(
-                          color: background,
-                        ),
-                        imageProvider: url.isValidUrl
-                            ? NetworkImage(url) as ImageProvider
-                            : kIsWeb
-                                ? MemoryImage(url.strigToUnit8List)
-                                    as ImageProvider
-                                : FileImage(File(url)) as ImageProvider,
-                        loadingBuilder: (context, event) =>
-                            const IsmChatLoadingDialog(),
-                        onTapUp:
-                            hostTheme ? null : (_, __, ___) => _toggleChrome(),
-                        wantKeepAlive: true,
-                      )
-                    : SizedBox.expand(
-                        child: VideoViewPage(path: url),
-                      );
+                if (customType == IsmChatCustomMessageType.image) {
+                  // Same cache-backed provider as chat bubbles — raw
+                  // NetworkImage skips disk cache and often lands on
+                  // PhotoView's broken-image icon.
+                  final provider =
+                      IsmChatMediaImageProvider.fromAttachment(attachment);
+                  if (provider == null) {
+                    return Center(
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: iconColor.withValues(alpha: .5),
+                        size: 48,
+                      ),
+                    );
+                  }
+                  return PhotoView(
+                    backgroundDecoration: BoxDecoration(
+                      color: background,
+                    ),
+                    imageProvider: provider,
+                    loadingBuilder: (context, event) =>
+                        const IsmChatLoadingDialog(),
+                    onTapUp:
+                        hostTheme ? null : (_, __, ___) => _toggleChrome(),
+                    wantKeepAlive: true,
+                  );
+                }
+                return SizedBox.expand(
+                  child: VideoViewPage(path: url),
+                );
               },
               onPageChanged: (index) {
                 final timeStamp = DateTime.fromMillisecondsSinceEpoch(

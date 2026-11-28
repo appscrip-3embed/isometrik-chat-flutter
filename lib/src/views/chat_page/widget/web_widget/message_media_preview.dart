@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
@@ -90,11 +87,12 @@ class _WebMessageMediaPreviewState extends State<IsmWebMessageMediaPreview> {
     final mediaTheme = IsmChatThemeResolver.mediaFromConfig(context);
     final headerTheme = IsmChatConfig.chatTheme.chatPageHeaderTheme;
     final tokens = IsmChatDesignTokens.of(context);
+    // Match chat page light/dark fill (see [IsmChatMediaTheme.chatScreenBackground]).
     final hostTheme = IsmChatThemeResolver.hasCustomMediaTheme;
     final background = mediaTheme.previewBackgroundColor;
     final foreground = hostTheme
         ? headerTheme?.iconColor ?? mediaTheme.appBarIconColor
-        : IsmChatDesignTokens.viewerForeground;
+        : IsmChatDesignTokens.foregroundFor(background);
     final index = chatPageController.assetsIndex;
     final total = messageData.length;
     final subtitle = total > 1
@@ -168,24 +166,34 @@ class _WebMessageMediaPreviewState extends State<IsmWebMessageMediaPreview> {
                     BuildContext context,
                     int index,
                   ) {
-                    var media = messageData[index];
-                    var url = media.attachments?.first.mediaUrl ?? '';
+                    final media = messageData[index];
+                    final attachment = media.attachments?.firstOrNull;
+                    final url = attachment?.mediaUrl ?? '';
                     final customType = media.mediaPreviewContentType;
-                    return customType == IsmChatCustomMessageType.image
-                        ? PhotoView(
-                            backgroundDecoration:
-                                BoxDecoration(color: background),
-                            imageProvider: url.isValidUrl
-                                ? NetworkImage(url)
-                                : kIsWeb
-                                    ? MemoryImage(url.strigToUnit8List)
-                                        as ImageProvider
-                                    : FileImage(File(url)),
-                            loadingBuilder: (context, event) =>
-                                const IsmChatLoadingDialog(),
-                            wantKeepAlive: true,
-                          )
-                        : VideoViewPage(path: url);
+                    if (customType == IsmChatCustomMessageType.image) {
+                      // Match chat bubbles: CachedNetworkImageProvider (not
+                      // NetworkImage) so the viewer reuses the bubble cache.
+                      final provider =
+                          IsmChatMediaImageProvider.fromAttachment(attachment);
+                      if (provider == null) {
+                        return Center(
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: foreground.withValues(alpha: .5),
+                            size: 48,
+                          ),
+                        );
+                      }
+                      return PhotoView(
+                        backgroundDecoration:
+                            BoxDecoration(color: background),
+                        imageProvider: provider,
+                        loadingBuilder: (context, event) =>
+                            const IsmChatLoadingDialog(),
+                        wantKeepAlive: true,
+                      );
+                    }
+                    return VideoViewPage(path: url);
                   },
                   onPageChanged: (index) {
                     var media = messageData[index];
@@ -235,14 +243,14 @@ class _WebMessageMediaPreviewState extends State<IsmWebMessageMediaPreview> {
                 separatorBuilder: (context, index) => IsmChatDimens.boxWidth8,
                 itemCount: messageData.length,
                 itemBuilder: (context, index) {
-                  var media = messageData[index].attachments;
-                  var isVideo = IsmChatConstants.videoExtensions.contains(
-                    media?.first.extension,
-                  );
+                  final item = messageData[index];
+                  final isVideo =
+                      item.mediaPreviewContentType ==
+                          IsmChatCustomMessageType.video;
                   final selected = chatPageController.assetsIndex == index;
-                  final url = isVideo
-                      ? media?.first.thumbnailUrl ?? ''
-                      : media?.first.mediaUrl ?? '';
+                  // Shared URL + cache path as [IsmChatMediaThumbnail].
+                  final url =
+                      IsmChatMediaImageProvider.displayUrlForMessage(item);
                   return Semantics(
                     button: true,
                     selected: selected,
@@ -270,11 +278,11 @@ class _WebMessageMediaPreviewState extends State<IsmWebMessageMediaPreview> {
                             alignment: Alignment.center,
                             children: [
                               Positioned.fill(
-                                child: IsmChatImage(
-                                  url,
-                                  radius: 8,
-                                  isNetworkImage: url.isValidUrl,
-                                  isBytes: !url.isValidUrl,
+                                child: ConversationMediaWidget(
+                                  media: item,
+                                  iconData: Icons.description_rounded,
+                                  url: url,
+                                  borderRadius: 8,
                                 ),
                               ),
                               if (isVideo)

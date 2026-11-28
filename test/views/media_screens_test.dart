@@ -139,7 +139,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  chatTestWidgets('viewer uses black chrome by default', (tester, ctx) async {
+  chatTestWidgets('viewer uses chat screen background by default',
+      (tester, ctx) async {
     final image = await _viewerImage(tester);
     await pumpSdkScreen(
       tester,
@@ -152,10 +153,14 @@ void main() {
       ),
     );
 
+    final element = tester.element(find.byType(Scaffold).first);
+    final expectedBg = IsmChatMediaTheme.chatScreenBackground(
+      IsmChatDesignTokens.of(element),
+    );
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
-    expect(scaffold.backgroundColor, IsmChatDesignTokens.viewerBackground);
+    expect(scaffold.backgroundColor, expectedBg);
     final share = tester.widget<Icon>(find.byIcon(Icons.share_outlined));
-    expect(share.color, IsmChatDesignTokens.viewerForeground);
+    expect(share.color, IsmChatDesignTokens.foregroundFor(expectedBg));
   });
 
   chatTestWidgets('viewer keeps a host media theme verbatim',
