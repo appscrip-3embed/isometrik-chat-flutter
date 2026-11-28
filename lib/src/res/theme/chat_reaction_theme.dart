@@ -39,6 +39,29 @@ class IsmChatReactionTheme {
         emojiBackgroundColor: IsmChatColors.blackColor,
       );
 
+  /// Reactions sheet default built from [IsmChatDesignTokens].
+  ///
+  /// [IsmChatReactionTheme.light] / [IsmChatReactionTheme.dark] stay the
+  /// defaults for the reaction chips on message bubbles;
+  /// [ImsChatShowUserReaction] uses this when the host passes no
+  /// [IsmChatPageTheme.reactionTheme].
+  factory IsmChatReactionTheme.fromTokens(IsmChatDesignTokens tokens) =>
+      IsmChatReactionTheme(
+        backgroundColor: tokens.surface,
+        countTextStyle: tokens.footnote.copyWith(color: tokens.textPrimary),
+        tabLabelTextStyle: tokens.footnote.copyWith(
+          color: tokens.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        tabCountTextStyle: tokens.footnote.copyWith(
+          color: tokens.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        listTileTitleTextStyle: tokens.bodyStrong,
+        listTileSubtitleTextStyle: tokens.footnote,
+        emojiBackgroundColor: tokens.surfaceMuted,
+      );
+
   /// Chip / sheet background.
   final Color backgroundColor;
 
@@ -59,4 +82,27 @@ class IsmChatReactionTheme {
 
   final List<BoxShadow>? boxShadow;
   final Color? emojiBackgroundColor;
+
+  IsmChatReactionTheme copyWith({
+    Color? backgroundColor,
+    TextStyle? countTextStyle,
+    TextStyle? tabLabelTextStyle,
+    TextStyle? tabCountTextStyle,
+    TextStyle? listTileTitleTextStyle,
+    TextStyle? listTileSubtitleTextStyle,
+    List<BoxShadow>? boxShadow,
+    Color? emojiBackgroundColor,
+  }) =>
+      IsmChatReactionTheme(
+        backgroundColor: backgroundColor ?? this.backgroundColor,
+        countTextStyle: countTextStyle ?? this.countTextStyle,
+        tabLabelTextStyle: tabLabelTextStyle ?? this.tabLabelTextStyle,
+        tabCountTextStyle: tabCountTextStyle ?? this.tabCountTextStyle,
+        listTileTitleTextStyle:
+            listTileTitleTextStyle ?? this.listTileTitleTextStyle,
+        listTileSubtitleTextStyle:
+            listTileSubtitleTextStyle ?? this.listTileSubtitleTextStyle,
+        boxShadow: boxShadow ?? this.boxShadow,
+        emojiBackgroundColor: emojiBackgroundColor ?? this.emojiBackgroundColor,
+      );
 }

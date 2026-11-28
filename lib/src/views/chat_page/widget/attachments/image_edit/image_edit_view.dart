@@ -11,7 +11,9 @@ class IsmChatImageEditView extends StatelessWidget {
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
         initState: (state) {
-          state.controller?.textEditingController.clear();
+          state.controller
+            ?..textEditingController.clear()
+            ..hideCaptionMentions();
         },
         builder: (controller) => Scaffold(
           backgroundColor: IsmChatColors.blackColor,
@@ -68,26 +70,40 @@ class IsmChatImageEditView extends StatelessWidget {
             padding: IsmChatDimens.edgeInsetsLeft10
                 .copyWith(left: IsmChatDimens.thirty),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
-                  child: IsmChatInputField(
-                    fillColor: IsmChatColors.greyColor,
-                    autofocus: false,
-                    padding: IsmChatDimens.edgeInsets0,
-                    hint: IsmChatStrings.addCaption,
-                    hintStyle: IsmChatStyles.w400White16,
-                    cursorColor: IsmChatColors.whiteColor,
-                    style: IsmChatStyles.w400White16,
-                    controller: controller.textEditingController,
-                    onChanged: (value) {
-                      controller.webMedia.first.caption = value;
-                    },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IsmChatCaptionMentionList(
+                        field: controller.textEditingController,
+                        onCaptionChanged: (value) {
+                          controller.webMedia.first.caption = value;
+                        },
+                      ),
+                      IsmChatInputField(
+                        fillColor: IsmChatColors.greyColor,
+                        autofocus: false,
+                        padding: IsmChatDimens.edgeInsets0,
+                        hint: IsmChatStrings.addCaption,
+                        hintStyle: IsmChatStyles.w400White16,
+                        cursorColor: IsmChatColors.whiteColor,
+                        style: IsmChatStyles.w400White16,
+                        controller: controller.textEditingController,
+                        onChanged: (value) {
+                          controller.webMedia.first.caption = value;
+                          controller.refreshCaptionMentions(value);
+                        },
+                      ),
+                    ],
                   ),
                 ),
                 IsmChatDimens.boxWidth8,
                 FloatingActionButton(
                   backgroundColor: IsmChatConfig.chatTheme.primaryColor,
                   onPressed: () async {
+                    controller.hideCaptionMentions();
                     final fileBytes =
                         controller.webMedia.first.platformFile.size ?? 0;
                     final sizeAllowed = await IsmChatStorageQuotaGuard

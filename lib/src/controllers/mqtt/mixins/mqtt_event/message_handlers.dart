@@ -47,9 +47,13 @@ mixin IsmChatMqttEventMessageHandlersMixin {
     // moves the root's "N replies" badge. Always false with threads off.
     final isThreadOnlyReply =
         IsmChatThreadCoordinator.shouldHideFromTimeline(message);
+    // Any thread reply (thread-only or "also sent to channel") moves the
+    // root's "N replies" badge.
+    final isIncomingThreadReply = IsmChatThreadCoordinator.isEnabled &&
+        IsmChatThreadCoordinator.isThreadReply(message);
     // True when a thread panel is open on this thread and already moved the
     // root's badge on the channel row — bumping it again would double-count.
-    final deliveredToOpenThread = isThreadOnlyReply &&
+    final deliveredToOpenThread = isIncomingThreadReply &&
         IsmChatThreadController.deliverIncomingReply(message);
     if (conversation != null && IsmChatUtility.chatPageControllerRegistered) {
       final controller = IsmChatUtility.chatPageController;
@@ -78,11 +82,44 @@ mixin IsmChatMqttEventMessageHandlersMixin {
               List<IsmChatMessageModel>.from(controller.messages),
             ),
           );
+          // Also-sent thread reply: bump the root's badge on the channel row.
+          if (isIncomingThreadReply && !deliveredToOpenThread) {
+            controller.messages =
+                IsmChatThreadCoordinator.applyReplyToRootInList(
+              List<IsmChatMessageModel>.from(controller.messages),
+              message,
+            );
+          }
           controller.update();
         }
       }
     }
-    if (conversation == null) return;
+    // Newly added to a group: row may be missing locally while MQTT still delivers
+    // messages and local notifications. Bootstrap from the payload so the list
+    // updates immediately; back-fill full metadata from the server.
+    if (conversation == null) {
+      final bootstrapped =
+          IsmChatGroupSystemMessageCoordinator
+              .bootstrapConversationFromIncomingMessage(
+        message,
+        sentByMe: isFromCurrentUser,
+      );
+      if (bootstrapped != null) {
+        await IsmChatConfig.dbWrapper?.saveConversation(
+          conversation: bootstrapped,
+        );
+        IsmChatGroupSystemMessageCoordinator.syncConversationListCache(
+          bootstrapped,
+        );
+        conversation = bootstrapped;
+      }
+      unawaited(
+        IsmChatUtility.conversationController.getChatConversations(),
+      );
+      if (conversation == null) {
+        return;
+      }
+    }
     if (!isFromThisDevice &&
         conversation.lastMessageDetails?.messageId == message.messageId) {
       return;
@@ -179,9 +216,14 @@ mixin IsmChatMqttEventMessageHandlersMixin {
             );
           }
         }
-        final messages = Map<String, IsmChatMessageModel>.from(
+        var messages = Map<String, IsmChatMessageModel>.from(
           next.messages ?? {},
         );
+        // Also-sent thread reply: persist the root's new replyCount too.
+        if (isIncomingThreadReply) {
+          messages =
+              IsmChatThreadCoordinator.applyReplyToRootInMap(messages, message);
+        }
         return next.copyWith(
           messages: IsmChatDBWrapper.mergeCallMessageIntoMap(messages, message),
         );

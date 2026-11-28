@@ -154,60 +154,39 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
     }
   }
 
+  /// Matches the visible media grid via [IsmChatMediaGridGrouping]; GIF/sticker
+  /// rows are not batch-selected unless they share a true grid group.
   List<IsmChatMessageModel> _getGroupedMediaMessagesForSelection(
     IsmChatMessageModel message,
   ) {
-    final isImage = message.customType == IsmChatCustomMessageType.image;
-    final isVideo = message.customType == IsmChatCustomMessageType.video;
-    if (!isImage && !isVideo) {
-      return [message];
+    final allMessages = _controller.messages
+        .where((msg) => msg.customType != IsmChatCustomMessageType.date)
+        .toList();
+    return IsmChatMediaGridGrouping.collectActionableGroup(allMessages, message);
+  }
+
+  /// Whether [message] is in the current multi-select set (stable identity).
+  bool isMessageInSelection(IsmChatMessageModel message) {
+    final selected = _controller.selectedMessage;
+    if (selected.any(
+      (item) => _messageIdentity(item) == _messageIdentity(message),
+    )) {
+      return true;
     }
 
     final allMessages = _controller.messages
         .where((msg) => msg.customType != IsmChatCustomMessageType.date)
         .toList();
-    if (allMessages.isEmpty) {
-      return [message];
+    final group = IsmChatMediaGridGrouping.collect(allMessages, message);
+    if (group.length < 2 ||
+        !IsmChatMediaGridGrouping.isGridHost(group, message)) {
+      return false;
     }
-
-    final currentIndex = allMessages.indexWhere(
-      (msg) => _messageIdentity(msg) == _messageIdentity(message),
+    return group.any(
+      (peer) => selected.any(
+        (item) => _messageIdentity(item) == _messageIdentity(peer),
+      ),
     );
-    if (currentIndex == -1) {
-      return [message];
-    }
-
-    final currentMessage = allMessages[currentIndex];
-    final sentByMe = currentMessage.sentByMe;
-    const timeWindow = 10000; // 10 seconds in milliseconds.
-    final groupedMessages = <IsmChatMessageModel>[];
-
-    var groupStartIndex = currentIndex;
-    for (var i = currentIndex; i >= 0; i--) {
-      final msg = allMessages[i];
-      final msgIsImage = msg.customType == IsmChatCustomMessageType.image;
-      final msgIsVideo = msg.customType == IsmChatCustomMessageType.video;
-      if (!msgIsImage && !msgIsVideo) break;
-      if (msg.sentByMe != sentByMe) break;
-
-      final timeDiff = (msg.sentAt - currentMessage.sentAt).abs();
-      if (timeDiff > timeWindow) break;
-      groupStartIndex = i;
-    }
-
-    for (var i = groupStartIndex; i < allMessages.length; i++) {
-      final msg = allMessages[i];
-      final msgIsImage = msg.customType == IsmChatCustomMessageType.image;
-      final msgIsVideo = msg.customType == IsmChatCustomMessageType.video;
-      if (!msgIsImage && !msgIsVideo) break;
-      if (msg.sentByMe != sentByMe) break;
-
-      final timeDiff = (msg.sentAt - allMessages[groupStartIndex].sentAt).abs();
-      if (timeDiff > timeWindow && groupedMessages.isNotEmpty) break;
-      groupedMessages.add(msg);
-    }
-
-    return groupedMessages.length >= 2 ? groupedMessages : [message];
   }
 
   String _messageIdentity(IsmChatMessageModel message) {
@@ -250,7 +229,13 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
       return;
     }
 
-    await _controller.showOverlay(context, message);
+    final allMessages = _controller.messages
+        .where((msg) => msg.customType != IsmChatCustomMessageType.date)
+        .toList();
+    final focusMessage =
+        IsmChatMediaGridGrouping.focusMenuAnchor(allMessages, message);
+
+    await _controller.showOverlay(context, focusMessage);
   }
 
   /// Shows overlay for message focus menu (mobile).
@@ -258,6 +243,7 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
     BuildContext context,
     IsmChatMessageModel message,
   ) async {
+    final anchorRect = _focusAnchorRect(context, message);
     await Navigator.push(
       context,
       PageRouteBuilder(
@@ -273,6 +259,7 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
             message,
             pageController: _controller,
             animation: animation,
+            anchorRect: anchorRect,
           );
         },
         fullscreenDialog: true,
@@ -281,6 +268,49 @@ mixin IsmChatPageMessageOperationsMixin on GetxController {
         reverseTransitionDuration: IsmChatConstants.transitionDuration,
       ),
     );
+  }
+
+  /// Where [message]'s bubble sits, in the navigator's coordinates, so the
+  /// focus menu can open it in place (WhatsApp-style) instead of re-centering.
+  ///
+  /// [context] may be the whole row (above the bubble's [Hero]) or a widget
+  /// inside the bubble (e.g. an image), so look both ways for the Hero; fall
+  /// back to [context]'s own box (e.g. thread tiles have no Hero).
+  Rect? _focusAnchorRect(BuildContext context, IsmChatMessageModel message) {
+    if (!context.mounted) return null;
+    Element? hero;
+    bool isBubbleHero(Element element) {
+      final widget = element.widget;
+      return widget is Hero && widget.tag == message;
+    }
+
+    context.visitAncestorElements((element) {
+      if (!isBubbleHero(element)) return true;
+      hero = element;
+      return false;
+    });
+    if (hero == null) {
+      void visit(Element element) {
+        if (hero != null) return;
+        if (isBubbleHero(element)) {
+          hero = element;
+          return;
+        }
+        element.visitChildElements(visit);
+      }
+
+      context.visitChildElements(visit);
+    }
+
+    final box = (hero ?? context).findRenderObject();
+    final navigatorBox = Navigator.of(context).context.findRenderObject();
+    if (box is! RenderBox ||
+        !box.attached ||
+        !box.hasSize ||
+        navigatorBox is! RenderBox) {
+      return null;
+    }
+    return box.localToGlobal(Offset.zero, ancestor: navigatorBox) & box.size;
   }
 
   /// Shows overlay for message focus menu (web).

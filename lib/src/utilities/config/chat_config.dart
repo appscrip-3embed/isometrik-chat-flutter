@@ -10,6 +10,24 @@ class IsmChatConfig {
   static late GlobalKey<NavigatorState> kNavigatorKey;
   static late BuildContext context;
   static bool configInitilized = false;
+
+  /// Navigator context, falling back to [context] when a chat host has set it.
+  ///
+  /// Returns `null` in headless unit tests where neither is available — prefer
+  /// this over `kNavigatorKey.currentContext ?? context`, which throws if
+  /// [context] was never assigned.
+  ///
+  /// **Reuse:** any controller/utility that only needs an optional BuildContext
+  /// (keyboard insets, hide-keyboard side effects, etc.) should call this.
+  static BuildContext? get contextOrNull {
+    final navContext = kNavigatorKey.currentContext;
+    if (navContext != null) return navContext;
+    try {
+      return context;
+    } catch (_) {
+      return null;
+    }
+  }
   static IsmChatThemeData? _chatLightTheme;
   static IsmChatThemeData? _chatDarkTheme;
   static IsmChatDBWrapper? dbWrapper;
@@ -104,8 +122,8 @@ class IsmChatConfig {
   }
 
   static IsmChatThemeData get chatTheme => isChatDarkMode
-      ? _chatDarkTheme ?? IsmChatThemeData.light()
-      : _chatLightTheme ?? IsmChatThemeData.dark();
+      ? _chatDarkTheme ?? IsmChatThemeData.dark()
+      : _chatLightTheme ?? IsmChatThemeData.light();
 
   // ignore: avoid_setters_without_getters
   static set chatLightTheme(IsmChatThemeData data) => _chatLightTheme = data;
@@ -150,7 +168,7 @@ class IsmChatConfig {
   /// - root messages show a tappable "N replies" footer
   ///   ([IsmChatThreadFooter]) built from `replyCount`,
   /// - the focus menu gains "Reply in thread", which opens [IsmChatThreadView],
-  /// - thread replies are sent with `messageType: 2`, `parentMessageId` and
+  /// - thread replies are sent with `messageType: 4`, `parentMessageId` and
   ///   `showInConversation: false` (or `true` for "also send to channel"),
   /// - incoming thread replies are routed to the open thread instead of the
   ///   channel list ([IsmChatThreadCoordinator]).

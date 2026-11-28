@@ -10,11 +10,14 @@ class IsmChatAudioPlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mediaTheme = IsmChatThemeResolver.mediaFromConfig(context);
+    final closeColor = IsmChatThemeResolver.hasCustomMediaTheme
+        ? mediaTheme.appBarIconColor
+        : IsmChatDesignTokens.of(context).textSecondary;
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: mediaTheme.tabBarContainerColor,
-        borderRadius: BorderRadius.circular(IsmChatDimens.ten),
+        borderRadius: BorderRadius.circular(IsmChatDesignTokens.cardRadius),
       ),
       padding: IsmChatDimens.edgeInsets8,
       constraints: BoxConstraints(minHeight: IsmChatDimens.eighty),
@@ -27,7 +30,7 @@ class IsmChatAudioPlayer extends StatelessWidget {
             onPressed: IsmChatRoute.goBack,
             icon: Icon(
               Icons.close,
-              color: mediaTheme.appBarIconColor,
+              color: closeColor,
             ),
           ),
         ],

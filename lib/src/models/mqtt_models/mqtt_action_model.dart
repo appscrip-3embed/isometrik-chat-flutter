@@ -65,6 +65,7 @@ class IsmChatMqttActionModel {
     this.isGroup,
     this.meetingId,
     this.messageDetails,
+    this.deviceId,
   });
   factory IsmChatMqttActionModel.fromJson(String source) =>
       IsmChatMqttActionModel.fromMap(
@@ -195,6 +196,7 @@ class IsmChatMqttActionModel {
                 Map<String, dynamic>.from(map['details'] as Map),
               )
             : null,
+        deviceId: map['deviceId']?.toString().trim() ?? '',
       );
 
   final String? conversationId;
@@ -224,6 +226,7 @@ class IsmChatMqttActionModel {
   final bool? isGroup;
   final String? meetingId;
   final IsmChatMqttMessageDetails? messageDetails;
+  final String? deviceId;
 
   IsmChatMqttActionModel copyWith({
     String? conversationId,
@@ -252,6 +255,7 @@ class IsmChatMqttActionModel {
     IsmChatMetaData? metaData,
     bool? isGroup,
     String? meetingId,
+    String? deviceId,
   }) =>
       IsmChatMqttActionModel(
         conversationId: conversationId ?? this.conversationId,
@@ -280,6 +284,7 @@ class IsmChatMqttActionModel {
         metaData: metaData ?? this.metaData,
         isGroup: isGroup ?? this.isGroup,
         meetingId: meetingId ?? this.meetingId,
+        deviceId: deviceId ?? this.deviceId,
       );
 
   Map<String, dynamic> toMap() => <String, dynamic>{
@@ -308,6 +313,7 @@ class IsmChatMqttActionModel {
         'attachments': attachments?.map((x) => x.toMap()).toList(),
         'metaData': metaData?.toMap(),
         'isGroup': isGroup,
+        'deviceId': deviceId,
       }.removeNullValues();
 
   String toJson() => json.encode(toMap());
@@ -344,7 +350,8 @@ class IsmChatMqttActionModel {
         other.body == body &&
         listEquals(other.attachments, attachments) &&
         other.metaData == metaData &&
-        other.isGroup == isGroup;
+        other.isGroup == isGroup &&
+        other.deviceId == deviceId;
   }
 
   @override
@@ -373,7 +380,8 @@ class IsmChatMqttActionModel {
       body.hashCode ^
       attachments.hashCode ^
       metaData.hashCode ^
-      isGroup.hashCode;
+      isGroup.hashCode ^
+      deviceId.hashCode;
 }
 
 class Members {

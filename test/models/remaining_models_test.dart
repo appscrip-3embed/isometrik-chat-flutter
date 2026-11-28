@@ -124,6 +124,18 @@ void main() {
       expect(MessageReactionModel.fromJson(model.toJson()), model);
       expect(model.copyWith(emojiKey: 'heart').emojiKey, 'heart');
     });
+
+    test('addUserIfAbsent / removeUser dedupe same reactor', () {
+      final model = MessageReactionModel(emojiKey: 'yes', userIds: [kMeId]);
+      expect(model.addUserIfAbsent(kMeId), isFalse);
+      expect(model.userIds, [kMeId]);
+      expect(model.addUserIfAbsent(kOpponentId), isTrue);
+      expect(model.userIds, [kMeId, kOpponentId]);
+      // Accidental duplicates from a prior race must all clear on remove.
+      model.userIds.add(kMeId);
+      expect(model.removeUser(kMeId), isTrue);
+      expect(model.userIds, [kOpponentId]);
+    });
   });
 
   group('IsmChatUserOwnDetails', () {

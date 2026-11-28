@@ -97,6 +97,51 @@ class IsmChatResponseModel {
     return fallback;
   }
 
+  /// Dialog / toast copy that hides gateway noise (`error code: 520`, etc.).
+  ///
+  /// Prefers JSON `error` / `message` from [apiErrorMessage], then maps
+  /// [errorCode] (HTTP status or SDK `1000` timeout) to localized strings.
+  /// Reuse from delete flows and host [IsmChatConfig.chatInvalidate] handlers
+  /// so users never see raw status codes alone.
+  String userFacingApiErrorMessage({String? fallback}) {
+    final resolvedFallback = fallback ?? IsmChatStrings.errorGeneric;
+    final fromBody = apiErrorMessage(fallback: '');
+    if (fromBody.isNotEmpty && !_isTechnicalErrorText(fromBody)) {
+      return fromBody;
+    }
+    return _httpStatusUserMessage(resolvedFallback);
+  }
+
+  /// Bodies that look like infrastructure codes, not product copy.
+  static bool _isTechnicalErrorText(String text) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) return true;
+    final codePattern = RegExp(
+      r'^(error|status)\s*code\s*:\s*\d+\s*$',
+      caseSensitive: false,
+    );
+    if (codePattern.hasMatch(normalized)) return true;
+    return normalized.length < 4 && int.tryParse(normalized) != null;
+  }
+
+  String _httpStatusUserMessage(String fallback) {
+    switch (errorCode) {
+      case 1000:
+        return IsmChatStrings.errorRequestTimeout;
+      case 503:
+        return IsmChatStrings.errorServiceUnavailable;
+      case 502:
+      case 520:
+      case 521:
+      case 522:
+      case 523:
+      case 524:
+        return IsmChatStrings.errorServerUnavailable;
+      default:
+        return fallback;
+    }
+  }
+
   static String? _apiErrorFromDecoded(dynamic decoded) {
     if (decoded is! Map) {
       return decoded is String ? decoded.trim() : null;

@@ -103,6 +103,45 @@ void main() {
       );
     });
 
+    test('addReacton does not duplicate when MQTT already applied', () async {
+      // Sender race: MQTT echo writes the reactor first, then HTTP success
+      // patches the same message — userIds must stay a single entry.
+      api.on('POST', '/reaction', FakeResponse.json({'ok': true}));
+      await openTestDatabase();
+      await IsmChatConfig.dbWrapper?.saveConversation(
+        conversation: directConversation().copyWith(
+          messages: {
+            'm': message(
+              messageId: 'm',
+              reactions: [
+                MessageReactionModel(
+                  emojiKey: IsmChatEmoji.yes.value,
+                  userIds: [kMeId],
+                ),
+              ],
+            ),
+          },
+        ),
+      );
+      GetTestControllers.registerPage(vm);
+      await vm.addReacton(
+        reaction: Reaction(
+          reactionType: IsmChatEmoji.yes,
+          messageId: 'm',
+          conversationId: kDirectConversationId,
+        ),
+      );
+      final stored =
+          await IsmChatConfig.dbWrapper?.getConversation(kDirectConversationId);
+      final msg = stored?.messages?.values
+          .cast<IsmChatMessageModel?>()
+          .firstWhere((e) => e?.messageId == 'm', orElse: () => null);
+      final bucket = msg?.reactions?.firstWhere(
+        (r) => r.emojiKey == IsmChatEmoji.yes.value,
+      );
+      expect(bucket?.userIds, [kMeId]);
+    });
+
     test('updateMessage and getMessageForStatus', () async {
       api.on('PATCH', '/message', FakeResponse.json({'ok': true}));
       expect(

@@ -96,22 +96,33 @@ class _ConversationPullRefreshState extends State<_ConversationPullRefresh> {
 
   late final IsmChatConversationsController _controller;
   Worker? _conversationsWorker;
+  Worker? _loadingWorker;
+
+  void _scheduleRebuild() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
     _controller = IsmChatUtility.conversationController;
+    // List data changes (MQTT, refresh, search).
     _conversationsWorker = ever<List<IsmChatConversationModel>>(
       _controller.conversations as RxInterface<List<IsmChatConversationModel>>,
-      (_) {
-        if (mounted) setState(() {});
-      },
+      (_) => _scheduleRebuild(),
+    );
+    // Empty inbox: load finishes by clearing the flag only — conversations
+    // stays [] so the worker above never fires; without this, loader sticks.
+    _loadingWorker = ever<bool>(
+      _controller.isConversationsLoadingRx,
+      (_) => _scheduleRebuild(),
     );
   }
 
   @override
   void dispose() {
     _conversationsWorker?.dispose();
+    _loadingWorker?.dispose();
     super.dispose();
   }
 
@@ -212,6 +223,8 @@ class _ConversationPullRefreshState extends State<_ConversationPullRefresh> {
 
     return RefreshConfiguration(
       enableScrollWhenRefreshCompleted: true,
+      // Don't reserve footer space when the list is shorter than the screen.
+      hideFooterWhenNotFull: true,
       child: IsmChatPullToRefresh(
         header: const RefreshHeader(),
         footer: const RefreshFooter(),
@@ -340,65 +353,71 @@ class _SlidableWidgetState extends State<_SlidableWidget>
                         ),
                     ],
                   ),
+        // Always read an Rx inside Obx. A web-only ternary short-circuits on
+        // mobile and GetX throws "improper use of a GetX" (no listeners).
         child: Obx(
-          () => IsmChatConversationCard(
-            canShowStack: IsmChatProperties
-                .conversationProperties.cardElementBuilders?.canShowStack,
-            onProfileTap: IsmChatProperties
-                .conversationProperties.cardElementBuilders?.onProfileTap,
-            isShowBackgroundColor: IsmChatResponsive.isWeb(context)
-                ? controller.currentConversationId ==
-                    widget.conversation.conversationId
-                : false,
-            name: IsmChatProperties
-                .conversationProperties.cardElementBuilders?.name,
-            nameBuilder: IsmChatProperties
-                .conversationProperties.cardElementBuilders?.nameBuilder,
-            trailing: IsmChatProperties
-                .conversationProperties.cardElementBuilders?.trailing,
-            trailingBuilder: IsmChatProperties
-                .conversationProperties.cardElementBuilders?.trailingBuilder,
-            profileImageUrl: IsmChatProperties
-                .conversationProperties.cardElementBuilders?.profileImageUrl,
-            subtitle: IsmChatProperties
-                .conversationProperties.cardElementBuilders?.subtitle,
-            widget.conversation,
-            profileImageBuilder: IsmChatProperties.conversationProperties
-                .cardElementBuilders?.profileImageBuilder,
-            subtitleBuilder: !widget.conversation.isSomeoneTyping
-                ? IsmChatProperties
-                    .conversationProperties.cardElementBuilders?.subtitleBuilder
-                : (_, __, ___) => Text(
-                      widget.conversation.typingUsers,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: IsmChatStyles.typing,
-                    ),
-            onTap: () async {
-              if (IsmChatProperties.conversationProperties.onChatTap != null) {
-                IsmChatProperties.conversationProperties.onChatTap?.call(
-                  context,
-                  widget.conversation,
-                );
-              }
-              if (IsmChatProperties.conversationProperties.shouldGoToChatPage
-                      ?.call(context, widget.conversation) ??
-                  true) {
-                await controller.updateLocalConversation(widget.conversation);
+          () {
+            final isSelected = controller.currentConversationId ==
+                widget.conversation.conversationId;
+            return IsmChatConversationCard(
+              canShowStack: IsmChatProperties
+                  .conversationProperties.cardElementBuilders?.canShowStack,
+              onProfileTap: IsmChatProperties
+                  .conversationProperties.cardElementBuilders?.onProfileTap,
+              isShowBackgroundColor:
+                  IsmChatResponsive.isWeb(context) ? isSelected : false,
+              name: IsmChatProperties
+                  .conversationProperties.cardElementBuilders?.name,
+              nameBuilder: IsmChatProperties
+                  .conversationProperties.cardElementBuilders?.nameBuilder,
+              trailing: IsmChatProperties
+                  .conversationProperties.cardElementBuilders?.trailing,
+              trailingBuilder: IsmChatProperties
+                  .conversationProperties.cardElementBuilders?.trailingBuilder,
+              profileImageUrl: IsmChatProperties
+                  .conversationProperties.cardElementBuilders?.profileImageUrl,
+              subtitle: IsmChatProperties
+                  .conversationProperties.cardElementBuilders?.subtitle,
+              widget.conversation,
+              profileImageBuilder: IsmChatProperties.conversationProperties
+                  .cardElementBuilders?.profileImageBuilder,
+              subtitleBuilder: !widget.conversation.isSomeoneTyping
+                  ? IsmChatProperties.conversationProperties
+                      .cardElementBuilders?.subtitleBuilder
+                  : (_, __, ___) => Text(
+                        widget.conversation.typingUsers,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: IsmChatStyles.typing,
+                      ),
+              onTap: () async {
+                if (IsmChatProperties.conversationProperties.onChatTap !=
+                    null) {
+                  IsmChatProperties.conversationProperties.onChatTap?.call(
+                    context,
+                    widget.conversation,
+                  );
+                }
+                if (IsmChatProperties.conversationProperties.shouldGoToChatPage
+                        ?.call(context, widget.conversation) ??
+                    true) {
+                  await controller
+                      .updateLocalConversation(widget.conversation);
 
-                await controller.goToChatPage();
-              }
-            },
-            onLongPress: () {
-              if (IsmChatProperties.conversationProperties.onLongPress !=
-                  null) {
-                IsmChatProperties.conversationProperties.onLongPress?.call(
-                  context,
-                  widget.conversation,
-                );
-              }
-            },
-          ),
+                  await controller.goToChatPage();
+                }
+              },
+              onLongPress: () {
+                if (IsmChatProperties.conversationProperties.onLongPress !=
+                    null) {
+                  IsmChatProperties.conversationProperties.onLongPress?.call(
+                    context,
+                    widget.conversation,
+                  );
+                }
+              },
+            );
+          },
         ),
       );
 }

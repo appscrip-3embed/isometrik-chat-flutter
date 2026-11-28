@@ -36,13 +36,19 @@ class _IsmChatImageMessageState extends State<IsmChatImageMessage> {
     final message = widget.message;
     final isSticker = message.isStickerMessage;
     final isGif = message.isGifMessage;
+    final isWeb = IsmChatResponsive.isWeb(context);
     final maxWidth = isSticker
         ? IsmChatDimens.hundredFourty
-        : (IsmChatResponsive.isWeb(context)
-            ? context.width * .35
-            : context.width * .6);
-    final maxHeight =
-        isSticker ? IsmChatDimens.hundredFourty : IsmChatDimens.twoHundredFifty;
+        : IsmChatMediaGridLayout.chatMediaBubbleMaxWidth(
+            context.width,
+            isWeb: isWeb,
+          );
+    final maxHeight = isSticker
+        ? IsmChatDimens.hundredFourty
+        : IsmChatMediaGridLayout.chatMediaMaxHeight(
+            context.width,
+            isWeb: isWeb,
+          );
     final data = IsmChatProperties.chatPageProperties.isShowMessageBlur
         ?.call(context, message);
     return Material(
@@ -54,120 +60,121 @@ class _IsmChatImageMessageState extends State<IsmChatImageMessage> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IsmChatTapHandler(
-                  onTap: () {
-                    IsmChatThreadCoordinator.openMediaPreviewFromThread(
-                        message);
-                  },
-                  onLongPress: () {
-                    if (IsmChatUtility.chatPageControllerRegistered) {
-                      IsmChatUtility.chatPageController.onMessageLongPress(
-                        context,
-                        message,
-                      );
-                    }
-                  },
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxWidth: maxWidth,
-                      maxHeight: maxHeight,
-                    ),
-                    child: _MessageMediaImage(
-                      message: message,
-                      isSticker: isSticker,
-                      isGif: isGif,
-                      maxWidth: maxWidth,
-                      maxHeight: maxHeight,
-                    ),
+            // Caption width is capped at the rendered image width.
+            IsmChatMediaCaptionLayout(
+              media: IsmChatTapHandler(
+                onTap: () {
+                  IsmChatThreadCoordinator.openMediaPreviewFromThread(message);
+                },
+                onLongPress: () {
+                  if (IsmChatUtility.chatPageControllerRegistered) {
+                    IsmChatUtility.chatPageController.onMessageLongPress(
+                      context,
+                      message,
+                    );
+                  }
+                },
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: maxWidth,
+                    maxHeight: maxHeight,
+                  ),
+                  child: _MessageMediaImage(
+                    message: message,
+                    isSticker: isSticker,
+                    isGif: isGif,
+                    maxWidth: maxWidth,
+                    maxHeight: maxHeight,
                   ),
                 ),
-                if (!isGif &&
-                    !isSticker &&
-                    message.metaData?.caption?.isNotEmpty == true) ...[
-                  Padding(
-                    padding: IsmChatDimens.edgeInsetsTop5,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final caption = message.metaData?.caption ?? '';
-                        final textSpan = TextSpan(
-                          text: caption,
-                          style: message.style,
-                        );
-                        final textPainter = TextPainter(
-                          text: textSpan,
-                          maxLines: _isExpandedNotifier.value ? null : 3,
-                          textDirection: TextDirection.ltr,
-                        )..layout(
-                            maxWidth: constraints.maxWidth > 0
-                                ? constraints.maxWidth
-                                : context.width * 0.7);
+              ),
+              caption: (!isGif &&
+                      !isSticker &&
+                      message.metaData?.caption?.isNotEmpty == true)
+                  ? Padding(
+                      padding: IsmChatDimens.edgeInsetsTop5,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final caption = message.metaData?.caption ?? '';
+                          final textSpan = TextSpan(
+                            style: message.style,
+                            children: IsmChatMentionRichText.measurementSpans(
+                              caption,
+                              message.style,
+                              message.mentionListForBody(caption),
+                            ),
+                          );
+                          final textPainter = TextPainter(
+                            text: textSpan,
+                            maxLines: _isExpandedNotifier.value ? null : 3,
+                            textDirection: TextDirection.ltr,
+                          )..layout(
+                              maxWidth: constraints.maxWidth > 0
+                                  ? constraints.maxWidth
+                                  : context.width * 0.7);
 
-                        final didOverflow = textPainter.didExceedMaxLines;
+                          final didOverflow = textPainter.didExceedMaxLines;
 
-                        return ValueListenableBuilder<bool>(
-                          valueListenable: _isExpandedNotifier,
-                          builder: (context, isExpanded, _) => Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                caption,
-                                style: message.style,
-                                textAlign: TextAlign.start,
-                                overflow: isExpanded
-                                    ? TextOverflow.visible
-                                    : TextOverflow.ellipsis,
-                                maxLines: isExpanded ? null : 3,
-                              ),
-                              if (!isExpanded && didOverflow)
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: TextButton(
-                                    style: TextButton.styleFrom(
-                                      padding: IsmChatDimens.edgeInsets0,
-                                      minimumSize: const Size(0, 0),
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    onPressed: () {
-                                      _isExpandedNotifier.value = true;
-                                    },
-                                    child: Text(
-                                      'Show more',
-                                      style: message.readTextStyle,
+                          return ValueListenableBuilder<bool>(
+                            valueListenable: _isExpandedNotifier,
+                            builder: (context, isExpanded, _) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                IsmChatMentionRichText(
+                                  body: caption,
+                                  style: message.style,
+                                  message: message,
+                                  textAlign: TextAlign.start,
+                                  overflow: isExpanded
+                                      ? TextOverflow.visible
+                                      : TextOverflow.ellipsis,
+                                  maxLines: isExpanded ? null : 3,
+                                ),
+                                if (!isExpanded && didOverflow)
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: TextButton(
+                                      style: TextButton.styleFrom(
+                                        padding: IsmChatDimens.edgeInsets0,
+                                        minimumSize: const Size(0, 0),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      onPressed: () {
+                                        _isExpandedNotifier.value = true;
+                                      },
+                                      child: Text(
+                                        'Show more',
+                                        style: message.readTextStyle,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              if (isExpanded)
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: TextButton(
-                                    style: TextButton.styleFrom(
-                                      padding: IsmChatDimens.edgeInsets0,
-                                      minimumSize: const Size(0, 0),
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    onPressed: () {
-                                      _isExpandedNotifier.value = false;
-                                    },
-                                    child: Text(
-                                      'Show less',
-                                      style: message.readTextStyle,
+                                if (isExpanded)
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: TextButton(
+                                      style: TextButton.styleFrom(
+                                        padding: IsmChatDimens.edgeInsets0,
+                                        minimumSize: const Size(0, 0),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      onPressed: () {
+                                        _isExpandedNotifier.value = false;
+                                      },
+                                      child: Text(
+                                        'Show less',
+                                        style: message.readTextStyle,
+                                      ),
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  )
-                ]
-              ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  : null,
             ),
             if (message.isUploading == true &&
                 !_MessageMediaImage.hasDisplayableMedia(message))
@@ -392,16 +399,18 @@ class _MessageMediaImageState extends State<_MessageMediaImage> {
         !hasNetworkUrl &&
         mediaUrl.isNotEmpty &&
         File(mediaUrl).existsSync();
-    final fit = isSticker || isGif ? BoxFit.contain : BoxFit.cover;
+    // Cover: the mobile frame clamps extreme ratios, so the image is
+    // center-cropped into it (WhatsApp-style) instead of letterboxed.
+    final fit = isSticker ? BoxFit.contain : BoxFit.cover;
     final borderRadius = isSticker
         ? BorderRadius.zero
         : BorderRadius.circular(IsmChatDimens.eight);
     final layoutAspect = _layoutAspectRatio(attachment);
     final reservedSize = isSticker
         ? null
-        : IsmChatMediaGridLayout.constrainedMediaDisplaySize(
-            maxWidth: maxWidth,
-            maxHeight: maxHeight,
+        : IsmChatMediaGridLayout.chatMediaFrameSize(
+            screenWidth: context.width,
+            isWeb: IsmChatResponsive.isWeb(context),
             aspectRatio: layoutAspect,
           );
     final placeholderUrl = isGif ? _gifPlaceholderUrl(attachment) : null;

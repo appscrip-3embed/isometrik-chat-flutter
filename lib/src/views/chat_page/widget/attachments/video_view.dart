@@ -20,18 +20,29 @@ class IsmChatVideoView extends StatefulWidget {
 }
 
 class _IsmChatVideoViewState extends State<IsmChatVideoView> {
-  TextEditingController textEditingController = TextEditingController();
+  final controller = IsmChatUtility.chatPageController;
+
+  /// Caption field; highlights picked `@mentions` in groups.
+  late final TextEditingController textEditingController =
+      IsmChatMentionTextEditingController(
+    membersProvider: () => controller.mentionableMembers,
+  );
 
   WebMediaModel? webMediaModel;
   bool isLoading = true;
   bool hasError = false;
 
-  final controller = IsmChatUtility.chatPageController;
-
   @override
   void initState() {
     super.initState();
     _startInit();
+  }
+
+  @override
+  void dispose() {
+    controller.hideCaptionMentions();
+    textEditingController.dispose();
+    super.dispose();
   }
 
   void _voidConfig(XFile file) async {
@@ -191,27 +202,42 @@ class _IsmChatVideoViewState extends State<IsmChatVideoView> {
               .copyWith(left: IsmChatDimens.thirty),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: IsmChatInputField(
-                  fillColor: IsmChatColors.greyColor,
-                  autofocus: false,
-                  padding: IsmChatDimens.edgeInsets0,
-                  hint: IsmChatStrings.addCaption,
-                  hintStyle: IsmChatStyles.w400White16,
-                  cursorColor: IsmChatColors.whiteColor,
-                  style: IsmChatStyles.w400White16,
-                  controller: textEditingController,
-                  onChanged: (value) {
-                    webMediaModel?.caption = value;
-                    safeUpdate();
-                  },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IsmChatCaptionMentionList(
+                      field: textEditingController,
+                      onCaptionChanged: (value) {
+                        webMediaModel?.caption = value;
+                        safeUpdate();
+                      },
+                    ),
+                    IsmChatInputField(
+                      fillColor: IsmChatColors.greyColor,
+                      autofocus: false,
+                      padding: IsmChatDimens.edgeInsets0,
+                      hint: IsmChatStrings.addCaption,
+                      hintStyle: IsmChatStyles.w400White16,
+                      cursorColor: IsmChatColors.whiteColor,
+                      style: IsmChatStyles.w400White16,
+                      controller: textEditingController,
+                      onChanged: (value) {
+                        webMediaModel?.caption = value;
+                        controller.refreshCaptionMentions(value);
+                        safeUpdate();
+                      },
+                    ),
+                  ],
                 ),
               ),
               IsmChatDimens.boxWidth8,
               FloatingActionButton(
                 backgroundColor: IsmChatConfig.chatTheme.primaryColor,
                 onPressed: () async {
+                  controller.hideCaptionMentions();
                   final fileBytes = webMediaModel?.platformFile.size ?? 0;
                   final sizeAllowed = await IsmChatStorageQuotaGuard
                       .ensureAttachmentSizeAllowed(fileBytes: fileBytes);

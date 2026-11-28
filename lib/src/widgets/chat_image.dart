@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -219,8 +220,8 @@ class _NetworkImage extends StatelessWidget {
             shape: _isProfileImage ? BoxShape.circle : BoxShape.rectangle,
           ),
           child: _isProfileImage
-              ? Text(
-                  _buildInitials(_name),
+              ? _ProfileInitials(
+                  name: _name,
                   style: IsmChatStyles.w600Black20.copyWith(
                     color: IsmChatConfig.chatTheme.primaryColor,
                   ),
@@ -265,8 +266,8 @@ class _ErrorImage extends StatelessWidget {
           shape: _isProfileImage ? BoxShape.circle : BoxShape.rectangle,
         ),
         child: _isProfileImage
-            ? Text(
-                _buildInitials(_name),
+            ? _ProfileInitials(
+                name: _name,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 20,
@@ -283,5 +284,39 @@ class _ErrorImage extends StatelessWidget {
                   IsmChatStrings.errorLoadingImage,
                 ),
               ),
+      );
+}
+
+/// Initials inside a profile circle, shrunk to fit small avatars.
+///
+/// [style]'s font size is kept on large avatars and capped at ~45% of the
+/// circle on small ones, so two letters never spill past the background.
+class _ProfileInitials extends StatelessWidget {
+  const _ProfileInitials({required this.name, required this.style});
+
+  final String name;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final initials = _buildInitials(name);
+          final side = constraints.biggest.shortestSide;
+          if (!side.isFinite || side <= 0) {
+            return Text(initials, style: style);
+          }
+          final fontSize = math.min(style.fontSize ?? 20, side * 0.45);
+          return Padding(
+            padding: EdgeInsets.all(side * 0.1),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                initials,
+                maxLines: 1,
+                style: style.copyWith(fontSize: fontSize),
+              ),
+            ),
+          );
+        },
       );
 }

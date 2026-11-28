@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:custom_will_pop_scope/custom_will_pop_scope.dart';
 import 'package:flutter/material.dart';
@@ -115,7 +114,11 @@ class _IsmChatPageViewState extends State<IsmChatPageView>
     if (attachMessagesScrollController && !_wasCurrentRoute) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        unawaited(_restoreChatAfterReturningToStack());
+        unawaited(_restoreChatAfterReturningToStack().then((_) async {
+          if (!mounted || !IsmChatUtility.chatPageControllerRegistered) return;
+          await IsmChatUtility.chatPageController
+              .syncComposerDraftWithConversation();
+        }));
       });
     }
     _wasCurrentRoute = attachMessagesScrollController;
@@ -256,6 +259,14 @@ class _IsmChatPageViewState extends State<IsmChatPageView>
       }
     }
 
+    if (AppLifecycleState.paused == state &&
+        IsmChatUtility.chatPageControllerRegistered) {
+      unawaited(IsmChatUtility.chatPageController.flushComposerDraft());
+    }
+    if (AppLifecycleState.paused == state &&
+        Get.isRegistered<IsmChatThreadController>()) {
+      unawaited(Get.find<IsmChatThreadController>().flushComposerDraft());
+    }
     if (AppLifecycleState.paused == state) {
       // Don't set isAppInBackground to avoid disconnection
       // mqttController.isAppInBackground = true;
@@ -384,37 +395,11 @@ class _IsmChatPageView extends StatelessWidget {
   Widget build(BuildContext context) => GetX<IsmChatPageController>(
         tag: IsmChat.i.chatPageTag,
         builder: (controller) {
-          final hasImageWallpaper = controller.backgroundImage.isNotEmpty &&
-              controller.backgroundImage.isSupportedChatWallpaperUrl;
-          final hasColorWallpaper = controller.backgroundColor.isNotEmpty;
           final hasConversationWallpaper =
-              hasImageWallpaper || hasColorWallpaper;
+              IsmChatWallpaper.hasWallpaper(controller);
 
           return DecoratedBox(
-            decoration: BoxDecoration(
-              color: hasColorWallpaper
-                  ? controller.backgroundColor.toColor
-                  : hasImageWallpaper
-                      ? Colors.transparent
-                      : IsmChatColors.whiteColor,
-              image: hasImageWallpaper
-                  ? DecorationImage(
-                      image: controller.backgroundImage.isValidUrl
-                          ? NetworkImage(controller.backgroundImage)
-                          : IsmChatProperties.chatPageProperties
-                                  .backgroundImageUrl.isNullOrEmpty
-                              ? controller.backgroundImage.contains(
-                                      'packages/isometrik_chat_flutter/assets')
-                                  ? AssetImage(controller.backgroundImage)
-                                      as ImageProvider
-                                  : FileImage(
-                                      File(controller.backgroundImage),
-                                    )
-                              : AssetImage(controller.backgroundImage),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
+            decoration: IsmChatWallpaper.decoration(controller),
             child: Scaffold(
               drawerEnableOpenDragGesture: false,
               backgroundColor: hasConversationWallpaper
@@ -478,17 +463,12 @@ class _IsmChatPageView extends StatelessWidget {
                               // groups where multiple messages can share same timestamp key.
                               selectedMessage['${stableKey}_$i'] = message;
                             }
-                            // Check if all messages are from current user
-                            var messageSenderSide =
+                            final allSelectedFromMe =
                                 controller.isAllMessagesFromMe();
-                            // Check if any message is deleted for everyone
-                            var messageDeletedForEveryone =
-                                controller.isAnyMessageDeletedForEveryone();
-                            // Show delete confirmation dialog
                             controller.showDialogForDeleteMultipleMessage(
-                                messageSenderSide,
-                                messageDeletedForEveryone,
-                                selectedMessage);
+                              allSelectedFromMe,
+                              selectedMessage,
+                            );
                           },
                           icon: Icon(
                             Icons.delete_rounded,
@@ -595,7 +575,10 @@ class _IsmChatPageView extends StatelessWidget {
                                                             child: ListView
                                                                 .builder(
                                                               physics:
-                                                                  const ClampingScrollPhysics(),
+                                                                  const AlwaysScrollableScrollPhysics(
+                                                                parent:
+                                                                    ClampingScrollPhysics(),
+                                                              ),
                                                               // Shared controller must only attach to the
                                                               // current (top) chat route. Stacked pages
                                                               // underneath keep `null` so scroll/pagination
@@ -689,14 +672,9 @@ class _IsmChatPageView extends StatelessWidget {
                                                   ?.isLastMessageCurrentUserRemovedFromGroup ==
                                               true)) ...[
                                     _MessageNotAllowedWidget(
-                                      showMessage: controller.isActionAllowed ==
-                                                  true ||
-                                              controller
-                                                      .conversation
-                                                      ?.lastMessageDetails
-                                                      ?.customType ==
-                                                  IsmChatCustomMessageType
-                                                      .removeMember
+                                      showMessage: controller.conversation
+                                                  ?.isCurrentUserRemovedFromGroup ==
+                                              true
                                           ? IsmChatStrings.removeGroupMessage
                                           : IsmChatStrings.leftGroupMessage,
                                     )

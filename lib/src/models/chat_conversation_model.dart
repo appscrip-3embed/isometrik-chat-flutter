@@ -350,6 +350,61 @@ class IsmChatConversationModel {
       ((opponentDetails?.userName ?? '').isEmpty ||
           (opponentDetails?.profileUrl ?? '').isEmpty);
 
+  /// Clears cached messages and list subtitle after "clear chat".
+  ///
+  /// Keeps [lastMessageDetails.sentAt] (and [lastMessageSentAt]) so the row
+  /// stays in the same place in the conversation list. [copyWith] alone cannot
+  /// null out [lastMessageDetails] (`null ?? old` keeps the old preview).
+  IsmChatConversationModel withClearedMessageHistory() {
+    final anchorSentAt = lastMessageSentAt ??
+        lastMessageDetails?.sentAt ??
+        DateTime.now().millisecondsSinceEpoch;
+    final convId = conversationId ?? '';
+    final clearedPreview = lastMessageDetails != null
+        ? lastMessageDetails!.copyWith(body: '', messageId: '')
+        : LastMessageDetails(
+            showInConversation: true,
+            sentAt: anchorSentAt,
+            senderName: '',
+            messageType: 0,
+            messageId: '',
+            conversationId: convId,
+            body: '',
+            sentByMe: true,
+          );
+
+    return IsmChatConversationModel(
+      updatedAt: updatedAt,
+      unreadMessagesCount: unreadMessagesCount,
+      privateOneToOne: privateOneToOne,
+      opponentDetails: opponentDetails,
+      metaData: metaData?.copyWith(blockedMessage: null) ?? metaData,
+      messagingDisabled: messagingDisabled,
+      membersCount: membersCount,
+      lastReadAt: lastReadAt,
+      lastMessageSentAt: anchorSentAt,
+      lastMessageDetails: clearedPreview,
+      isGroup: isGroup,
+      createdAt: createdAt,
+      conversationType: conversationType,
+      conversationTitle: conversationTitle,
+      conversationImageUrl: conversationImageUrl,
+      conversationId: conversationId,
+      config: config,
+      userIds: userIds,
+      members: members,
+      usersOwnDetails: usersOwnDetails,
+      createdBy: createdBy,
+      createdByUserName: createdByUserName,
+      messages: {},
+      outSideMessage: outSideMessage,
+      customType: customType,
+      pushNotifications: pushNotifications,
+      searchableTags: searchableTags,
+      selfChat: selfChat,
+    );
+  }
+
   IsmChatConversationModel copyWith({
     int? updatedAt,
     int? unreadMessagesCount,

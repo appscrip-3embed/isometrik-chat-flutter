@@ -278,7 +278,9 @@ mixin IsmChatMqttEventMessageStatusMixin {
     final self = this;
     if (self is IsmChatMqttEventUtilitiesMixin) {
       final utils = self as IsmChatMqttEventUtilitiesMixin;
-      if (utils.isSenderMe(actionModel.userDetails?.userId)) return;
+      if (utils.shouldSkipSameDeviceMqttEcho(actionModel)) return;
+      final targetIds = _deleteForAllTargetIds(actionModel);
+      if (targetIds.isEmpty) return;
       final conversationId = actionModel.conversationId ?? '';
       await IsmChatConfig.dbWrapper?.updateConversation(
         conversationId: conversationId,
@@ -287,19 +289,35 @@ mixin IsmChatMqttEventMessageStatusMixin {
           final allMessages =
               Map<String, IsmChatMessageModel>.from(conversation.messages ?? {});
           if (allMessages.isEmpty) return null;
-          if (actionModel.messageIds?.isNotEmpty != true) return null;
           var changed = false;
-          for (final messageId in actionModel.messageIds ?? []) {
+          IsmChatMessageModel? patchedLastMessage;
+          final lastId = conversation.lastMessageDetails?.messageId?.trim() ?? '';
+          for (final messageId in targetIds) {
             final located = _storedMessage(allMessages, messageId);
             if (located == null) continue;
-            located.messages[located.storageKey] = located.message.copyWith(
+            final updated = located.message.copyWith(
               customType: IsmChatCustomMessageType.deletedForEveryone,
               reactions: [],
             );
+            located.messages[located.storageKey] = updated;
             changed = true;
+            if (lastId.isNotEmpty && messageId == lastId) {
+              patchedLastMessage = updated;
+            }
           }
           if (!changed) return null;
-          return conversation.copyWith(messages: allMessages);
+          var next = conversation.copyWith(messages: allMessages);
+          if (patchedLastMessage != null) {
+            next = next.copyWith(
+              lastMessageDetails: next.lastMessageDetails?.copyWith(
+                customType: IsmChatCustomMessageType.deletedForEveryone,
+                body: IsmChatUtility.lastMessageBodyForConversationSync(
+                  patchedLastMessage!,
+                ),
+              ),
+            );
+          }
+          return next;
         },
       );
 
@@ -308,7 +326,62 @@ mixin IsmChatMqttEventMessageStatusMixin {
         if (controller.conversation?.conversationId ==
             actionModel.conversationId) {
           await controller.getMessagesFromDB(actionModel.conversationId ?? '');
+          controller.update();
         }
+      }
+      if (IsmChatUtility.conversationControllerRegistered) {
+        unawaited(
+          IsmChatUtility.conversationController.getConversationsFromDB(),
+        );
+      }
+    }
+  }
+
+  /// Handles `messagesDeleteLocal` (delete for me) on the user's Status topic.
+  ///
+  /// Only affects this account's local cache; must propagate to other devices
+  /// logged into the same user (same rules as delete-for-everyone echoes).
+  void handleMessageDeleteLocal(IsmChatMqttActionModel actionModel) async {
+    final self = this;
+    if (self is IsmChatMqttEventUtilitiesMixin) {
+      final utils = self as IsmChatMqttEventUtilitiesMixin;
+      if (!utils.isSenderMe(actionModel.userDetails?.userId)) return;
+      if (utils.shouldSkipSameDeviceMqttEcho(actionModel)) return;
+      final targetIds = _deleteForAllTargetIds(actionModel);
+      if (targetIds.isEmpty) return;
+      final targetIdSet = targetIds.toSet();
+      final conversationId = actionModel.conversationId ?? '';
+      await IsmChatConfig.dbWrapper?.updateConversation(
+        conversationId: conversationId,
+        update: (conversation) {
+          if (conversation == null) return null;
+          final allMessages =
+              Map<String, IsmChatMessageModel>.from(conversation.messages ?? {});
+          if (allMessages.isEmpty) return null;
+          final beforeCount = allMessages.length;
+          allMessages.removeWhere(
+            (_, value) => targetIdSet.contains(value.messageId),
+          );
+          if (allMessages.length == beforeCount) return null;
+          return _conversationWithResyncedLastMessage(
+            conversation.copyWith(messages: allMessages),
+            conversationId,
+          );
+        },
+      );
+
+      if (IsmChatUtility.chatPageControllerRegistered) {
+        final controller = IsmChatUtility.chatPageController;
+        if (controller.conversation?.conversationId ==
+            actionModel.conversationId) {
+          await controller.getMessagesFromDB(actionModel.conversationId ?? '');
+          controller.update();
+        }
+      }
+      if (IsmChatUtility.conversationControllerRegistered) {
+        unawaited(
+          IsmChatUtility.conversationController.getConversationsFromDB(),
+        );
       }
     }
   }
@@ -338,6 +411,86 @@ Future<IsmChatConversationModel?> _conversationForStatusEvent(
   final id = conversationId?.trim() ?? '';
   if (id.isEmpty) return null;
   return IsmChatConfig.dbWrapper?.getConversation(id);
+}
+
+/// Latest timeline row usable for conversation-list preview.
+IsmChatMessageModel? _lastTimelineMessageForPreview(
+  Iterable<IsmChatMessageModel> messages,
+) {
+  final sorted = messages.toList()..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+  for (var i = sorted.length - 1; i >= 0; i--) {
+    final m = sorted[i];
+    switch (m.customType) {
+      case IsmChatCustomMessageType.conversationCreated:
+      case IsmChatCustomMessageType.date:
+      case IsmChatCustomMessageType.block:
+      case IsmChatCustomMessageType.unblock:
+        continue;
+      default:
+        return m;
+    }
+  }
+  return null;
+}
+
+/// Recomputes [IsmChatConversationModel.lastMessageDetails] after rows are removed.
+IsmChatConversationModel _conversationWithResyncedLastMessage(
+  IsmChatConversationModel conversation,
+  String conversationId,
+) {
+  final last = _lastTimelineMessageForPreview(
+    conversation.messages?.values ?? const [],
+  );
+  if (last == null) return conversation;
+  final base = conversation.lastMessageDetails;
+  final lastDetails = base != null
+      ? base.copyWith(
+          sentByMe: last.sentByMe,
+          senderId: last.senderInfo?.userId ?? last.initiatorId ?? '',
+          senderName: last.senderInfo?.userName ??
+              last.userName ??
+              last.initiatorName ??
+              '',
+          showInConversation: true,
+          sentAt: last.sentAt,
+          messageType: last.messageType?.value ?? 0,
+          messageId: last.messageId ?? '',
+          conversationId: last.conversationId ?? conversationId,
+          body: IsmChatUtility.lastMessageBodyForConversationSync(last),
+          customType: last.customType,
+          action: last.action,
+        )
+      : LastMessageDetails(
+          showInConversation: true,
+          sentAt: last.sentAt,
+          senderName: last.senderInfo?.userName ??
+              last.userName ??
+              last.initiatorName ??
+              '',
+          senderId: last.senderInfo?.userId ?? last.initiatorId ?? '',
+          messageType: last.messageType?.value ?? 0,
+          messageId: last.messageId ?? '',
+          conversationId: last.conversationId ?? conversationId,
+          body: IsmChatUtility.lastMessageBodyForConversationSync(last),
+          sentByMe: last.sentByMe,
+          customType: last.customType,
+          action: last.action,
+        );
+  return conversation.copyWith(
+    lastMessageDetails: lastDetails,
+    lastMessageSentAt: last.sentAt,
+  );
+}
+
+/// Target message ids from delete-for-all / delete-local MQTT payloads.
+///
+/// Brokers may send either `messageIds` or a single `messageId`.
+List<String> _deleteForAllTargetIds(IsmChatMqttActionModel action) {
+  final fromList = action.messageIds ?? const <String>[];
+  if (fromList.isNotEmpty) return fromList;
+  final single = action.messageId?.trim() ?? '';
+  if (single.isNotEmpty) return [single];
+  return const [];
 }
 
 /// Whether to ignore a deliver/read MQTT action from the logged-in user.

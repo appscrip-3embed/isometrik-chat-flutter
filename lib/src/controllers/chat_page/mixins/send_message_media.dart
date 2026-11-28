@@ -62,6 +62,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       return;
     }
     final mediaList = List<WebMediaModel>.from(_controller.webMedia);
+    _controller.hideCaptionMentions();
     _controller.mediaProcessingGeneration++;
     _controller.isProcessingMedia = false;
     _controller.webMedia.clear();
@@ -104,6 +105,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       return;
     }
     final mediaList = List<WebMediaModel>.from(_controller.webMedia);
+    _controller.hideCaptionMentions();
     _controller.mediaProcessingGeneration++;
     _controller.isProcessingMedia = false;
     _controller.webMedia.clear();
@@ -286,9 +288,11 @@ mixin IsmChatPageSendMessageMediaMixin {
       return;
     }
 
-    final hadMediaCaption = mediaList.any(
-      (media) => media.caption?.trim().isNotEmpty == true,
-    );
+    final hadMediaCaption = mediaList.any((media) {
+      final trimmed = media.caption?.trim() ?? '';
+      return trimmed.isNotEmpty &&
+          !IsmChatUtility.isOutboundMediaCaptionPlaceholder(trimmed);
+    });
     if (!hadMediaCaption && caption.isNotEmpty) {
       _controller.chatInputController.clear();
     }
@@ -326,6 +330,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       sentAt: sentAt,
       sentByMe: true,
       isUploading: true,
+      mentionedUsers: _controller.captionMentionedUsers(caption),
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
@@ -418,7 +423,9 @@ mixin IsmChatPageSendMessageMediaMixin {
     required String resolvedCaption,
     String? mediaCaption,
   }) {
-    final hadMediaCaption = mediaCaption?.trim().isNotEmpty == true;
+    final trimmedMediaCaption = mediaCaption?.trim() ?? '';
+    final hadMediaCaption = trimmedMediaCaption.isNotEmpty &&
+        !IsmChatUtility.isOutboundMediaCaptionPlaceholder(trimmedMediaCaption);
     if (!hadMediaCaption && resolvedCaption.isNotEmpty) {
       _controller.chatInputController.clear();
     }
@@ -662,6 +669,10 @@ mixin IsmChatPageSendMessageMediaMixin {
     }
     final sentAt = preAssignedSentAt ?? _controller.nextUniqueMediaSentAt();
     final thumbnailBytes = webMediaModel.platformFile.thumbnailBytes;
+    // Thumbnails keep the video's shape; sent so receivers size the bubble
+    // before the thumbnail downloads.
+    final thumbnailSize =
+        IsmChatImageAttachmentDimensions.headerDimensions(thumbnailBytes);
     final nameWithExtension = webMediaModel.platformFile.name;
     final mediaId = '$sentAt';
     final extension = webMediaModel.platformFile.extension;
@@ -697,6 +708,8 @@ mixin IsmChatPageSendMessageMediaMixin {
               kIsWeb ? webMediaModel.platformFile.bytes.toString() : localPath,
           mediaId: mediaId,
           extension: extension,
+          mediaWidth: thumbnailSize?.width,
+          mediaHeight: thumbnailSize?.height,
         )
       ],
       deliveredToAll: false,
@@ -712,6 +725,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       sentAt: sentAt,
       sentByMe: true,
       isUploading: true,
+      mentionedUsers: _controller.captionMentionedUsers(caption),
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
@@ -881,6 +895,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       sentAt: sentAt,
       sentByMe: true,
       isUploading: true,
+      mentionedUsers: _controller.captionMentionedUsers(caption),
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,
@@ -1744,6 +1759,7 @@ mixin IsmChatPageSendMessageMediaMixin {
       sentAt: sentAt,
       sentByMe: true,
       isUploading: true,
+      mentionedUsers: _controller.captionMentionedUsers(caption),
       metaData: IsmChatMetaData(
         messageSentAt: sentAt,
         isDownloaded: true,

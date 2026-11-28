@@ -276,6 +276,28 @@ extension BlockStatus on IsmChatConversationModel {
         last.customType == IsmChatCustomMessageType.memberLeave;
   }
 
+  /// True when the latest preview is `removeMember` for the signed-in user
+  /// (admin removed them — not voluntary leave). Used for composer banner copy.
+  bool get isCurrentUserRemovedFromGroup {
+    if (isGroup != true) return false;
+    final currentUserId =
+        IsmChatConfig.communicationConfig.userConfig.userId.trim();
+    if (currentUserId.isEmpty) return false;
+
+    final last = lastMessageDetails;
+    if (last == null) return false;
+    if (last.conversationId.isNotEmpty &&
+        last.conversationId != conversationId) {
+      return false;
+    }
+    if (last.customType != IsmChatCustomMessageType.removeMember) {
+      return false;
+    }
+
+    final subjectId = (last.userId ?? last.memberId ?? '').trim();
+    return subjectId.isNotEmpty && subjectId == currentUserId;
+  }
+
   /// Returns true if the conversation is blocked by the current user.
   bool get isBlockedByMe {
     if (isChattingAllowed) {
@@ -465,6 +487,52 @@ extension LastMessageMediaPreview on LastMessageDetails {
   }
 }
 
+/// Builds list-preview copy for group system rows from [LastMessageDetails].
+extension LastMessageGroupBannerPreview on LastMessageDetails {
+  IsmChatMessageModel get _groupBannerMessageStub => IsmChatMessageModel(
+        body: body,
+        customType: customType,
+        sentAt: sentAt,
+        sentByMe: sentByMe,
+        initiatorId: initiatorId,
+        initiatorName: senderName,
+        userId: userId ?? senderId,
+        userName: senderName,
+        memberId: memberId,
+        memberName: memberName,
+      );
+
+  String groupSystemListPreview() {
+    switch (customType) {
+      case IsmChatCustomMessageType.removeMember:
+        return _groupBannerMessageStub.groupAddRemoveMemberBannerText(
+          isAdded: false,
+        );
+      case IsmChatCustomMessageType.addMember:
+        final names = (members ?? []).join(', ');
+        if (names.isNotEmpty) {
+          final stub = _groupBannerMessageStub.copyWith(
+            memberName: memberName ?? names,
+          );
+          if (stub.isCurrentUserAmongAddedMembers) {
+            return stub.groupAddRemoveMemberBannerText(isAdded: true);
+          }
+          return IsmChatStrings.addedMembersToGroup(
+            initiator: stub.initiator,
+            members: names,
+          );
+        }
+        return _groupBannerMessageStub.groupAddRemoveMemberBannerText(
+          isAdded: true,
+        );
+      case IsmChatCustomMessageType.memberLeave:
+        return _groupBannerMessageStub.groupMemberLeaveBannerText();
+      default:
+        return '';
+    }
+  }
+}
+
 /// Extension for LastMessageDetails to get message body and icon.
 extension LastMessageBody on LastMessageDetails {
   /// Returns the formatted message body based on custom type.
@@ -516,15 +584,25 @@ extension LastMessageBody on LastMessageDetails {
       case IsmChatCustomMessageType.conversationTitleUpdated:
         return 'Changed this group title';
       case IsmChatCustomMessageType.removeMember:
-        return 'Removed ${(members ?? []).join(', ')}';
       case IsmChatCustomMessageType.addMember:
-        return 'Added ${(members ?? []).join(', ')}';
+      case IsmChatCustomMessageType.memberLeave:
+        final preview = groupSystemListPreview();
+        if (preview.isNotEmpty) {
+          return preview;
+        }
+        if (customType == IsmChatCustomMessageType.addMember) {
+          return 'Added ${(members ?? []).join(', ')}';
+        }
+        if (customType == IsmChatCustomMessageType.removeMember) {
+          return 'Removed ${(members ?? []).join(', ')}';
+        }
+        return IsmChatStrings.memberLeftTheGroup(
+          senderName.isNotEmpty ? senderName : 'Someone',
+        );
       case IsmChatCustomMessageType.addAdmin:
         return 'Added $adminOpponentName as an Admin';
       case IsmChatCustomMessageType.removeAdmin:
         return 'Remove $adminOpponentName as an Admin';
-      case IsmChatCustomMessageType.memberLeave:
-        return '$senderName left';
       case IsmChatCustomMessageType.memberJoin:
         return '$senderName join';
       case IsmChatCustomMessageType.deletedForMe:
@@ -681,11 +759,97 @@ extension MemberLeaveVisibility on IsmChatMessageModel {
   bool isVisibleInGroupChat(IsmChatConversationModel? conversation) => true;
 }
 
+/// Centered group system row copy (chat banners and conversation list previews).
+extension GroupSystemBannerText on IsmChatMessageModel {
+  bool get _isLeaveSubjectCurrentUser {
+    final candidates = <String>[
+      userId ?? '',
+      memberId ?? '',
+      senderInfo?.userId ?? '',
+    ].map((id) => id.trim()).where((id) => id.isNotEmpty);
+    return candidates.any(isCurrentChatUser);
+  }
+
+  bool get isCurrentUserAmongAddedMembers {
+    final membersList = members;
+    if (membersList != null) {
+      for (final member in membersList) {
+        final id = member.userId.trim().isNotEmpty
+            ? member.userId.trim()
+            : (member.memberId?.trim() ?? '');
+        if (id.isNotEmpty && isCurrentChatUser(id)) {
+          return true;
+        }
+      }
+    }
+    final single = memberId?.trim() ?? '';
+    return single.isNotEmpty && isCurrentChatUser(single);
+  }
+
+  String _resolvedAddedMemberLabel() {
+    final fromList = members
+            ?.map((e) => (e.memberName ?? e.userName).trim())
+            .where((name) => name.isNotEmpty)
+            .join(', ') ??
+        '';
+    if (fromList.isNotEmpty) {
+      return fromList;
+    }
+    final single = (memberName ?? '').trim();
+    if (single.isNotEmpty) {
+      if (isCurrentUserAmongAddedMembers) {
+        return IsmChatStrings.you;
+      }
+      return single;
+    }
+    return '';
+  }
+
+  String groupMemberLeaveBannerText() {
+    if (_isLeaveSubjectCurrentUser) {
+      return IsmChatStrings.youLeftTheGroup;
+    }
+    final name = (userName ?? '').trim().isNotEmpty
+        ? (userName ?? '').trim()
+        : (initiatorName ?? '').trim();
+    if (name.isEmpty) {
+      return IsmChatStrings.memberLeftTheGroup('Someone');
+    }
+    return IsmChatStrings.memberLeftTheGroup(name);
+  }
+
+  String groupMemberJoinBannerText() {
+    final name = (userName ?? '').trim();
+    if (name.isEmpty) {
+      return '';
+    }
+    if (_isLeaveSubjectCurrentUser) {
+      return '${IsmChatStrings.you} joined conversation';
+    }
+    return '$name joined conversation';
+  }
+
+  String groupAddRemoveMemberBannerText({required bool isAdded}) {
+    if (!isAdded) {
+      final memberLabel = _resolvedAddedMemberLabel();
+      return '${initiator} removed $memberLabel'.trim();
+    }
+    if (isCurrentUserAmongAddedMembers) {
+      return IsmChatStrings.youWereAddedToGroupBy(initiator);
+    }
+    final memberLabel = _resolvedAddedMemberLabel();
+    return IsmChatStrings.addedMembersToGroup(
+      initiator: initiator,
+      members: memberLabel,
+    );
+  }
+}
+
 /// Label inserted after `@` when picking someone from the mention list.
 String mentionLabelForUser(UserDetails user) {
-  final display = user.displayName.trim();
+  final display = ismChatJoinNameParts([user.displayName]);
   if (display.isNotEmpty) return display;
-  return user.userName.trim();
+  return ismChatJoinNameParts([user.userName]);
 }
 
 /// Whether [userId] is the signed-in chat user.
@@ -863,7 +1027,7 @@ Set<String> mentionUserIdsInComposerText(
 
   for (final seg in segments) {
     final trimmed = seg.trimLeft();
-  outer:
+    outer:
     for (final member in groupMembers) {
       if (_isCurrentChatUserWhenConfigured(member.userId)) continue;
       final userName = member.userName.trim();
@@ -885,6 +1049,169 @@ Set<String> mentionUserIdsInComposerText(
   return resolvedIds;
 }
 
+/// Mention picker suggestions for [composerText], or `null` to hide the list.
+///
+/// Shared by the channel composer and the thread composer: the list shows while
+/// the last word contains `@`, filtered by the text after the last `@`, and
+/// skips the signed-in user plus members already mentioned.
+List<UserDetails>? mentionSuggestionsForComposer(
+  String composerText,
+  List<UserDetails> groupMembers,
+) {
+  if (!composerText.split(' ').last.contains('@')) return null;
+  final query = composerText.split('@').last.toLowerCase();
+  final alreadyMentioned =
+      mentionUserIdsInComposerText(composerText, groupMembers);
+  return groupMembers
+      .where((e) => !_isCurrentChatUserWhenConfigured(e.userId))
+      .where((e) => !alreadyMentioned.contains(e.userId.trim()))
+      .where(
+        (e) =>
+            e.userName.toLowerCase().contains(query) ||
+            mentionLabelForUser(e).toLowerCase().contains(query),
+      )
+      .toList();
+}
+
+/// Replaces the partial `@query` at the end of [composerText] with
+/// `@[mentionLabel] ` (trailing space so the user can keep typing).
+String insertMentionIntoComposerText(String composerText, String mentionLabel) {
+  final parts = composerText.split('@');
+  final remainingText = parts.sublist(0, parts.length - 1).join('@');
+  return '$remainingText@$mentionLabel ';
+}
+
+/// Mention rows (`userId` / `wordCount` / `order`) for an outgoing [body].
+///
+/// Matches each `@` segment against [mentionLabelForUser],
+/// [UserDetails.displayName] and [UserDetails.userName]; longest label wins so
+/// "@Rasika Flutter User" beats a "@Rasika" alias. [MentionModel.wordCount]
+/// follows the label inserted by the composer. Reuse for channel and thread sends.
+List<MentionModel> resolveComposerMentions(
+  String body,
+  List<UserDetails> groupMembers,
+) {
+  final result = <MentionModel>[];
+  final segments = body.split('@').toList()
+    ..removeWhere((e) => e.trim().isEmpty);
+  final seenUserIds = <String>{};
+
+  final membersByLabelLength = List<UserDetails>.from(groupMembers)
+    ..sort(
+      (a, b) =>
+          mentionLabelForUser(b).length.compareTo(mentionLabelForUser(a).length),
+    );
+
+  for (var mentionIndex = 0; mentionIndex < segments.length; mentionIndex++) {
+    final seg = segments[mentionIndex].trimLeft();
+    UserDetails? matchedMember;
+    int? bestMatchEnd;
+
+    for (final member in membersByLabelLength) {
+      if (_isCurrentChatUserWhenConfigured(member.userId)) continue;
+      final userName = member.userName.trim();
+      if (userName.isEmpty) continue;
+
+      final label = mentionLabelForUser(member);
+      final displayName = member.displayName.trim();
+      final matches = mentionSegmentMatchesMemberName(seg, label) ||
+          (displayName.isNotEmpty &&
+              mentionSegmentMatchesMemberName(seg, displayName)) ||
+          mentionSegmentMatchesMemberName(seg, userName);
+      if (!matches) continue;
+
+      final matchEnd = longestMentionNameEndInBody('@$seg', 0, member);
+      if (matchEnd == null || matchEnd <= 1) continue;
+      if (bestMatchEnd == null || matchEnd > bestMatchEnd) {
+        bestMatchEnd = matchEnd;
+        matchedMember = member;
+      }
+    }
+
+    if (matchedMember == null) continue;
+    if (!seenUserIds.add(matchedMember.userId.trim())) continue;
+
+    final wordCount = mentionLabelForUser(matchedMember)
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .length;
+    result.add(
+      MentionModel(
+        wordCount: wordCount,
+        userId: matchedMember.userId,
+        order: mentionIndex,
+      ),
+    );
+  }
+  return result;
+}
+
+/// [UserDetails] rows for a local echo so the sender sees highlighted mentions
+/// before the server copy arrives. Skips ids not found in [groupMembers].
+List<UserDetails> mentionedUserDetailsFor(
+  List<MentionModel> mentions,
+  List<UserDetails> groupMembers,
+) {
+  final out = <UserDetails>[];
+  for (final e in mentions) {
+    final member = groupMembers.firstWhereOrNull((m) => m.userId == e.userId);
+    if (member == null) continue;
+    out.add(
+      UserDetails(
+        userProfileImageUrl: member.profileUrl,
+        userName: member.userName,
+        userIdentifier: member.userIdentifier,
+        userId: e.userId,
+        online: false,
+        lastSeen: 0,
+        metaData: member.metaData,
+        wordCount: e.wordCount,
+        order: e.order,
+      ),
+    );
+  }
+  return out;
+}
+
+/// Mention span style used everywhere a mention is painted: message bubbles,
+/// reply previews and the composer. Bold plus [IsmChatThemeData.mentionColor]
+/// (set by the host app) on top of [base].
+TextStyle ismChatMentionTextStyle(TextStyle base) => base.copyWith(
+      fontWeight: FontWeight.bold,
+      color: IsmChatConfig.chatTheme.mentionColor,
+    );
+
+/// `[start, end)` ranges of completed `@mentions` in composer [text].
+///
+/// Only names that match one of [members] count, so a half-typed `@Opp` is not
+/// highlighted until the user picks (or fully types) a member. Longest name
+/// wins when members share a prefix.
+List<({int start, int end})> composerMentionRanges(
+  String text,
+  List<UserDetails> members,
+) {
+  final ranges = <({int start, int end})>[];
+  if (members.isEmpty || !text.contains('@')) return ranges;
+  var i = 0;
+  while (i < text.length) {
+    if (text[i] == '@' && _isComposerMentionAt(text, i)) {
+      int? best;
+      for (final member in members) {
+        if (_isCurrentChatUserWhenConfigured(member.userId)) continue;
+        final end = longestMentionNameEndInBody(text, i, member);
+        if (end != null && (best == null || end > best)) best = end;
+      }
+      if (best != null && best > i + 1) {
+        ranges.add((start: i, end: best));
+        i = best;
+        continue;
+      }
+    }
+    i++;
+  }
+  return ranges;
+}
+
 /// `@` that starts a composer mention (not an email local-part).
 bool _isComposerMentionAt(String text, int index) {
   if (index < 0 || index >= text.length || text[index] != '@') return false;
@@ -893,13 +1220,24 @@ bool _isComposerMentionAt(String text, int index) {
   return prev == ' ' || prev == '\n' || prev == '\t';
 }
 
-List<UserDetails> _orderedMentionUsersByApiOrder(
-  List<UserDetails> users,
-) {
+/// True when [body] contains at least one composer-style `@mention`.
+///
+/// Reuse in thread rows and replies before full segment parsing is available.
+bool messageBodyHasComposerMention(String body) {
+  for (var i = 0; i < body.length; i++) {
+    if (body[i] == '@' && _isComposerMentionAt(body, i)) return true;
+  }
+  return false;
+}
+
+/// Authoritative mention rows sorted by [UserDetails.order] (includes self).
+///
+/// Receiver bodies keep every `@` that was sent; dropping the signed-in user
+/// desyncs slot indices and breaks highlight spans.
+List<UserDetails> orderedMentionedUsersForParsing(List<UserDetails> users) {
   final seen = <String>{};
   final ordered = <UserDetails>[];
   for (final user in users) {
-    if (_isCurrentChatUserWhenConfigured(user.userId)) continue;
     final id = user.userId.trim();
     if (id.isEmpty || !seen.add(id)) continue;
     ordered.add(user);
@@ -908,26 +1246,120 @@ List<UserDetails> _orderedMentionUsersByApiOrder(
   return ordered;
 }
 
-/// Mention span end for one [user] at `@` in [text], preferring full name match.
-int? _mentionEndForUser(String text, int atIndex, UserDetails user) {
-  if (!_isComposerMentionAt(text, atIndex)) return null;
-  for (final name in _mentionNamesForUser(user)) {
-    final byName = _mentionNameEndAfterAt(text, atIndex, name);
-    if (byName != null) return byName;
+/// Merges wire `mentionedUsers` (userId/wordCount/order) with [memberCandidates].
+///
+/// MQTT/API payloads often omit display names; group members supply labels for
+/// matching while preserving server [UserDetails.wordCount] and [UserDetails.order].
+List<UserDetails> enrichMentionedUsersFromMembers(
+  List<UserDetails> mentionedUsers,
+  List<UserDetails> memberCandidates,
+) {
+  if (mentionedUsers.isEmpty) return const [];
+
+  final byId = <String, UserDetails>{};
+  for (final member in memberCandidates) {
+    final id = member.userId.trim();
+    if (id.isNotEmpty) byId[id] = member;
+    final memberId = member.memberId?.trim() ?? '';
+    if (memberId.isNotEmpty) byId.putIfAbsent(memberId, () => member);
   }
+
+  return mentionedUsers.map((wire) {
+    final id = wire.userId.trim();
+    final member = id.isNotEmpty ? byId[id] : null;
+    if (member == null) return wire;
+    final apiWords = wire.wordCount ?? 0;
+    final labelWords = _mentionLabelWordCount(member);
+    final mergedWordCount = apiWords >= 1
+        ? (labelWords > apiWords ? labelWords : apiWords)
+        : member.wordCount;
+    return member.copyWith(
+      order: wire.order ?? member.order,
+      wordCount: mergedWordCount,
+    );
+  }).toList();
+}
+
+/// Longest display/user-name match at `@` in [body] (exclusive end index).
+///
+/// Reuse in send-path mention resolution when multiple members share a prefix.
+int? longestMentionNameEndInBody(String body, int atIndex, UserDetails user) {
+  int? best;
+  for (final name in _mentionNamesForUser(user)) {
+    final end = _mentionNameEndAfterAt(body, atIndex, name);
+    if (end != null && (best == null || end > best)) best = end;
+  }
+  return best;
+}
+
+/// Fallback `@` token through the next whitespace (phones, handles, masked ids).
+int? _mentionHandleEndAfterAt(String body, int atIndex) {
+  if (atIndex >= body.length || body[atIndex] != '@') return null;
+  var pos = atIndex + 1;
+  while (pos < body.length && body[pos] != ' ' && body[pos] != '\n') {
+    pos++;
+  }
+  return pos > atIndex + 1 ? pos : null;
+}
+
+int? _mentionWordCountSpanEnd(
+  String text,
+  int atIndex,
+  UserDetails user,
+  int wordCount, {
+  bool trustAuthoritativeWordCount = false,
+}) {
+  if (wordCount < 1) return null;
+
   final label = mentionLabelForUser(user);
-  final words =
-      label.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-  if (words.isEmpty) return null;
+
+  // Receiver wire rows (userId/wordCount/order only): trust API word span length.
+  if (trustAuthoritativeWordCount && label.isEmpty) {
+    return _mentionWordCountEndAfterAt(text, atIndex, wordCount);
+  }
+  final words = label.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  if (words.isEmpty) {
+    return _mentionWordCountEndAfterAt(text, atIndex, wordCount);
+  }
   // Do not consume [wordCount] words unless the inserted label's first token matches.
   if (_mentionNameEndAfterAt(text, atIndex, words.first) == null) {
     return null;
   }
+  return _mentionWordCountEndAfterAt(text, atIndex, wordCount);
+}
+
+/// Mention span end for one [user] at `@` in [text], preferring full name match.
+int? _mentionEndForUser(
+  String text,
+  int atIndex,
+  UserDetails user, {
+  bool trustAuthoritativeWordCount = false,
+}) {
+  if (!_isComposerMentionAt(text, atIndex)) return null;
+
+  final bestNameEnd = longestMentionNameEndInBody(text, atIndex, user);
+
   final apiWordCount = user.wordCount ?? 0;
   final wordCount =
       apiWordCount >= 1 ? apiWordCount : _mentionLabelWordCount(user);
-  if (wordCount < 1) return null;
-  return _mentionWordCountEndAfterAt(text, atIndex, wordCount);
+  final wordCountEnd = _mentionWordCountSpanEnd(
+    text,
+    atIndex,
+    user,
+    wordCount,
+    trustAuthoritativeWordCount: trustAuthoritativeWordCount,
+  );
+
+  int? best;
+  void consider(int? end) {
+    if (end != null && end > atIndex + 1 && (best == null || end > best!)) {
+      best = end;
+    }
+  }
+
+  consider(bestNameEnd);
+  consider(wordCountEnd);
+  return best;
 }
 
 List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
@@ -939,14 +1371,18 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
     r'\bhttps?:\/\/\S+\b|\bwww\.\S+\b|\b\d{9,13}\b|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
     caseSensitive: false,
   );
-  final singleWordMention = RegExp(r'^@[A-Za-z0-9_.]+');
-
   bool hasLinkAt(int index) =>
       nonMentionLink.allMatches(text).any((m) => m.start == index);
 
-  final authoritative = _orderedMentionUsersByApiOrder(
-    authoritativeMentionedUsers ?? const <UserDetails>[],
-  );
+  final rawAuthoritative = authoritativeMentionedUsers ?? const <UserDetails>[];
+  final authoritative = rawAuthoritative.isEmpty
+      ? const <UserDetails>[]
+      : orderedMentionedUsersForParsing(
+          enrichMentionedUsersFromMembers(
+            rawAuthoritative,
+            mentionCandidates,
+          ),
+        );
   final useAuthoritativeMentions = authoritative.isNotEmpty;
 
   final legacyOrderedMentionUsers = <UserDetails>[];
@@ -991,8 +1427,7 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
     final currentId =
         IsmChatConfig.communicationConfig.userConfig.userId.trim();
     if (currentId.isEmpty) return false;
-    for (final member
-        in IsmChatUtility.chatPageController.groupMembers) {
+    for (final member in IsmChatUtility.chatPageController.groupMembers) {
       if (member.userId.trim() != currentId) continue;
       for (final name in _mentionNamesForUser(member)) {
         if (_mentionNameEndAfterAt(text, start, name) == endExclusive) {
@@ -1010,9 +1445,22 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
     if (text[i] == '@' && _isComposerMentionAt(text, i)) {
       int? end;
 
-      if (useAuthoritativeMentions &&
-          mentionSlotIndex < authoritative.length) {
-        end = _mentionEndForUser(text, i, authoritative[mentionSlotIndex]);
+      if (useAuthoritativeMentions && mentionSlotIndex < authoritative.length) {
+        end = _mentionEndForUser(
+          text,
+          i,
+          authoritative[mentionSlotIndex],
+          trustAuthoritativeWordCount: true,
+        );
+        if (end == null || end <= i + 1) {
+          end = mentionEndAt(i);
+        }
+      } else if (useAuthoritativeMentions) {
+        // More `@` in body than [mentionedUsers] entries (e.g. extra handles).
+        end = mentionEndAt(i);
+        if (end == null || end <= i + 1) {
+          end = _mentionHandleEndAfterAt(text, i);
+        }
       } else if (!useAuthoritativeMentions) {
         end = mentionEndAt(i);
 
@@ -1022,11 +1470,15 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
           final user = legacyOrderedMentionUsers[mentionSlotIndex];
           end = _mentionEndForUser(text, i, user);
         }
+        if (end == null || end <= i + 1) {
+          end = _mentionHandleEndAfterAt(text, i);
+        }
       }
 
-      if (end != null &&
-          end > i + 1 &&
-          !isSelfMentionSpan(i, end)) {
+      final suppressSelfHighlight = end != null &&
+          !useAuthoritativeMentions &&
+          isSelfMentionSpan(i, end);
+      if (end != null && end > i + 1 && !suppressSelfHighlight) {
         segments.add(
           LocalMentionAndLinkData(
             text: text.substring(i, end),
@@ -1041,17 +1493,22 @@ List<LocalMentionAndLinkData> _buildMentionAndLinkSegments(
         continue;
       }
 
-      if (!useAuthoritativeMentions) {
-        // Last resort: single token after `@` (legacy bodies without wordCount).
-        final fallback = singleWordMention.matchAsPrefix(text, i);
-        if (fallback != null && !isSelfMentionSpan(i, fallback.end)) {
+      final allowHandleFallback = !useAuthoritativeMentions ||
+          mentionSlotIndex >= authoritative.length;
+      if (allowHandleFallback) {
+        final tokenEnd = _mentionHandleEndAfterAt(text, i);
+        final suppressSelf = tokenEnd != null &&
+            !useAuthoritativeMentions &&
+            isSelfMentionSpan(i, tokenEnd);
+        if (tokenEnd != null && !suppressSelf) {
           segments.add(
             LocalMentionAndLinkData(
-              text: fallback.group(0)!,
+              text: text.substring(i, tokenEnd),
               isLink: true,
             ),
           );
-          i = fallback.end;
+          if (useAuthoritativeMentions) mentionSlotIndex++;
+          i = tokenEnd;
           continue;
         }
       }
@@ -1160,8 +1617,7 @@ extension MentionMessage on IsmChatMessageModel {
       if (userName.split(' ').first == q) return true;
       if (userName.contains(q)) return true;
       final firstName = user.metaData?.firstName?.trim().toLowerCase() ?? '';
-      if (firstName.isNotEmpty &&
-          (firstName == q || firstName.startsWith(q))) {
+      if (firstName.isNotEmpty && (firstName == q || firstName.startsWith(q))) {
         return true;
       }
       return false;
@@ -1268,7 +1724,7 @@ extension MentionMessage on IsmChatMessageModel {
   /// Reuse in tests and MQTT — do not duplicate rules in views.
   bool get canShowEditInFocusMenu {
     if (!IsmChatProperties.chatPageProperties.features
-      .contains(IsmChatFeature.edit)) {
+        .contains(IsmChatFeature.edit)) {
       return false;
     }
     if (!sentByMe) return false;
@@ -1287,6 +1743,15 @@ extension MentionMessage on IsmChatMessageModel {
     }
     return true;
   }
+
+  /// Own, persisted, non-deleted rows that the server can delete for everyone.
+  ///
+  /// Reuse in multi-select delete UI, [IsmChatPageViewModel.deleteMessageForEveryone],
+  /// and tests — keep rules in one place.
+  bool get isEligibleForDeleteForEveryone =>
+      sentByMe &&
+      customType != IsmChatCustomMessageType.deletedForEveryone &&
+      (messageId ?? '').trim().isNotEmpty;
 
   /// Returns a list of focus menu types available for this message.
   List<IsmChatFocusMenuType> get focusMenuList {
@@ -1332,19 +1797,24 @@ extension MentionMessage on IsmChatMessageModel {
         .contains(IsmChatFeature.deleteMessage)) {
       menu.remove(IsmChatFocusMenuType.delete);
     }
-    if (![
-      IsmChatCustomMessageType.audio,
-      IsmChatCustomMessageType.image,
-      IsmChatCustomMessageType.video,
-      IsmChatCustomMessageType.file,
-      IsmChatCustomMessageType.multipleAttachments,
-    ].contains(customType)) {
-      menu.remove(IsmChatFocusMenuType.save);
-    }
-    if (!IsmChatProperties.chatPageProperties.features
-        .contains(IsmChatFeature.mediaDownload)) {
-      menu.remove(IsmChatFocusMenuType.save);
-    }
+    // Long-press Save — disabled; media preview / app bars still expose Save.
+    menu.remove(IsmChatFocusMenuType.save);
+    // if (![
+    //   IsmChatCustomMessageType.audio,
+    //   IsmChatCustomMessageType.image,
+    //   IsmChatCustomMessageType.video,
+    //   IsmChatCustomMessageType.file,
+    //   IsmChatCustomMessageType.multipleAttachments,
+    // ].contains(customType)) {
+    //   menu.remove(IsmChatFocusMenuType.save);
+    // }
+    // if (!IsmChatProperties.chatPageProperties.features
+    //     .contains(IsmChatFeature.mediaDownload)) {
+    //   menu.remove(IsmChatFocusMenuType.save);
+    // }
+    // if (isGifOrStickerMessage) {
+    //   menu.remove(IsmChatFocusMenuType.save);
+    // }
 
     if (!(IsmChatProperties.chatPageProperties.canReplayMessage?.call(this) ??
         true)) {
@@ -1405,8 +1875,7 @@ extension MentionMessage on IsmChatMessageModel {
   int get threadReplyCount => IsmChatThreadCoordinator.replyCountOf(this);
 
   /// Whether the "N replies" footer should be shown under this message.
-  bool get showThreadFooter =>
-      IsmChatThreadCoordinator.shouldShowFooter(this);
+  bool get showThreadFooter => IsmChatThreadCoordinator.shouldShowFooter(this);
 
   /// Returns the text style for the message based on sender.
   TextStyle get style {
@@ -1467,19 +1936,11 @@ extension MentionMessage on IsmChatMessageModel {
             channelThreadContextStyle.color,
       );
 
-  /// File name row in [IsmChatFileMessage] — not solid bubble fill.
+  /// File name row in [IsmChatFileMessage] and document tiles in multi-attach.
   ///
-  /// Self messages use in-bubble white [style], which is unreadable on the
-  /// thread panel's light scaffold and on the document bar's light tint.
-  TextStyle get fileAttachmentNameStyle {
-    if (!sentByMe) return style;
-    return channelThreadContextStyle.copyWith(
-      fontWeight: FontWeight.w500,
-      color: IsmChatConfig.isChatDarkMode
-          ? IsmChatColors.whiteColor
-          : IsmChatColors.blackColor,
-    );
-  }
+  /// Same as text bubbles: [IsmChatMessageTheme.textStyle] + [textColor] from
+  /// [IsmChatPageTheme.selfMessageTheme] / [opponentMessageTheme].
+  TextStyle get fileAttachmentNameStyle => style;
 
   /// "Forwarded" label style derived from the message text color at 70% opacity.
   TextStyle get forwardedTextStyle => style.copyWith(
@@ -1615,6 +2076,13 @@ extension MentionMessage on IsmChatMessageModel {
     if (trimmedBody.startsWith('AttachmentMessage:')) return '';
     return trimmedBody;
   }
+
+  /// Caption under [IsmChatMediaGridMessage] — [IsmChatMetaData.caption] only.
+  ///
+  /// Outbound image/video captions are duplicated in [body] and metadata
+  /// (`captionMessage` on the wire). The grid must not fall back to [body] or
+  /// batch preview placeholders.
+  String get mediaGridCaption => metaData?.caption?.trim() ?? '';
 
   /// Homogeneous layout for multipleAttachments messages.
   ///
@@ -1783,6 +2251,14 @@ extension MentionMessage on IsmChatMessageModel {
   bool get isGridDisplayableMedia =>
       customType == IsmChatCustomMessageType.video ||
       (isGridEligibleMedia && customType == IsmChatCustomMessageType.image);
+
+  /// Bubble sized by [IsmChatMediaGridLayout.chatMediaBubbleMaxWidth] on mobile:
+  /// still image, GIF, video or media grid (not stickers).
+  bool get isWideMediaBubble =>
+      (customType == IsmChatCustomMessageType.image && !isStickerMessage) ||
+      isGridDisplayableMedia ||
+      (customType == IsmChatCustomMessageType.multipleAttachments &&
+          multipleAttachmentLayout == MultipleAttachmentLayout.mediaGrid);
 
   bool sharesMediaGridWith(IsmChatMessageModel other) {
     if (!isGridDisplayableMedia || !other.isGridDisplayableMedia) {
@@ -1961,6 +2437,44 @@ class IsmChatMediaGridGrouping {
     IsmChatMessageModel current,
   ) =>
       group.length >= 2 && !group.first.hasSameMediaGridIdentityAs(current);
+
+  /// Messages that should be selected, forwarded, or deleted as one unit when
+  /// the user acts on [anchor]. Reuses [collect] so batch actions match the
+  /// visible media grid; standalone GIF/sticker rows stay single-message.
+  static List<IsmChatMessageModel> collectActionableGroup(
+    List<IsmChatMessageModel> chronologicMessages,
+    IsmChatMessageModel anchor,
+  ) {
+    final group = collect(chronologicMessages, anchor);
+    return group.length >= 2 ? group : [anchor];
+  }
+
+  /// Message to show in the long-press focus menu — the visible grid host, not
+  /// an individual tile (consecutive images or a multi-attachment grid slice).
+  static IsmChatMessageModel focusMenuAnchor(
+    List<IsmChatMessageModel> chronologicMessages,
+    IsmChatMessageModel message,
+  ) {
+    final group = collect(chronologicMessages, message);
+    if (group.length >= 2) {
+      return group.first;
+    }
+
+    final messageId = (message.messageId ?? '').trim();
+    if (messageId.isNotEmpty && message.isGridDisplayableMedia) {
+      for (final candidate in chronologicMessages) {
+        if (candidate.customType ==
+                IsmChatCustomMessageType.multipleAttachments &&
+            candidate.multipleAttachmentLayout ==
+                MultipleAttachmentLayout.mediaGrid &&
+            (candidate.messageId ?? '').trim() == messageId) {
+          return candidate;
+        }
+      }
+    }
+
+    return message;
+  }
 }
 
 /// flutter_contacts 2.x helpers for a device [Contact].
@@ -2119,7 +2633,8 @@ extension IsmChatMessageMediaExtension on IsmChatMessageModel {
           fromMeta != IsmChatCustomMessageType.forward) {
         return fromMeta;
       }
-      final fromAttachment = _threadPanelTypeFromAttachment(primaryAttachmentType);
+      final fromAttachment =
+          _threadPanelTypeFromAttachment(primaryAttachmentType);
       if (fromAttachment != null) return fromAttachment;
       if (isGifOrStickerMessage && (attachments?.isNotEmpty ?? false)) {
         return IsmChatCustomMessageType.image;
@@ -2149,6 +2664,7 @@ extension IsmChatMessageMediaExtension on IsmChatMessageModel {
       return bubble;
     }
     if (messageType == IsmChatMessageType.reply ||
+        messageType == IsmChatMessageType.threadReply ||
         type == IsmChatCustomMessageType.reply) {
       return metaData?.replyMessage?.parentMessageMessageType;
     }

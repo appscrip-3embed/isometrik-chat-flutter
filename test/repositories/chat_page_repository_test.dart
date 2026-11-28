@@ -272,11 +272,24 @@ void main() {
     expect(await repo.blockUser(opponentId: kOpponentId), isNull);
     api.throwOn('POST', '/block', Exception('x'));
     expect(await repo.blockUser(opponentId: kOpponentId), isNull);
+    api.on('DELETE', '/self', const FakeResponse('{}', status: 520));
+    final deleteMeErr = await repo.deleteMessageForMe(
+      conversationId: conv,
+      messageIds: 'm1',
+    );
+    expect(deleteMeErr?.hasError, isTrue);
+    expect(deleteMeErr?.errorCode, 520);
     api.throwOn('DELETE', '/self', Exception('x'));
     expect(
       await repo.deleteMessageForMe(conversationId: conv, messageIds: 'm1'),
       isNull,
     );
+    api.on('DELETE', '/everyone', const FakeResponse('{}', status: 520));
+    final deleteEveryoneErr = await repo.deleteMessageForEveryone(
+      conversationId: conv,
+      messages: 'm1',
+    );
+    expect(deleteEveryoneErr?.hasError, isTrue);
     api.throwOn('DELETE', '/everyone', Exception('x'));
     expect(
       await repo.deleteMessageForEveryone(conversationId: conv, messages: 'm1'),

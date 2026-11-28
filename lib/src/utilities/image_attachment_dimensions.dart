@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:image/image.dart' as img;
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
@@ -24,6 +26,43 @@ class IsmChatImageAttachmentDimensions {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Width and height read from the image header only (no pixel decode), so it
+  /// is cheap enough to call on the send path (e.g. a video thumbnail).
+  static ({int width, int height})? headerDimensions(Uint8List? bytes) {
+    if (bytes == null || bytes.isEmpty) return null;
+    try {
+      final info = img.findDecoderForData(bytes)?.startDecode(bytes);
+      if (info == null || info.width <= 0 || info.height <= 0) return null;
+      return (width: info.width, height: info.height);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Aspect ratio of [provider]'s image once it loads; null on error.
+  static Future<double?> aspectRatioFromProvider(ImageProvider provider) {
+    final completer = Completer<double?>();
+    final stream = provider.resolve(ImageConfiguration.empty);
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener(
+      (info, _) {
+        final w = info.image.width;
+        final h = info.image.height;
+        info.dispose();
+        stream.removeListener(listener);
+        if (!completer.isCompleted) {
+          completer.complete(w > 0 && h > 0 ? w / h : null);
+        }
+      },
+      onError: (_, __) {
+        stream.removeListener(listener);
+        if (!completer.isCompleted) completer.complete(null);
+      },
+    );
+    stream.addListener(listener);
+    return completer.future;
   }
 
   /// Flutter codec decode — handles formats `image` may not (e.g. some HEIC/JPEG).

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/src/res/theme/attachment_card_theme.dart';
+import 'package:isometrik_chat_flutter/src/res/theme/chat_design_tokens.dart';
 import 'package:isometrik_chat_flutter/src/res/theme/chat_dialog_theme.dart';
 import 'package:isometrik_chat_flutter/src/res/theme/chat_reaction_theme.dart';
 import 'package:isometrik_chat_flutter/src/res/theme/chat_textfiled_theme.dart';
@@ -31,6 +32,38 @@ class IsmChatThemeResolver {
 
   /// Same source as [IsmChatConfig.chatTheme] (host [chatBrightness] or Get).
   static bool get isSdkDarkMode => IsmChatConfig.isChatDarkMode;
+
+  /// Whether the host passed `IsmChatPageTheme.mediaTheme`. Screens keep their
+  /// pre-token behaviour for host themes and only restyle the SDK default.
+  static bool get hasCustomMediaTheme =>
+      IsmChatConfig.chatTheme.chatPageTheme?.mediaTheme != null;
+
+  /// Whether the host passed `IsmChatThemeData.profileTheme`.
+  static bool get hasCustomProfileTheme =>
+      IsmChatConfig.chatTheme.profileTheme != null;
+
+  /// Whether the host passed `IsmChatPageTheme.reactionTheme`.
+  static bool get hasCustomReactionTheme =>
+      IsmChatConfig.chatTheme.chatPageTheme?.reactionTheme != null;
+
+  /// Whether the host passed a search or composer text-field theme.
+  static bool get hasCustomSearchTextFieldTheme =>
+      IsmChatConfig.chatTheme.chatPageTheme?.searchTextFiledTheme != null ||
+      IsmChatConfig.chatTheme.chatPageTheme?.textFiledTheme != null;
+
+  /// In-chat user info (`IsmChatUserInfo`): host `IsmChatThemeData.profileTheme`,
+  /// else [IsmChatProfileTheme.fromTokens]. Chat-list profile screens keep
+  /// [profileFromConfig].
+  static IsmChatProfileTheme inChatProfileFromConfig(BuildContext context) =>
+      IsmChatConfig.chatTheme.profileTheme ??
+      IsmChatProfileTheme.fromTokens(IsmChatDesignTokens.of(context));
+
+  /// Reactions sheet (`ImsChatShowUserReaction`): host
+  /// `IsmChatPageTheme.reactionTheme`, else [IsmChatReactionTheme.fromTokens].
+  /// Bubble chips keep [reactionFromConfig].
+  static IsmChatReactionTheme reactionSheetFromConfig(BuildContext context) =>
+      IsmChatConfig.chatTheme.chatPageTheme?.reactionTheme ??
+      IsmChatReactionTheme.fromTokens(IsmChatDesignTokens.of(context));
 
   static IsmChatAttachmentCardTheme attachmentCard(
     BuildContext context, {

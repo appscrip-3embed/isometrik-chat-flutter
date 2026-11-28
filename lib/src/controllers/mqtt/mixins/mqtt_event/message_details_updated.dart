@@ -4,6 +4,28 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 /// Handles `messageDetailsUpdated` MQTT events (edited message body/metadata).
 mixin IsmChatMqttEventMessageDetailsUpdatedMixin {
+  /// Finds a message row already on screen (thread panel or channel list).
+  ///
+  /// Thread replies are often absent from the conversation DB map until reload.
+  IsmChatMessageModel? _liveMessageForMqttEdit(
+    String conversationId,
+    String messageId,
+  ) {
+    final fromThread =
+        IsmChatThreadController.findMessageInOpenPanel(messageId);
+    if (fromThread != null) return fromThread;
+
+    if (!IsmChatUtility.chatPageControllerRegistered) return null;
+    final page = IsmChatUtility.chatPageController;
+    if ((page.conversation?.conversationId ?? '').trim() != conversationId) {
+      return null;
+    }
+    for (final row in page.messages) {
+      if ((row.messageId ?? '').trim() == messageId) return row;
+    }
+    return null;
+  }
+
   Future<void> handleMessageDetailsUpdated(
     IsmChatMqttActionModel actionModel,
   ) async {
@@ -17,45 +39,48 @@ mixin IsmChatMqttEventMessageDetailsUpdatedMixin {
 
     final conversation =
         await IsmChatConfig.dbWrapper?.getConversation(conversationId);
-    if (conversation == null) return;
 
-    final messages = Map<String, IsmChatMessageModel>.from(
-      conversation.messages ?? {},
-    );
-    MapEntry<String, IsmChatMessageModel>? match;
-    for (final entry in messages.entries) {
-      if (entry.value.messageId == messageId) {
-        match = entry;
-        break;
+    IsmChatMessageModel? existing;
+    String? cachedKey;
+    if (conversation != null) {
+      final messages = conversation.messages ?? {};
+      for (final entry in messages.entries) {
+        if ((entry.value.messageId ?? '').trim() == messageId) {
+          existing = entry.value;
+          cachedKey = entry.key;
+          break;
+        }
       }
     }
-    if (match == null) {
-      if (IsmChatUtility.chatPageControllerRegistered &&
-          IsmChatUtility.chatPageController.conversation?.conversationId ==
-              conversationId) {
-        await IsmChatUtility.chatPageController.getMessagesFromDB(
-          conversationId,
-        );
-      }
-      return;
-    }
+    existing ??= _liveMessageForMqttEdit(conversationId, messageId);
 
-    final existing = match.value;
-    final groupCastId = existing.metaData?.groupCastId?.trim() ?? '';
+    final groupCastId = existing?.metaData?.groupCastId?.trim() ?? '';
     final decryptionId =
-        existing.metaData?.isBroadCastMessage == true && groupCastId.isNotEmpty
+        existing?.metaData?.isBroadCastMessage == true && groupCastId.isNotEmpty
             ? groupCastId
             : conversationId;
 
     final plainBody = detailsBody != null
         ? IsmChatUtility.decryptMessage(detailsBody, decryptionId)
-        : existing.body;
+        : existing?.body;
 
-    final updated = existing.copyWith(
-      body: plainBody,
-      searchableTags: details?.searchableTags ?? existing.searchableTags,
-      customType: details?.customType ?? existing.customType,
-      metaData: details?.metaData ?? existing.metaData,
+    final base = existing ??
+        IsmChatMessageModel(
+          body: plainBody ?? '',
+          customType: details?.customType ?? IsmChatCustomMessageType.text,
+          sentAt: actionModel.sentAt,
+          sentByMe: false,
+          conversationId: conversationId,
+          messageId: messageId,
+        );
+
+    final updated = base.copyWith(
+      body: plainBody ?? base.body,
+      conversationId: conversationId,
+      messageId: messageId,
+      searchableTags: details?.searchableTags ?? base.searchableTags,
+      customType: details?.customType ?? base.customType,
+      metaData: details?.metaData ?? base.metaData,
       messageUpdated: true,
     );
 
@@ -68,8 +93,11 @@ mixin IsmChatMqttEventMessageDetailsUpdatedMixin {
       await IsmChatUtility.chatPageController.applyMessageEditFromRemote(
         updated,
       );
-    } else {
-      messages[match.key] = updated;
+    } else if (conversation != null && cachedKey != null) {
+      final messages = Map<String, IsmChatMessageModel>.from(
+        conversation.messages ?? {},
+      );
+      messages[cachedKey] = updated;
       var nextConversation = conversation.copyWith(messages: messages);
       if (nextConversation.lastMessageDetails?.messageId == messageId) {
         nextConversation = nextConversation.copyWith(

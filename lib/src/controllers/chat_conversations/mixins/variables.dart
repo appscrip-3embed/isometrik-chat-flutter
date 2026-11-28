@@ -33,6 +33,11 @@ mixin IsmChatConversationsVariablesMixin on GetxController {
   set searchConversationQuery(String value) =>
       _searchConversationQuery.value = value;
 
+  /// Unsent composer drafts by conversation id, for the list preview.
+  /// Kept in sync by the chat page; persisted in the local DB.
+  final RxMap<String, IsmChatDraftModel> conversationDrafts =
+      <String, IsmChatDraftModel>{}.obs;
+
   /// True when the chat list is filtered by a non-empty search query.
   bool get isSearchingConversations =>
       searchConversationQuery.trim().isNotEmpty;
@@ -74,6 +79,13 @@ mixin IsmChatConversationsVariablesMixin on GetxController {
   bool get isConversationsLoading => _isConversationsLoading.value;
   set isConversationsLoading(bool value) =>
       _isConversationsLoading.value = value;
+
+  /// Rx handle for list UI workers ([ever] / [Obx]).
+  ///
+  /// Reuse when empty-state loader must clear after load even if
+  /// [conversations] stays `[]` (assigning the loading flag alone does not
+  /// notify a conversations-only worker).
+  RxBool get isConversationsLoadingRx => _isConversationsLoading;
 
   /// This variabel use for store user details which is login or signup
   final Rx<UserDetails?> _userDetails = Rx<UserDetails?>(null);

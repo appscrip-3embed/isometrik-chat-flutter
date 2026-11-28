@@ -121,7 +121,11 @@ class IsmChatThreadMessageTile extends StatelessWidget {
       children: [
         IsmChatImage.profile(
           message.senderInfo?.userProfileImageUrl ?? '',
-          name: message.senderInfo?.userName,
+          // Match the label beside it: own rows read "You", so the
+          // fallback initials are "Y" rather than the user's real name.
+          name: message.sentByMe
+              ? IsmChatStrings.you
+              : message.senderInfo?.userName,
           dimensions: isRoot ? IsmChatDimens.thirtyFive : IsmChatDimens.thirty,
         ),
         IsmChatDimens.boxWidth8,
@@ -140,6 +144,15 @@ class IsmChatThreadMessageTile extends StatelessWidget {
                     ),
                   ),
                   IsmChatDimens.boxWidth4,
+                  if (message.messageUpdated) ...[
+                    Text(
+                      IsmChatStrings.messageEdited,
+                      style: theme.timeStyle.copyWith(
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    IsmChatDimens.boxWidth4,
+                  ],
                   Text(
                     message.sentAt.toTimeString,
                     style: theme.timeStyle,
@@ -165,6 +178,7 @@ class IsmChatThreadMessageTile extends StatelessWidget {
                     textStyle: theme.bodyStyle,
                     toggleStyle: _threadExpandToggleStyle(theme),
                     collapsedMaxLines: 3,
+                    message: message,
                   ),
                 ],
               ] else if (label != null && body.isEmpty)
@@ -325,6 +339,7 @@ bool _threadBodyUsesMentionRichText(
   IsmChatMessageModel message,
   String body,
 ) =>
+    messageBodyHasComposerMention(body) ||
     message.mentionListForBody(body).any((s) => s.isLink);
 
 /// Channel bubble widgets paint captions with [IsmChatMessageModel.style] (white

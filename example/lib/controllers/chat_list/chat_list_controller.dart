@@ -71,7 +71,7 @@ class ChatListController extends GetxController {
     await IsmChat.i.initialize(
       threadsEnabled: true,
       maskSensitiveContent: true,
-      messageEncrypted: true,
+      messageEncrypted: false,
       kNavigatorKey: kNavigatorKey,
       communicationConfig: IsmChatCommunicationConfig(
         userConfig: IsmChatUserConfig(

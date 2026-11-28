@@ -25,8 +25,8 @@ class IsmChatMemberLeaveAndJoin extends StatelessWidget {
           padding: IsmChatDimens.edgeInsets8_4,
           child: Text(
             didLeft
-                ? '${message.userName} has left'
-                : '${message.userName} joined conversation',
+                ? message.groupMemberLeaveBannerText()
+                : message.groupMemberJoinBannerText(),
             textAlign: TextAlign.center,
             style: IsmChatConfig
                     .chatTheme.chatPageTheme?.centerMessageTheme?.textStyle ??

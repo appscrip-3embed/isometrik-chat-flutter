@@ -298,9 +298,11 @@ void main() {
         child: IsmChatThreadMessageTile(message: imageReply),
       );
       await tester.pump();
-      expect(find.text(caption), findsOneWidget);
-      final captionText = tester.widget<Text>(find.text(caption));
-      expect(captionText.style?.color, isNot(IsmChatColors.whiteColor));
+      // Captions render as mention-aware RichText.
+      final captionFinder = find.text(caption, findRichText: true);
+      expect(captionFinder, findsOneWidget);
+      final captionText = tester.widget<RichText>(captionFinder);
+      expect(captionText.text.style?.color, isNot(IsmChatColors.whiteColor));
       await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
     });
 
@@ -320,7 +322,7 @@ void main() {
         child: IsmChatThreadMessageTile(message: imageReply),
       );
       await tester.pump();
-      expect(find.text(caption), findsOneWidget);
+      expect(find.text(caption, findRichText: true), findsOneWidget);
       await Get.delete<IsmChatPageController>(tag: IsmChat.i.chatPageTag);
     });
 
@@ -356,22 +358,47 @@ void main() {
       expect(find.text('Show more'), findsNothing);
     });
 
-    testWidgets('long text replies can expand and collapse', (tester) async {
-      final longBody = List.generate(20, (i) => 'Thread paragraph line $i.').join('\n');
+    testWidgets('root starting with @mention keeps body text color',
+        (tester) async {
+      final root = threadRoot(sentByMe: false)
+          .copyWith(body: '@Opponent please check this');
       await pumpChatHost(
         tester,
-        child: IsmChatThreadMessageTile(
-          message: threadReply(body: longBody),
+        child: IsmChatThreadMessageTile(message: root, isRoot: true),
+      );
+      final rich = tester
+          .widgetList<RichText>(find.byType(RichText))
+          .firstWhere(
+            (w) => w.text.toPlainText() == '@Opponent please check this',
+          );
+      final rootStyle = (rich.text as TextSpan).style;
+      expect(rootStyle?.color, isNotNull);
+      expect(rootStyle?.color, isNot(IsmChatColors.whiteColor));
+    });
+
+    testWidgets('long text replies can expand and collapse', (tester) async {
+      // 20 lines exceeds collapsedMaxLines (15). Host in a scroll view like the
+      // real thread SliverList so expanding past the 800px test viewport does
+      // not RenderFlex-overflow the Scaffold body.
+      final longBody =
+          List.generate(20, (i) => 'Thread paragraph line $i.').join('\n');
+      await pumpChatHost(
+        tester,
+        child: SingleChildScrollView(
+          child: IsmChatThreadMessageTile(
+            message: threadReply(body: longBody),
+          ),
         ),
       );
       await tester.pump();
       expect(find.text('Show more'), findsOneWidget);
       await tester.tap(find.text('Show more'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.text('Show less'), findsOneWidget);
       expect(find.textContaining('Thread paragraph line 19'), findsOneWidget);
+      await tester.ensureVisible(find.text('Show less'));
       await tester.tap(find.text('Show less'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.text('Show more'), findsOneWidget);
     });
 
@@ -548,7 +575,7 @@ void main() {
           .last
           .json as Map<String, dynamic>;
       expect(body['body'], 'typed in the panel');
-      expect(body['messageType'], 2);
+      expect(body['messageType'], 4);
       expect(body['parentMessageId'], 'root-1');
       expect(body['showInConversation'], isFalse);
       expect(find.text('typed in the panel'), findsOneWidget);
@@ -574,7 +601,7 @@ void main() {
       expect(body['showInConversation'], isTrue);
     });
 
-    testWidgets('tapping a reply targets it for a nested reply',
+    testWidgets('tapping a reply does not start a nested reply',
         (tester) async {
       await pumpThreadView(tester, replies: [
         threadReplyJson(messageId: 'r1', body: 'first reply', sentAt: 2000),
@@ -582,14 +609,11 @@ void main() {
 
       await tester.tap(find.text('first reply'));
       await tester.pump();
-      expect(
-        find.byKey(const Key('ism-thread-reply-to-chip')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('ism-thread-reply-to-chip')), findsNothing);
 
       await tester.enterText(
         find.byKey(const Key('ism-thread-composer-field')),
-        'answering r1',
+        'answering the thread',
       );
       await tester.tap(find.byKey(const Key('ism-thread-send-button')));
       await settle(tester);
@@ -598,8 +622,7 @@ void main() {
           .requestsForPath('/chat/message', method: 'POST')
           .last
           .json as Map<String, dynamic>;
-      expect(body['parentMessageId'], 'r1');
-      expect(find.byKey(const Key('ism-thread-reply-to-chip')), findsNothing);
+      expect(body['parentMessageId'], isNot('r1'));
     });
 
     testWidgets('the composer offers the channel attachment sheet',

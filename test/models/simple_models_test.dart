@@ -65,6 +65,35 @@ void main() {
       );
     });
 
+    test('userFacingApiErrorMessage maps gateway noise to localized copy', () {
+      expect(
+        const IsmChatResponseModel(
+          data: 'error code: 520',
+          hasError: true,
+          errorCode: 520,
+        ).userFacingApiErrorMessage(),
+        IsmChatStrings.errorServerUnavailable,
+      );
+      expect(
+        const IsmChatResponseModel(
+          data: '{"error":"Cannot delete this message."}',
+          hasError: true,
+          errorCode: 400,
+        ).userFacingApiErrorMessage(
+          fallback: IsmChatStrings.deleteForEveryoneFailed,
+        ),
+        'Cannot delete this message.',
+      );
+      expect(
+        const IsmChatResponseModel(
+          data: '',
+          hasError: true,
+          errorCode: 1000,
+        ).userFacingApiErrorMessage(),
+        IsmChatStrings.errorRequestTimeout,
+      );
+    });
+
     test('apiErrorMessage reads nested and raw bodies', () {
       expect(
         const IsmChatResponseModel(

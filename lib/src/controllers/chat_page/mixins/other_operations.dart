@@ -23,6 +23,7 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
   Future<void> leaveGroup({
     required int adminCount,
     required bool isUserAdmin,
+    IsmChatLeaveGroupMode mode = IsmChatLeaveGroupMode.keepHistory,
   }) async {
     final conversationId = _controller.conversation?.conversationId ?? '';
     if (conversationId.isEmpty) return;
@@ -34,6 +35,11 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
     }
     final didLeft = await _controller.leaveConversation(conversationId);
     if (didLeft) {
+      await IsmChatLeaveGroupCoordinator.applyPostLeaveLocalState(
+        conversationId: conversationId,
+        mode: mode,
+      );
+
       // Clear BOTH conversation controllers. Leaving only
       // `currentConversation` null while keeping `conversation` set to the
       // exited group lets a late `getConverstaionDetails` response write that
@@ -53,10 +59,6 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
         ..isMessageSeleted = false;
       IsmChatRoute.goBack(); // to Chat Page
       IsmChatRoute.goBack(); // to Conversation Page
-      await Future.wait([
-        IsmChatConfig.dbWrapper!.removeConversation(conversationId),
-        _controller.conversationController.getChatConversations(),
-      ]);
     }
   }
 
@@ -128,6 +130,9 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
   }
 
   /// Resolves the user for [@mentionText] on [message] and opens their DM.
+  ///
+  /// From a thread panel row the panel is closed first: it is a route on top
+  /// of the chat page, and [openDirectChatWithUser] rebinds the page beneath.
   Future<void> onMentionLinkTapped(
     IsmChatMessageModel message,
     String mentionText,
@@ -139,6 +144,10 @@ mixin IsmChatPageOtherOperationsMixin on GetxController {
         ? user.userId.trim()
         : (user.memberId?.trim() ?? '');
     if (userId.isEmpty || isCurrentChatUser(userId)) return;
+    if (IsmChatThreadCoordinator.isMessageInOpenThreadPanel(message)) {
+      IsmChatUtility.hideKeyboard();
+      IsmChatRoute.goBack<void>();
+    }
     await openDirectChatWithUser(
       user.userId.trim().isNotEmpty ? user : user.copyWith(userId: userId),
     );

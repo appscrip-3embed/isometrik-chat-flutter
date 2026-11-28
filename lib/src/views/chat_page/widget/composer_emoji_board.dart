@@ -44,25 +44,30 @@ class IsmChatComposerEmojiBoard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textFieldTheme = IsmChatThemeResolver.textFieldFromConfig(context);
+    final tokens = IsmChatDesignTokens.of(context);
     final panelColor = textFieldTheme.emojiBoardBackgroundColor ??
         textFieldTheme.backgroundColor ??
         IsmChatColors.whiteColor;
+    // Unselected category / search icons: theme override or design-token secondary.
     final categoryIconColor =
-        textFieldTheme.emojiBoardCategoryIconColor ?? IsmChatColors.greyColor;
+        textFieldTheme.emojiBoardCategoryIconColor ?? tokens.textSecondary;
     final actionIconColor =
         textFieldTheme.emojiBoardActionIconColor ?? IsmChatColors.blackColor;
+    // Selected category icons always use host primary (not hardcoded purple).
     final primaryColor = IsmChatConfig.chatTheme.primaryColor ??
         IsmChatColors.primaryColorLight;
     final isDark = IsmChatThemeResolver.brightness(context) == Brightness.dark;
     final showGiphy = _showGiphyPicker;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    final panelBodyHeight =
+        IsmChatUtility.composerEmojiPanelBodyHeight(context);
 
     return ColoredBox(
       color: panelColor,
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: SizedBox(
-          height: IsmChatDimens.twoHundredFifty,
+          height: panelBodyHeight,
           child: Column(
             children: [
               if (showGiphy) ...[
@@ -101,6 +106,7 @@ class IsmChatComposerEmojiBoard extends StatelessWidget {
                         categoryIconColor,
                         actionIconColor,
                         primaryColor,
+                        tokens.textPrimary,
                         isDark,
                       )
                     : IsmChatComposerEmojiPicker(
@@ -109,6 +115,7 @@ class IsmChatComposerEmojiBoard extends StatelessWidget {
                         categoryIconColor: categoryIconColor,
                         actionIconColor: actionIconColor,
                         primaryColor: primaryColor,
+                        textPrimaryColor: tokens.textPrimary,
                         isDark: isDark,
                         textFieldTheme: textFieldTheme,
                       ),
@@ -126,6 +133,7 @@ class IsmChatComposerEmojiBoard extends StatelessWidget {
     Color categoryIconColor,
     Color actionIconColor,
     Color primaryColor,
+    Color textPrimaryColor,
     bool isDark,
   ) {
     switch (emojiBoardTab) {
@@ -151,6 +159,7 @@ class IsmChatComposerEmojiBoard extends StatelessWidget {
           categoryIconColor: categoryIconColor,
           actionIconColor: actionIconColor,
           primaryColor: primaryColor,
+          textPrimaryColor: textPrimaryColor,
           isDark: isDark,
           textFieldTheme: textFieldTheme,
         );
@@ -203,6 +212,18 @@ class IsmChatComposerEmojiBoardTab extends StatelessWidget {
 }
 
 /// Emoji grid wired to any composer [TextEditingController].
+///
+/// Category-tab colors (reuse this wiring elsewhere):
+/// - Selected → [primaryColor] (host [IsmChatThemeData.primaryColor])
+/// - Unselected / search → [categoryIconColor]
+///   ([IsmChatTextFiledTheme.emojiBoardCategoryIconColor] or
+///   [IsmChatDesignTokens.textSecondary])
+///
+/// Recents tab is off ([RecentTabBehavior.NONE]); opens on smileys.
+/// Search / empty placeholders use [textPrimaryColor] so dark mode stays
+/// readable (package default `Colors.black26` is invisible on dark panels).
+///
+/// [IsmChatTextFiledTheme.emojiColor] styles the composer smile button only.
 class IsmChatComposerEmojiPicker extends StatelessWidget {
   const IsmChatComposerEmojiPicker({
     required this.textController,
@@ -210,6 +231,7 @@ class IsmChatComposerEmojiPicker extends StatelessWidget {
     required this.categoryIconColor,
     required this.actionIconColor,
     required this.primaryColor,
+    required this.textPrimaryColor,
     required this.isDark,
     required this.textFieldTheme,
     super.key,
@@ -220,52 +242,82 @@ class IsmChatComposerEmojiPicker extends StatelessWidget {
   final Color categoryIconColor;
   final Color actionIconColor;
   final Color primaryColor;
+
+  /// [IsmChatDesignTokens.textPrimary] — search hint / empty-state copy.
+  final Color textPrimaryColor;
   final bool isDark;
   final IsmChatTextFiledTheme textFieldTheme;
 
   @override
-  Widget build(BuildContext context) => EmojiPicker(
-        textEditingController: textController,
-        onEmojiSelected: (category, emoji) {
-          IsmChatLog.error(emoji.toJson());
-        },
-        config: Config(
-          bottomActionBarConfig: BottomActionBarConfig(
-            showBackspaceButton: true,
-            enabled: true,
-            buttonIconColor: actionIconColor,
-            buttonColor: panelColor,
-            backgroundColor: panelColor,
-          ),
-          categoryViewConfig: CategoryViewConfig(
-            backgroundColor: panelColor,
-            indicatorColor: primaryColor,
-            iconColor: categoryIconColor,
-            iconColorSelected: textFieldTheme.emojiColor ?? primaryColor,
-            backspaceColor: primaryColor,
-            dividerColor:
-                isDark ? IsmChatColors.greyColor : IsmChatColors.greyColorLight,
-          ),
-          searchViewConfig: SearchViewConfig(
-            backgroundColor: panelColor,
-            buttonIconColor: categoryIconColor,
-            hintTextStyle: textFieldTheme.hintTextStyle,
-            inputTextStyle: textFieldTheme.inputTextStyle,
-          ),
-          skinToneConfig: SkinToneConfig(
-            dialogBackgroundColor: panelColor,
-            indicatorColor: primaryColor,
-          ),
-          emojiViewConfig: EmojiViewConfig(
-            emojiSizeMax: IsmChatDimens.twentyFour,
-            columns: 8,
-            backgroundColor: panelColor,
+  Widget build(BuildContext context) {
+    final hintStyle = (textFieldTheme.hintTextStyle ??
+            textFieldTheme.inputTextStyle ??
+            const TextStyle())
+        .copyWith(
+      color: textPrimaryColor,
+      fontSize: IsmChatDimens.twelve,
+    );
+    final inputStyle = (textFieldTheme.inputTextStyle ?? const TextStyle())
+        .copyWith(
+      color: textPrimaryColor,
+      fontSize: IsmChatDimens.twelve,
+    );
+
+    return EmojiPicker(
+      textEditingController: textController,
+      onEmojiSelected: (category, emoji) {
+        IsmChatLog.error(emoji.toJson());
+      },
+      config: Config(
+        bottomActionBarConfig: BottomActionBarConfig(
+          showBackspaceButton: true,
+          enabled: true,
+          buttonIconColor: actionIconColor,
+          buttonColor: panelColor,
+          backgroundColor: panelColor,
+        ),
+        categoryViewConfig: CategoryViewConfig(
+          // Skip Recents — start on smileys so hosts never land on empty state.
+          initCategory: Category.SMILEYS,
+          recentTabBehavior: RecentTabBehavior.NONE,
+          backgroundColor: panelColor,
+          indicatorColor: primaryColor,
+          iconColor: categoryIconColor,
+          iconColorSelected: primaryColor,
+          backspaceColor: primaryColor,
+          dividerColor:
+              isDark ? IsmChatColors.greyColor : IsmChatColors.greyColorLight,
+        ),
+        searchViewConfig: SearchViewConfig(
+          backgroundColor: panelColor,
+          buttonIconColor: categoryIconColor,
+          hintTextStyle: hintStyle,
+          inputTextStyle: inputStyle,
+        ),
+        skinToneConfig: SkinToneConfig(
+          dialogBackgroundColor: panelColor,
+          indicatorColor: primaryColor,
+        ),
+        emojiViewConfig: EmojiViewConfig(
+          emojiSizeMax: IsmChatDimens.twenty,
+          columns: 8,
+          backgroundColor: panelColor,
+          // Fallback if Recents is re-enabled; readable in light and dark.
+          noRecents: Text(
+            'No Recents',
+            style: TextStyle(
+              fontSize: IsmChatDimens.twelve,
+              color: textPrimaryColor,
+            ),
+            textAlign: TextAlign.center,
           ),
         ),
-        onBackspacePressed: () {
-          final value = textController.text;
-          if (value.isEmpty) return;
-          textController.text = value.substring(0, value.length - 1);
-        },
-      );
+      ),
+      onBackspacePressed: () {
+        final value = textController.text;
+        if (value.isEmpty) return;
+        textController.text = value.substring(0, value.length - 1);
+      },
+    );
+  }
 }

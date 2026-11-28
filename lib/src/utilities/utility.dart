@@ -46,6 +46,40 @@ class IsmChatUtility {
   static void openKeyboard() =>
       FocusManager.instance.primaryFocus?.requestFocus();
 
+  /// Latest non-zero [MediaQuery.viewInsets.bottom] while the soft keyboard
+  /// was visible. Used so [IsmChatComposerEmojiBoard] can match keyboard height
+  /// after the keyboard is dismissed.
+  static double _lastKeyboardViewInset = 0;
+
+  /// Records [MediaQuery.viewInsets.bottom] when the keyboard is on screen.
+  /// Call before hiding the keyboard when opening the emoji panel.
+  static void rememberKeyboardViewInset(BuildContext? context) {
+    if (context == null || !context.mounted) return;
+    final inset = MediaQuery.viewInsetsOf(context).bottom;
+    if (inset > 0) {
+      _lastKeyboardViewInset = inset;
+    }
+  }
+
+  /// Resets cached keyboard metrics (tests only).
+  @visibleForTesting
+  static void resetComposerKeyboardMetricsForTest() {
+    _lastKeyboardViewInset = 0;
+  }
+
+  /// Emoji panel body height inside [IsmChatComposerEmojiBoard] (home indicator
+  /// padding is applied separately and is not included here).
+  static double composerEmojiPanelBodyHeight(BuildContext context) {
+    rememberKeyboardViewInset(context);
+    final fallback = IsmChatDimens.twoHundredFifty;
+    if (_lastKeyboardViewInset <= 0) {
+      return fallback;
+    }
+    final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
+    final matched = _lastKeyboardViewInset - bottomSafe;
+    return matched > fallback ? matched : fallback;
+  }
+
   /// Method for Do Work After Frame Call Back
   static void doLater(VoidCallback? work) {
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
@@ -120,16 +154,25 @@ class IsmChatUtility {
     );
   }
 
-  static Future<void> showErrorDialog(String message,
-      {void Function()? onCancel}) async {
+  static Future<void> showErrorDialog(
+    String message, {
+    String? title,
+    void Function()? onCancel,
+    void Function()? onRetry,
+  }) async {
     if (IsmChatContextWidget.tryDialogContext() == null) {
       return;
     }
+    final headline = title ?? message;
+    final body = title != null ? message : null;
     await IsmChatContextWidget.showDialogContext(
       content: IsmChatAlertDialogBox(
-        title: message,
+        title: headline,
+        content: body == null ? null : Text(body),
         cancelLabel: IsmChatStrings.okay,
         onCancel: onCancel,
+        actionLabels: onRetry == null ? null : [IsmChatStrings.threadRetry],
+        callbackActions: onRetry == null ? null : [onRetry],
       ),
     );
   }
@@ -1205,6 +1248,25 @@ class IsmChatUtility {
         trimmed == IsmChatStrings.sticker;
   }
 
+  /// Type labels and wire placeholders that must not be sent as captionMessage.
+  ///
+  /// Reused by multi-photo sends so batch preview text ([multipleMediaBatchLabel],
+  /// [AttachmentMessage:Multiple]) does not land in metadata caption.
+  static bool isOutboundMediaCaptionPlaceholder(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return false;
+    if (isOutboundAttachmentPlaceholderBody(trimmed)) {
+      return true;
+    }
+    if (trimmed == 'AttachmentMessage:Multiple') {
+      return true;
+    }
+    if (trimmed == IsmChatStrings.imagesAndVideos) {
+      return true;
+    }
+    return false;
+  }
+
   /// Wire `body` when an attachment has no caption (see [outboundAttachmentBody]).
   static String _outboundAttachmentPlaceholderBody(
       IsmChatMediaType? mediaType) {
@@ -1225,7 +1287,10 @@ class IsmChatUtility {
   /// Metadata `caption` / `captionMessage` for outbound attachment sends.
   static String? outboundAttachmentCaptionMeta(String? caption) {
     final trimmed = caption?.trim() ?? '';
-    return trimmed.isEmpty ? null : trimmed;
+    if (trimmed.isEmpty || isOutboundMediaCaptionPlaceholder(trimmed)) {
+      return null;
+    }
+    return trimmed;
   }
 
   /// FCM / conversation preview for a multi photo+video batch (no docs).
@@ -1326,15 +1391,23 @@ class IsmChatUtility {
   }
 
   /// Picks the first non-empty per-file caption, else composer text.
+  ///
+  /// Skips localized type labels and batch preview strings so they are not
+  /// duplicated into captionMessage on multi-media sends.
   static String resolveOutboundMediaCaption({
     String? mediaCaption,
     String? composerText,
   }) {
     final fromMedia = mediaCaption?.trim() ?? '';
-    if (fromMedia.isNotEmpty) {
+    if (fromMedia.isNotEmpty && !isOutboundMediaCaptionPlaceholder(fromMedia)) {
       return fromMedia;
     }
-    return composerText?.trim() ?? '';
+    final fromComposer = composerText?.trim() ?? '';
+    if (fromComposer.isNotEmpty &&
+        !isOutboundMediaCaptionPlaceholder(fromComposer)) {
+      return fromComposer;
+    }
+    return '';
   }
 
   static bool isOnlyEmoji(String text) {

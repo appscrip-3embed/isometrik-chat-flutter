@@ -70,6 +70,8 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
         }
       }
 
+      // Empty [messages] is normal for chats not opened yet — keep API/DB preview.
+      // Cleared chats null [lastMessageDetails] via [withClearedMessageHistory].
       if (!needsRecompute ||
           messagesMap == null ||
           messagesMap.isEmpty ||
@@ -184,9 +186,11 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
     _controller.isConversationsLoading = false;
 
     if (_controller.conversations.length > 1) {
-      _controller.conversations
-          .sort((a, b) => (b.lastMessageDetails?.sentAt ?? 0)
-              .compareTo(a.lastMessageDetails?.sentAt ?? 0));
+      _controller.conversations.sort((a, b) {
+        int sortKey(IsmChatConversationModel c) =>
+            c.lastMessageDetails?.sentAt ?? c.lastMessageSentAt ?? 0;
+        return sortKey(b).compareTo(sortKey(a));
+      });
       final opponentEmptyData = <IsmChatConversationModel>[];
       final opponentData = <IsmChatConversationModel>[];
       for (var x in _controller.conversations) {
@@ -432,13 +436,20 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
     String? conversationId, {
     bool deleteFromServer = true,
     bool shouldUpdateLocal = true,
+    /// When true (e.g. after [IsmChatLeaveGroupMode.deleteForMe]), still remove
+    /// from local DB and the list if the server delete fails — common after leave.
+    bool removeLocalEvenIfServerFails = false,
   }) async {
     if (conversationId.isNullOrEmpty) return;
 
+    var serverDeleteOk = true;
     if (deleteFromServer) {
       final response =
           await _controller.viewModel.deleteChat(conversationId ?? '');
-      if (response?.hasError ?? true) return;
+      serverDeleteOk = response != null && !response.hasError;
+      if (!serverDeleteOk && !removeLocalEvenIfServerFails) {
+        return;
+      }
     }
     if (shouldUpdateLocal) {
       final isCurrentConversation =
@@ -458,8 +469,12 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
         }
       }
       await IsmChatConfig.dbWrapper?.removeConversation(conversationId ?? '');
+      final remaining = _controller.conversations
+          .where((c) => c.conversationId != conversationId)
+          .toList();
+      _controller.conversations = remaining;
       await _controller.getConversationsFromDB();
-      if (deleteFromServer) {
+      if (deleteFromServer && serverDeleteOk) {
         await _controller.getChatConversations();
       }
     }
@@ -716,11 +731,22 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
         actions: [
           IsmChatConfirmationAction(
             id: IsmChatConfirmationActionId.exitGroup,
-            label: IsmChatStrings.exitGroup,
+            label: IsmChatStrings.leaveGroup,
             onPressed: () async => leaveGroup(
               conversation: conversation,
               adminCount: adminCount,
               isUserAdmin: isUserAdmin,
+              mode: IsmChatLeaveGroupMode.keepHistory,
+            ),
+          ),
+          IsmChatConfirmationAction(
+            id: IsmChatConfirmationActionId.leaveGroupAndDeleteForMe,
+            label: IsmChatStrings.leaveAndDeleteForMe,
+            onPressed: () async => leaveGroup(
+              conversation: conversation,
+              adminCount: adminCount,
+              isUserAdmin: isUserAdmin,
+              mode: IsmChatLeaveGroupMode.deleteForMe,
             ),
           ),
         ],
@@ -732,6 +758,7 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
     required IsmChatConversationModel conversation,
     required int adminCount,
     required bool isUserAdmin,
+    IsmChatLeaveGroupMode mode = IsmChatLeaveGroupMode.keepHistory,
   }) async {
     final conversationId = conversation.conversationId ?? '';
     if (conversationId.isEmpty) {
@@ -744,6 +771,7 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
       await IsmChatUtility.chatPageController.leaveGroup(
         adminCount: adminCount,
         isUserAdmin: isUserAdmin,
+        mode: mode,
       );
       return;
     }
@@ -773,6 +801,11 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
       return;
     }
 
+    await IsmChatLeaveGroupCoordinator.applyPostLeaveLocalState(
+      conversationId: conversationId,
+      mode: mode,
+    );
+
     final isCurrentConversation =
         _controller.currentConversationId == conversationId;
     if (isCurrentConversation) {
@@ -789,11 +822,6 @@ mixin IsmChatConversationsConversationOperationsMixin on GetxController {
           ..closeOverlay();
       }
     }
-
-    await Future.wait([
-      IsmChatConfig.dbWrapper!.removeConversation(conversationId),
-      _controller.getChatConversations(),
-    ]);
   }
 
   /// Filters suggestions based on the search query.

@@ -67,6 +67,7 @@ enum IsmChatConfirmationActionId {
   deleteGroup,
   deleteChat,
   exitGroup,
+  leaveGroupAndDeleteForMe,
   changeGroupTitle,
   dismiss,
   cannotBlockWhenTheyBlockedMe,

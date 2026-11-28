@@ -14,6 +14,34 @@ class MessageReactionModel {
     required this.userIds,
   });
 
+  /// Adds [userId] at most once.
+  ///
+  /// Reuse on every local reaction-write path (API success in
+  /// [IsmChatPageViewModel.addReacton], MQTT [handleAddAndRemoveReaction],
+  /// thread [IsmChatThreadController.applyReactionChange]). The reacting
+  /// device often gets both the HTTP success patch and an MQTT echo; without
+  /// this guard the same user appears twice (chip count 2 / detail list
+  /// duplicated) while other devices stay correct.
+  bool addUserIfAbsent(String userId) {
+    final id = userId.trim();
+    if (id.isEmpty || userIds.contains(id)) {
+      return false;
+    }
+    userIds.add(id);
+    return true;
+  }
+
+  /// Removes every occurrence of [userId] (also clears accidental duplicates).
+  bool removeUser(String userId) {
+    final id = userId.trim();
+    if (id.isEmpty) {
+      return false;
+    }
+    final before = userIds.length;
+    userIds.removeWhere((e) => e == id);
+    return userIds.length != before;
+  }
+
   MessageReactionModel copyWith({
     String? emojiKey,
     List<String>? userIds,

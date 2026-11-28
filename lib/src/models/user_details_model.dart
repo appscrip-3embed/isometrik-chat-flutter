@@ -98,15 +98,17 @@ class UserDetails {
   /// Same rule as [IsmChatMqttUserModel.displayName] and chat UI headers.
   String get displayName {
     final fullName =
-        '${metaData?.firstName ?? ''} ${metaData?.lastName ?? ''}'.trim();
+        ismChatJoinNameParts([metaData?.firstName, metaData?.lastName]);
     if (fullName.isNotEmpty) return fullName;
     final custom = metaData?.customMetaData;
     if (custom != null) {
-      final customFull =
-          '${custom['firstName'] ?? ''} ${custom['lastName'] ?? ''}'.trim();
+      final customFull = ismChatJoinNameParts([
+        custom['firstName']?.toString(),
+        custom['lastName']?.toString(),
+      ]);
       if (customFull.isNotEmpty) return customFull;
     }
-    final member = memberName?.trim() ?? '';
+    final member = ismChatJoinNameParts([memberName]);
     if (member.isNotEmpty) return member;
     return userName;
   }
@@ -242,3 +244,13 @@ class UserDetails {
       memberId.hashCode ^
       pushNotification.hashCode;
 }
+
+/// Joins name parts with single spaces and collapses inner whitespace.
+///
+/// `"Mr. "` + `"Ajay"` must read `"Mr. Ajay"`, not `"Mr.  Ajay"`, both in
+/// headers and in the label inserted after `@` by the mention picker.
+String ismChatJoinNameParts(Iterable<String?> parts) => parts
+    .map((e) => (e ?? '').trim())
+    .where((e) => e.isNotEmpty)
+    .join(' ')
+    .replaceAll(RegExp(r'\s+'), ' ');

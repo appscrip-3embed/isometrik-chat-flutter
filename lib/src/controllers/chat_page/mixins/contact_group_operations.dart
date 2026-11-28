@@ -128,27 +128,10 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
     if (!_controller.conversation!.isGroup!) {
       return;
     }
-    _controller.showMentionUserList = value.split(' ').last.contains('@');
-    if (!_controller.showMentionUserList) {
-      _controller.mentionSuggestions.clear();
-      return;
-    }
-    var query = value.split('@').last;
-    final currentUserId =
-        IsmChatConfig.communicationConfig.userConfig.userId.trim();
-    final alreadyMentioned = mentionUserIdsInComposerText(
-      value,
-      _controller.groupMembers,
-    );
-    _controller.mentionSuggestions = _controller.groupMembers
-        .where((e) => e.userId.trim() != currentUserId)
-        .where((e) => !alreadyMentioned.contains(e.userId.trim()))
-        .where((e) {
-          final q = query.toLowerCase();
-          final label = mentionLabelForUser(e).toLowerCase();
-          return e.userName.toLowerCase().contains(q) || label.contains(q);
-        })
-        .toList();
+    final suggestions =
+        mentionSuggestionsForComposer(value, _controller.groupMembers);
+    _controller.showMentionUserList = suggestions != null;
+    _controller.mentionSuggestions = suggestions ?? [];
   }
 
   /// Updates the mention user in the input field.
@@ -156,18 +139,17 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
     final member = _controller.groupMembers.firstWhereOrNull(
       (e) => e.userName == value,
     );
-    final currentUserId =
-        IsmChatConfig.communicationConfig.userConfig.userId.trim();
-    if (member != null && member.userId.trim() == currentUserId) {
+    if (member != null && isCurrentChatUser(member.userId)) {
       _controller.showMentionUserList = false;
       return;
     }
-    final tempList = _controller.chatInputController.text.split('@');
-    final remainingText = tempList.sublist(0, tempList.length - 1).join('@');
     final mentionLabel = member != null
         ? mentionLabelForUser(member)
         : value.capitalizeFirst!;
-    final updatedText = '$remainingText@$mentionLabel ';
+    final updatedText = insertMentionIntoComposerText(
+      _controller.chatInputController.text,
+      mentionLabel,
+    );
     _controller.showMentionUserList = false;
     _controller.chatInputController.value =
         _controller.chatInputController.value.copyWith(
@@ -178,53 +160,48 @@ mixin IsmChatPageContactGroupOperationsMixin on GetxController {
     );
   }
 
+  /// Refreshes the `@` picker for a media caption while the user types.
+  void refreshCaptionMentions(String text) {
+    final members = _controller.mentionableMembers;
+    final suggestions =
+        members.isEmpty ? null : mentionSuggestionsForComposer(text, members);
+    _controller.captionMentionSuggestions
+        .assignAll(suggestions ?? const <UserDetails>[]);
+  }
+
+  /// Hides the media caption `@` picker.
+  void hideCaptionMentions() => _controller.captionMentionSuggestions.clear();
+
+  /// Inserts [member] into the caption [field] and returns the new text so the
+  /// caller can store it on the picked media.
+  String selectCaptionMention(TextEditingController field, UserDetails member) {
+    final updatedText =
+        insertMentionIntoComposerText(field.text, mentionLabelForUser(member));
+    field.value = field.value.copyWith(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: updatedText.length),
+      composing: TextRange.empty,
+    );
+    hideCaptionMentions();
+    return updatedText;
+  }
+
+  /// Mentioned users for an outgoing media [caption], ready for the local
+  /// echo; `null` when nothing in it resolves to a group member.
+  List<UserDetails>? captionMentionedUsers(String caption) {
+    final members = _controller.mentionableMembers;
+    if (members.isEmpty || !caption.contains('@')) return null;
+    final mentions = resolveComposerMentions(caption, members);
+    if (mentions.isEmpty) return null;
+    return mentionedUserDetailsFor(mentions, members);
+  }
+
   /// Gets the list of mentioned users from the message data.
   ///
-  /// Matches each `@` segment against [mentionLabelForUser], [UserDetails.displayName],
-  /// and [UserDetails.userName]. [MentionModel.wordCount] follows the label actually
-  /// inserted in the composer, not [UserDetails.userName] alone.
+  /// See [resolveComposerMentions].
   Future<void> getMentionedUserList(String data) async {
-    _controller.userMentionedList.clear();
-    final mentionedList = (data.split('@').toList())
-      ..removeWhere((e) => e.trim().isEmpty);
-
-    final seenUserIds = <String>{};
-
-    for (var mentionIndex = 0; mentionIndex < mentionedList.length;
-        mentionIndex++) {
-      final seg = mentionedList[mentionIndex].trimLeft();
-      UserDetails? matchedMember;
-
-      for (final member in _controller.groupMembers) {
-        if (isCurrentChatUser(member.userId)) continue;
-        final userName = member.userName.trim();
-        if (userName.isEmpty) continue;
-
-        final label = mentionLabelForUser(member);
-        final displayName = member.displayName.trim();
-        final matches = mentionSegmentMatchesMemberName(seg, label) ||
-            (displayName.isNotEmpty &&
-                mentionSegmentMatchesMemberName(seg, displayName)) ||
-            mentionSegmentMatchesMemberName(seg, userName);
-        if (matches) {
-          matchedMember = member;
-          break;
-        }
-      }
-
-      if (matchedMember == null) continue;
-      if (!seenUserIds.add(matchedMember.userId.trim())) continue;
-
-      final label = mentionLabelForUser(matchedMember);
-      final wordCount =
-          label.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
-      _controller.userMentionedList.add(
-        MentionModel(
-          wordCount: wordCount,
-          userId: matchedMember.userId,
-          order: mentionIndex,
-        ),
-      );
-    }
+    _controller.userMentionedList
+      ..clear()
+      ..addAll(resolveComposerMentions(data, _controller.groupMembers));
   }
 }

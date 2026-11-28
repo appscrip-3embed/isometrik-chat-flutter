@@ -43,6 +43,45 @@ void main() {
         FakeResponse.json({'messageId': messageId}),
       );
 
+  group('mentions', () {
+    setUp(() {
+      IsmChatProperties.chatPageProperties = IsmChatPageProperties(
+        features: [IsmChatFeature.mentionMember],
+      );
+    });
+    tearDown(() {
+      IsmChatProperties.chatPageProperties = IsmChatPageProperties();
+    });
+
+    test('typing then sending a mention does not throw on clear', () async {
+      stubThread([]);
+      stubSend();
+      await controller.openThread(
+        root: threadRoot(conversationId: kGroupConversationId),
+        conversation: groupConversation(),
+      );
+
+      // No `@` yet: suggestions become empty (must stay a mutable list).
+      controller
+        ..replyController.text = 'hey'
+        ..handleComposerTextChanged('hey');
+      expect(controller.showMentionUserList, isFalse);
+
+      controller.replyController.text = 'hey @Opp';
+      controller.handleComposerTextChanged('hey @Opp');
+      expect(controller.showMentionUserList, isTrue);
+      expect(controller.mentionSuggestions.map((e) => e.userId),
+          [kOpponentId]);
+
+      controller.selectMention(controller.mentionSuggestions.first);
+      expect(controller.showMentionUserList, isFalse);
+
+      await controller.sendReply();
+      final sent = controller.replies.last;
+      expect(sent.mentionedUsers?.map((e) => e.userId), [kOpponentId]);
+    });
+  });
+
   group('openThread', () {
     test('loads replies oldest-first and keeps the root', () async {
       stubThread([
@@ -309,7 +348,7 @@ void main() {
       final reply = controller.replies.single;
       expect(reply.messageId, 'server-reply');
       expect(reply.body, 'on it');
-      expect(reply.messageType, IsmChatMessageType.reply);
+      expect(reply.messageType, IsmChatMessageType.threadReply);
       expect(reply.threadRootId, 'root-1');
       expect(reply.parentMessageId, 'root-1');
       expect(reply.showInConversation, isFalse);
@@ -702,7 +741,7 @@ void main() {
       // Stored as a thread reply, so the retry re-sends it as one.
       expect(queuedReply.threadRootId, 'root-1');
       expect(queuedReply.showInConversation, isFalse);
-      expect(queuedReply.messageType, IsmChatMessageType.reply);
+      expect(queuedReply.messageType, IsmChatMessageType.threadReply);
 
       // 2. Reopening the thread still shows it (the server does not have it).
       await controller.openThread(
@@ -906,6 +945,37 @@ void main() {
   });
 
   group('message reaction sync', () {
+    test('applyMessageUpdate patches root body for remote edit', () async {
+      stubThread([]);
+      await controller.openThread(
+        root: threadRoot(messageId: 'root-1').copyWith(body: 'before'),
+      );
+
+      expect(
+        controller.applyMessageUpdate(
+          controller.root!.copyWith(body: 'after', messageUpdated: true),
+        ),
+        isTrue,
+      );
+      expect(controller.root?.body, 'after');
+      expect(controller.root?.messageUpdated, isTrue);
+    });
+
+    test('findMessageInOpenPanel resolves root and reply', () async {
+      stubThread([threadReplyJson(messageId: 'r1', sentAt: 2000)]);
+      await controller.openThread(root: threadRoot(messageId: 'root-1'));
+
+      expect(
+        IsmChatThreadController.findMessageInOpenPanel('root-1')?.messageId,
+        'root-1',
+      );
+      expect(
+        IsmChatThreadController.findMessageInOpenPanel('r1')?.messageId,
+        'r1',
+      );
+      expect(IsmChatThreadController.findMessageInOpenPanel('missing'), isNull);
+    });
+
     test('applyMessageUpdate patches root and reply reactions', () async {
       stubThread([threadReplyJson(messageId: 'r1', sentAt: 2000)]);
       await controller.openThread(root: threadRoot(replyCount: 1));
@@ -985,7 +1055,7 @@ void main() {
         alsoSendToChannel: true,
       );
       expect(pending.messageId, isEmpty);
-      expect(pending.messageType, IsmChatMessageType.reply);
+      expect(pending.messageType, IsmChatMessageType.threadReply);
       expect(pending.parentMessageId, 'r1');
       expect(pending.threadRootId, 'root-1');
       expect(pending.showInConversation, isTrue);

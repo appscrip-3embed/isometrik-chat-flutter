@@ -20,6 +20,9 @@ mixin IsmChatConversationsLifecycleInitializationMixin on GetxController {
     _generateReactionList();
     // Cached conversations first so the list renders before user/API work.
     await _controller.getConversationsFromDB();
+    _controller.conversationDrafts.assignAll(
+      await IsmChatConfig.dbWrapper?.getAllDrafts() ?? {},
+    );
     var users = await IsmChatConfig.dbWrapper?.userDetailsBox
         .get(IsmChatStrings.userData);
     if (users != null) {

@@ -4,7 +4,13 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 /// Theme for profile / user-info screens ([IsmChatUserView], [IsmChatUserInfo]).
 ///
 /// Omit [IsmChatThemeData.profileTheme] for SDK light/dark defaults ([IsmChatThemeResolver]).
-/// Pass a full instance only when customizing.
+/// Pass a full instance, or tweak a default with
+/// `IsmChatProfileTheme.light().copyWith(...)`.
+///
+/// [IsmChatProfileTheme.light] / [IsmChatProfileTheme.dark] stay the defaults
+/// for the chat-list profile screens; the in-chat contact info page
+/// ([IsmChatUserInfo]) uses [IsmChatProfileTheme.fromTokens] when the host
+/// passes none.
 class IsmChatProfileTheme {
   const IsmChatProfileTheme({
     required this.scaffoldBackgroundColor,
@@ -69,6 +75,25 @@ class IsmChatProfileTheme {
         ),
       );
 
+  /// In-chat default built from [IsmChatDesignTokens].
+  factory IsmChatProfileTheme.fromTokens(IsmChatDesignTokens tokens) =>
+      IsmChatProfileTheme(
+        scaffoldBackgroundColor: tokens.canvas,
+        cardBackgroundColor: tokens.surface,
+        sectionTitleStyle: tokens.caption,
+        primaryTextStyle: tokens.headline,
+        secondaryTextStyle: tokens.subhead,
+        inputTextStyle: tokens.body,
+        inputHintStyle: tokens.body.copyWith(color: tokens.textTertiary),
+        iconColor: tokens.textTertiary,
+        editButtonBackgroundColor: tokens.surface,
+        editButtonBorderColor: tokens.hairline,
+        editButtonIconColor: tokens.textSecondary,
+        listTileTitleStyle: tokens.body,
+        listTileSubtitleStyle: tokens.footnote,
+        emptyStateTextStyle: tokens.title,
+      );
+
   final Color scaffoldBackgroundColor;
   final Color cardBackgroundColor;
   final TextStyle sectionTitleStyle;
@@ -83,4 +108,41 @@ class IsmChatProfileTheme {
   final TextStyle listTileTitleStyle;
   final TextStyle listTileSubtitleStyle;
   final TextStyle emptyStateTextStyle;
+
+  IsmChatProfileTheme copyWith({
+    Color? scaffoldBackgroundColor,
+    Color? cardBackgroundColor,
+    TextStyle? sectionTitleStyle,
+    TextStyle? primaryTextStyle,
+    TextStyle? secondaryTextStyle,
+    TextStyle? inputTextStyle,
+    TextStyle? inputHintStyle,
+    Color? iconColor,
+    Color? editButtonBackgroundColor,
+    Color? editButtonBorderColor,
+    Color? editButtonIconColor,
+    TextStyle? listTileTitleStyle,
+    TextStyle? listTileSubtitleStyle,
+    TextStyle? emptyStateTextStyle,
+  }) =>
+      IsmChatProfileTheme(
+        scaffoldBackgroundColor:
+            scaffoldBackgroundColor ?? this.scaffoldBackgroundColor,
+        cardBackgroundColor: cardBackgroundColor ?? this.cardBackgroundColor,
+        sectionTitleStyle: sectionTitleStyle ?? this.sectionTitleStyle,
+        primaryTextStyle: primaryTextStyle ?? this.primaryTextStyle,
+        secondaryTextStyle: secondaryTextStyle ?? this.secondaryTextStyle,
+        inputTextStyle: inputTextStyle ?? this.inputTextStyle,
+        inputHintStyle: inputHintStyle ?? this.inputHintStyle,
+        iconColor: iconColor ?? this.iconColor,
+        editButtonBackgroundColor:
+            editButtonBackgroundColor ?? this.editButtonBackgroundColor,
+        editButtonBorderColor:
+            editButtonBorderColor ?? this.editButtonBorderColor,
+        editButtonIconColor: editButtonIconColor ?? this.editButtonIconColor,
+        listTileTitleStyle: listTileTitleStyle ?? this.listTileTitleStyle,
+        listTileSubtitleStyle:
+            listTileSubtitleStyle ?? this.listTileSubtitleStyle,
+        emptyStateTextStyle: emptyStateTextStyle ?? this.emptyStateTextStyle,
+      );
 }

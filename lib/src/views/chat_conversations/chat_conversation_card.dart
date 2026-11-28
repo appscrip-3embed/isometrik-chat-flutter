@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 class IsmChatConversationCard extends StatefulWidget {
@@ -187,101 +188,19 @@ class _IsmChatConversationCardState extends State<IsmChatConversationCard>
                         ),
                   ),
                   IsmChatDimens.boxHeight2,
-                  if (widget.subtitle != null) ...[
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (widget.conversation.lastMessageDetails?.reactionType
-                                ?.isEmpty ==
-                            true) ...[
-                          if (!(widget.conversation.isGroup ?? false)) ...[
-                            widget.conversation.readCheck,
-                          ],
-                          widget.conversation.sender,
-                          if (widget.conversation.isGroup ?? false) ...[
-                            widget.conversation.readCheck,
-                          ],
-                          widget.conversation.lastMessageDetails?.icon ??
-                              IsmChatDimens.box0,
-                          IsmChatDimens.boxWidth4,
-                        ],
-                        Flexible(
-                          child: Text(
-                            widget.subtitle?.call(
-                                    context,
-                                    widget.conversation,
-                                    widget.conversation.lastMessageDetails
-                                            ?.messageBody ??
-                                        '') ??
-                                '',
-                            style: IsmChatConfig.chatTheme.chatListCardThemData
-                                    ?.subTitleTextStyle ??
-                                IsmChatStyles.w400Black12.copyWith(
-                                  fontStyle: widget.conversation
-                                              .lastMessageDetails?.customType ==
-                                          IsmChatCustomMessageType
-                                              .deletedForEveryone
-                                      ? FontStyle.italic
-                                      : FontStyle.normal,
-                                ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    )
-                  ] else ...[
-                    widget.subtitleBuilder?.call(
-                            context,
-                            widget.conversation,
-                            widget.conversation.lastMessageDetails
-                                    ?.messageBody ??
-                                '') ??
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            if (widget.conversation.lastMessageDetails
-                                    ?.reactionType?.isEmpty ==
-                                true) ...[
-                              if (!(widget.conversation.isGroup ?? false)) ...[
-                                widget.conversation.readCheck,
-                              ],
-                              widget.conversation.sender,
-                              if (widget.conversation.isGroup ?? false) ...[
-                                widget.conversation.readCheck,
-                              ],
-                              widget.conversation.lastMessageDetails?.icon ??
-                                  IsmChatDimens.box0,
-                              IsmChatDimens.boxWidth4,
-                            ],
-                            Flexible(
-                              child: Text(
-                                widget.conversation.lastMessageDetails
-                                        ?.messageBody ??
-                                    '',
-                                style: IsmChatConfig
-                                        .chatTheme
-                                        .chatListCardThemData
-                                        ?.subTitleTextStyle ??
-                                    IsmChatStyles.w400Black12.copyWith(
-                                      fontStyle: widget
-                                                  .conversation
-                                                  .lastMessageDetails
-                                                  ?.customType ==
-                                              IsmChatCustomMessageType
-                                                  .deletedForEveryone
-                                          ? FontStyle.italic
-                                          : FontStyle.normal,
-                                    ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                  ]
+                  // Host apps often set [subtitleBuilder] (e.g. custom call
+                  // subtitles). That path used to skip every Rx read and GetX
+                  // threw "improper use of a GetX" — always touch drafts first.
+                  Obx(() {
+                    if (IsmChatUtility.conversationControllerRegistered) {
+                      IsmChatUtility
+                          .conversationController.conversationDrafts.length;
+                    }
+                    final draft = _visibleDraft;
+                    return draft != null
+                        ? _draftSubtitle(draft)
+                        : _lastMessageSubtitle(context);
+                  }),
                 ],
               ),
             ),
@@ -341,5 +260,128 @@ class _IsmChatConversationCardState extends State<IsmChatConversationCard>
         ),
       ),
     );
+  }
+
+  /// Draft for this chat, unless the host renders its own subtitle or the
+  /// chat is the one open beside the list (web).
+  IsmChatDraftModel? get _visibleDraft {
+    if (widget.subtitleBuilder != null) return null;
+    if (!IsmChatUtility.conversationControllerRegistered) return null;
+    final controller = IsmChatUtility.conversationController;
+    final id = widget.conversation.conversationId ?? '';
+    final draft = controller.conversationDrafts[id];
+    if (draft == null || draft.isEmpty) return null;
+    if (IsmChatResponsive.isWeb(context) &&
+        controller.currentConversationId == id) {
+      return null;
+    }
+    return draft;
+  }
+
+  Widget _draftSubtitle(IsmChatDraftModel draft) {
+    final style =
+        IsmChatConfig.chatTheme.chatListCardThemData?.subTitleTextStyle ??
+            IsmChatStyles.w400Black12;
+    final text = draft.text.trim().isNotEmpty
+        ? draft.text.trim().replaceAll(RegExp(r'\s+'), ' ')
+        : IsmChatStrings.focusMenuReply;
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '${IsmChatStrings.draft}: ',
+            style: style.copyWith(
+              color: IsmChatConfig.chatTheme.primaryColor ??
+                  IsmChatColors.greenColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          TextSpan(text: text, style: style),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  Widget _lastMessageSubtitle(BuildContext context) {
+    if (widget.subtitle != null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (widget.conversation.lastMessageDetails?.reactionType?.isEmpty ==
+              true) ...[
+            if (!(widget.conversation.isGroup ?? false)) ...[
+              widget.conversation.readCheck,
+            ],
+            widget.conversation.sender,
+            if (widget.conversation.isGroup ?? false) ...[
+              widget.conversation.readCheck,
+            ],
+            widget.conversation.lastMessageDetails?.icon ?? IsmChatDimens.box0,
+            IsmChatDimens.boxWidth4,
+          ],
+          Flexible(
+            child: Text(
+              widget.subtitle?.call(
+                      context,
+                      widget.conversation,
+                      widget.conversation.lastMessageDetails?.messageBody ??
+                          '') ??
+                  '',
+              style: IsmChatConfig
+                      .chatTheme.chatListCardThemData?.subTitleTextStyle ??
+                  IsmChatStyles.w400Black12.copyWith(
+                    fontStyle:
+                        widget.conversation.lastMessageDetails?.customType ==
+                                IsmChatCustomMessageType.deletedForEveryone
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
+    }
+    return widget.subtitleBuilder?.call(context, widget.conversation,
+            widget.conversation.lastMessageDetails?.messageBody ?? '') ??
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (widget.conversation.lastMessageDetails?.reactionType?.isEmpty ==
+                true) ...[
+              if (!(widget.conversation.isGroup ?? false)) ...[
+                widget.conversation.readCheck,
+              ],
+              widget.conversation.sender,
+              if (widget.conversation.isGroup ?? false) ...[
+                widget.conversation.readCheck,
+              ],
+              widget.conversation.lastMessageDetails?.icon ??
+                  IsmChatDimens.box0,
+              IsmChatDimens.boxWidth4,
+            ],
+            Flexible(
+              child: Text(
+                widget.conversation.lastMessageDetails?.messageBody ?? '',
+                style: IsmChatConfig
+                        .chatTheme.chatListCardThemData?.subTitleTextStyle ??
+                    IsmChatStyles.w400Black12.copyWith(
+                      fontStyle:
+                          widget.conversation.lastMessageDetails?.customType ==
+                                  IsmChatCustomMessageType.deletedForEveryone
+                              ? FontStyle.italic
+                              : FontStyle.normal,
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
   }
 }

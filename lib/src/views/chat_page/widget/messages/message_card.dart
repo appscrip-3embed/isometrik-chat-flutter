@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:flutter/services.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 import 'package:scroll_to_index/scroll_to_index.dart';
 
@@ -24,63 +24,79 @@ class MessageCard extends StatefulWidget {
 
 class _MessageCardState extends State<MessageCard>
     with SingleTickerProviderStateMixin {
-  AnimationController? controllerAnimation;
-  Animation<Offset>? animation;
+  /// Horizontal travel (px) the bubble must be dragged before releasing
+  /// triggers reply. Small accidental movements while scrolling never reach it.
+  static const double _replyTriggerDistance = 64;
+
+  /// The bubble follows the finger up to this distance, then stops.
+  static const double _maxDragOffset = 88;
+
+  /// Current horizontal offset of the bubble. A [ValueNotifier] so dragging
+  /// only repaints the [Transform], not the whole message card.
+  final ValueNotifier<double> _dragOffset = ValueNotifier<double>(0);
+
+  late final AnimationController _resetController;
+  double _resetFrom = 0;
+  bool _thresholdReached = false;
 
   @override
-  initState() {
+  void initState() {
     super.initState();
-    controllerAnimation = AnimationController(
+    _resetController = AnimationController(
       vsync: this,
       duration: IsmChatConstants.swipeDuration,
-    );
-    animation = Tween<Offset>(
-      begin: const Offset(0.0, 0.0),
-      end: const Offset(0.0, 0.0),
-    ).animate(
-      CurvedAnimation(curve: Curves.decelerate, parent: controllerAnimation!),
-    );
-    controllerAnimation?.addListener(() {
-      setState(() {});
-    });
+    )..addListener(() {
+        final t = Curves.easeOut.transform(_resetController.value);
+        _dragOffset.value = _resetFrom * (1 - t);
+      });
   }
 
   @override
-  dispose() {
-    controllerAnimation?.dispose();
+  void dispose() {
+    _resetController.dispose();
+    _dragOffset.dispose();
     super.dispose();
   }
 
-  ///Run animation for child widget
-  void _runAnimation({required bool onRight}) {
-    //set child animation
-    animation = Tween(
-      begin: const Offset(0.0, 0.0),
-      end: Offset(onRight ? 0.8 : -0.8, 0.0),
-    ).animate(
-      CurvedAnimation(curve: Curves.decelerate, parent: controllerAnimation!),
-    );
+  bool get _canSwipeToReply =>
+      !widget.showMessageInCenter &&
+      widget.message.customType !=
+          IsmChatCustomMessageType.deletedForEveryone &&
+      widget.message.messageId?.isNotEmpty == true &&
+      (IsmChatProperties.chatPageProperties.canReplayMessage
+              ?.call(widget.message) ??
+          true);
 
-    //Forward animation
-    controllerAnimation?.forward().whenComplete(() {
-      controllerAnimation?.reverse().whenComplete(() {
-        IsmChatUtility.chatPageController.onReplyTap(widget.message);
-      });
-    });
+  void _onDragStart(DragStartDetails _) {
+    _resetController.stop();
+    _thresholdReached = _dragOffset.value.abs() >= _replyTriggerDistance;
   }
 
-  /// Checks if this message should be hidden because it's part of a group
-  /// but not the first message in that group
-  bool _shouldHideMessage(IsmChatPageController controller) {
-    if (!widget.message.isGridDisplayableMedia) {
-      return false;
+  void _onDragUpdate(DragUpdateDetails details) {
+    final next = (_dragOffset.value + details.delta.dx)
+        .clamp(-_maxDragOffset, _maxDragOffset)
+        .toDouble();
+    _dragOffset.value = next;
+    final reached = next.abs() >= _replyTriggerDistance;
+    if (reached && !_thresholdReached) {
+      HapticFeedback.selectionClick();
     }
+    _thresholdReached = reached;
+  }
 
-    final allMessages = controller.messages
-        .where((msg) => msg.customType != IsmChatCustomMessageType.date)
-        .toList();
-    final group = IsmChatMediaGridGrouping.collect(allMessages, widget.message);
-    return IsmChatMediaGridGrouping.shouldHide(group, widget.message);
+  void _onDragEnd(DragEndDetails _) {
+    final shouldReply = _thresholdReached;
+    _snapBack();
+    if (shouldReply) {
+      IsmChatUtility.chatPageController.onReplyTap(widget.message);
+    }
+  }
+
+  void _snapBack() {
+    _thresholdReached = false;
+    _resetFrom = _dragOffset.value;
+    if (_resetFrom == 0) return;
+    _resetController.forward(from: 0);
   }
 
   /// Bubble + reactions. When this row is an also-sent thread reply, wraps
@@ -91,8 +107,8 @@ class _MessageCardState extends State<MessageCard>
     IsmChatPageController controller,
   ) {
     final bubble = _messageBubbleStack(context, controller);
-    final showContext = !widget.showMessageInCenter &&
-        widget.message.showChannelThreadContext;
+    final showContext =
+        !widget.showMessageInCenter && widget.message.showChannelThreadContext;
     if (!showContext) return bubble;
 
     return Column(
@@ -117,9 +133,8 @@ class _MessageCardState extends State<MessageCard>
   ) =>
       Stack(
         clipBehavior: Clip.none,
-        alignment: widget.message.sentByMe
-            ? Alignment.topRight
-            : Alignment.topLeft,
+        alignment:
+            widget.message.sentByMe ? Alignment.topRight : Alignment.topLeft,
         children: [
           if (widget.message.reactions?.isNotEmpty == true)
             IgnorePointer(
@@ -135,10 +150,8 @@ class _MessageCardState extends State<MessageCard>
             hoverColor: IsmChatColors.transparent,
             highlightColor: IsmChatColors.transparent,
             onTap: () {
-              if (widget.message.customType ==
-                      IsmChatCustomMessageType.video ||
-                  widget.message.customType ==
-                      IsmChatCustomMessageType.image ||
+              if (widget.message.customType == IsmChatCustomMessageType.video ||
+                  widget.message.customType == IsmChatCustomMessageType.image ||
                   widget.message.customType ==
                       IsmChatCustomMessageType.multipleAttachments) {
                 return;
@@ -167,10 +180,10 @@ class _MessageCardState extends State<MessageCard>
                       tag: widget.message,
                       child: IsmChatProperties.chatPageProperties.messageBuilder
                               ?.call(
-                            context,
-                            widget.message,
-                            widget.message.customType!,
-                            widget.showMessageInCenter) ??
+                                  context,
+                                  widget.message,
+                                  widget.message.customType!,
+                                  widget.showMessageInCenter) ??
                           MessageBubble(
                             message: widget.message,
                             showMessageInCenter: widget.showMessageInCenter,
@@ -198,177 +211,141 @@ class _MessageCardState extends State<MessageCard>
         ],
       );
 
+  // No GetBuilder here: the parent [IsmChatMessage] already rebuilds on every
+  // controller update (and already hides non-first grid tiles). A second
+  // listener per row doubled the rebuild work for every real-time message.
   @override
-  Widget build(BuildContext context) => GetBuilder<IsmChatPageController>(
-        tag: IsmChat.i.chatPageTag,
-        builder: (controller) {
-          // Hide the entire message card if it's part of a group but not the first
-          if (_shouldHideMessage(controller)) {
-            return const SizedBox.shrink();
-          }
-
-          return GestureDetector(
-            onHorizontalDragUpdate: widget.showMessageInCenter
-                ? null
-                : widget.message.customType ==
-                        IsmChatCustomMessageType.deletedForEveryone
-                    ? null
-                    : (details) {
-                        if ((IsmChatProperties
-                                    .chatPageProperties.canReplayMessage
-                                    ?.call(widget.message) ??
-                                true) &&
-                            widget.message.messageId?.isNotEmpty == true) {
-                          if (details.delta.dx > 1) {
-                            _runAnimation(
-                              onRight: true,
-                            );
-                          }
-                          if (details.delta.dx < -1) {
-                            _runAnimation(
-                              onRight: false,
-                            );
-                          }
-                        }
-                      },
-            child: SlideTransition(
-              position: animation!,
-              child: MouseRegion(
-                onEnter: (_) {
-                  if (controller
-                          .conversationController.isRenderChatPageaScreen !=
-                      IsRenderChatPageScreen.none) {
-                    return;
-                  }
-                  controller.onMessageHoverIndex = widget.index;
-                },
-                onExit: (_) {
-                  if (controller
-                          .conversationController.isRenderChatPageaScreen !=
-                      IsRenderChatPageScreen.none) {
-                    return;
-                  }
-                  controller.onMessageHoverIndex = -1;
-                },
-                child: Column(
-                  crossAxisAlignment: widget.message.sentByMe
-                      ? CrossAxisAlignment.end
-                      : CrossAxisAlignment.start,
-                  children: [
-                    _threadAwareMessageBody(context, controller),
-                    // Slack-style threads: "N replies" under the root bubble.
-                    // [IsmChatThreadCoordinator.shouldShowFooter] is false
-                    // whenever threading is off, so nothing changes for
-                    // existing integrations.
-                    if (!widget.showMessageInCenter &&
-                        IsmChatThreadCoordinator.shouldShowFooter(
-                          widget.message,
-                        ))
-                      IsmChatThreadFooter(message: widget.message),
-                    if (!widget.showMessageInCenter &&
-                        (IsmChatProperties.chatPageProperties.messageStatus
-                                ?.shouldShowTimeStatusOuter ??
-                            false)) ...[
-                      IsmChatDimens.boxHeight5,
-                      Material(
-                        color: Colors.transparent,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: widget.message.sentByMe
-                              ? MainAxisAlignment.end
-                              : MainAxisAlignment.start,
-                          children: [
-                            if (IsmChatProperties.chatPageProperties
-                                    .messageStatus?.shouldShowMessageTime ??
-                                false) ...[
-                              Text(
-                                widget.message.sentAt.toTimeString,
-                                style: widget.message.style,
-                              )
-                            ],
-                            if ((IsmChatProperties
-                                        .chatPageProperties
-                                        .messageStatus
-                                        ?.shouldShowMessgaeStatus ??
-                                    false) &&
-                                widget.message.sentByMe &&
-                                ![
-                                  IsmChatCustomMessageType.deletedForEveryone,
-                                  IsmChatCustomMessageType.oneToOneCall,
-                                ].contains(widget.message.customType)) ...[
-                              if (widget.message.messageId?.isEmpty ==
-                                  true) ...[
-                                IsmChatDimens.boxWidth2,
-                                if (widget.message.isInvalidMessage ==
-                                    true) ...[
-                                  Icon(
-                                    Icons.error_outlined,
-                                    color: IsmChatConfig
-                                            .chatTheme
-                                            .chatPageTheme
-                                            ?.messageStatusTheme
-                                            ?.inValidIconColor ??
-                                        IsmChatColors.redColor,
-                                    size: IsmChatConfig.chatTheme.chatPageTheme
-                                            ?.messageStatusTheme?.checkSize ??
-                                        IsmChatDimens.forteen,
-                                  ),
-                                ] else ...[
-                                  Icon(
-                                    Icons.watch_later_outlined,
-                                    color: IsmChatConfig
-                                            .chatTheme
-                                            .chatPageTheme
-                                            ?.messageStatusTheme
-                                            ?.unreadCheckColor ??
-                                        IsmChatColors.whiteColor,
-                                    size: IsmChatConfig.chatTheme.chatPageTheme
-                                            ?.messageStatusTheme?.checkSize ??
-                                        IsmChatDimens.forteen,
-                                  ),
-                                ]
-                              ] else if (IsmChatProperties
-                                  .chatPageProperties.features
-                                  .contains(
-                                IsmChatFeature.showMessageStatus,
-                              )) ...[
-                                IsmChatDimens.boxWidth2,
-                                Icon(
-                                  // If readByAll is true, deliveredToAll must also be true
-                                  // Always show double checkmark if read
-                                  (widget.message.readByAll ?? false) ||
-                                          (widget.message.deliveredToAll ??
-                                              false)
-                                      ? Icons.done_all_rounded
-                                      : Icons.done_rounded,
-                                  color: widget.message.readByAll ?? false
-                                      ? IsmChatConfig
-                                              .chatTheme
-                                              .chatPageTheme
-                                              ?.messageStatusTheme
-                                              ?.readCheckColor ??
-                                          Colors.blue
-                                      : IsmChatConfig
-                                              .chatTheme
-                                              .chatPageTheme
-                                              ?.messageStatusTheme
-                                              ?.unreadCheckColor ??
-                                          Colors.black,
-                                  size: IsmChatConfig.chatTheme.chatPageTheme
-                                          ?.messageStatusTheme?.checkSize ??
-                                      IsmChatDimens.forteen,
-                                ),
-                              ]
-                            ],
-                          ],
-                        ),
-                      ),
-                    ]
-                  ],
+  Widget build(BuildContext context) {
+    final controller = IsmChatUtility.chatPageController;
+    final canSwipe = _canSwipeToReply;
+    return GestureDetector(
+      onHorizontalDragStart: canSwipe ? _onDragStart : null,
+      onHorizontalDragUpdate: canSwipe ? _onDragUpdate : null,
+      onHorizontalDragEnd: canSwipe ? _onDragEnd : null,
+      onHorizontalDragCancel: canSwipe ? _snapBack : null,
+      child: ValueListenableBuilder<double>(
+        valueListenable: _dragOffset,
+        builder: (_, dx, child) => dx == 0
+            ? child!
+            : Transform.translate(offset: Offset(dx, 0), child: child),
+        child: MouseRegion(
+          onEnter: (_) {
+            if (controller.conversationController.isRenderChatPageaScreen !=
+                IsRenderChatPageScreen.none) {
+              return;
+            }
+            controller.onMessageHoverIndex = widget.index;
+          },
+          onExit: (_) {
+            if (controller.conversationController.isRenderChatPageaScreen !=
+                IsRenderChatPageScreen.none) {
+              return;
+            }
+            controller.onMessageHoverIndex = -1;
+          },
+          child: Column(
+            crossAxisAlignment: widget.message.sentByMe
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
+            children: [
+              _threadAwareMessageBody(context, controller),
+              // Slack-style threads: "N replies" under the root bubble.
+              // [IsmChatThreadCoordinator.shouldShowFooter] is false
+              // whenever threading is off, so nothing changes for
+              // existing integrations.
+              if (!widget.showMessageInCenter &&
+                  IsmChatThreadCoordinator.shouldShowFooter(
+                    widget.message,
+                  ))
+                IsmChatThreadFooter(message: widget.message),
+              if (!widget.showMessageInCenter &&
+                  (IsmChatProperties.chatPageProperties.messageStatus
+                          ?.shouldShowTimeStatusOuter ??
+                      false)) ...[
+                IsmChatDimens.boxHeight5,
+                Material(
+                  color: Colors.transparent,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: widget.message.sentByMe
+                        ? MainAxisAlignment.end
+                        : MainAxisAlignment.start,
+                    children: [
+                      if (IsmChatProperties.chatPageProperties.messageStatus
+                              ?.shouldShowMessageTime ??
+                          false) ...[
+                        Text(
+                          widget.message.sentAt.toTimeString,
+                          style: widget.message.style,
+                        )
+                      ],
+                      if ((IsmChatProperties.chatPageProperties.messageStatus
+                                  ?.shouldShowMessgaeStatus ??
+                              false) &&
+                          widget.message.sentByMe &&
+                          ![
+                            IsmChatCustomMessageType.deletedForEveryone,
+                            IsmChatCustomMessageType.oneToOneCall,
+                          ].contains(widget.message.customType)) ...[
+                        if (widget.message.messageId?.isEmpty == true) ...[
+                          IsmChatDimens.boxWidth2,
+                          if (widget.message.isInvalidMessage == true) ...[
+                            Icon(
+                              Icons.error_outlined,
+                              color: IsmChatConfig.chatTheme.chatPageTheme
+                                      ?.messageStatusTheme?.inValidIconColor ??
+                                  IsmChatColors.redColor,
+                              size: IsmChatConfig.chatTheme.chatPageTheme
+                                      ?.messageStatusTheme?.checkSize ??
+                                  IsmChatDimens.forteen,
+                            ),
+                          ] else ...[
+                            Icon(
+                              Icons.watch_later_outlined,
+                              color: IsmChatConfig.chatTheme.chatPageTheme
+                                      ?.messageStatusTheme?.unreadCheckColor ??
+                                  IsmChatColors.whiteColor,
+                              size: IsmChatConfig.chatTheme.chatPageTheme
+                                      ?.messageStatusTheme?.checkSize ??
+                                  IsmChatDimens.forteen,
+                            ),
+                          ]
+                        ] else if (IsmChatProperties.chatPageProperties.features
+                            .contains(
+                          IsmChatFeature.showMessageStatus,
+                        )) ...[
+                          IsmChatDimens.boxWidth2,
+                          Icon(
+                            // If readByAll is true, deliveredToAll must also be true
+                            // Always show double checkmark if read
+                            (widget.message.readByAll ?? false) ||
+                                    (widget.message.deliveredToAll ?? false)
+                                ? Icons.done_all_rounded
+                                : Icons.done_rounded,
+                            color: widget.message.readByAll ?? false
+                                ? IsmChatConfig.chatTheme.chatPageTheme
+                                        ?.messageStatusTheme?.readCheckColor ??
+                                    Colors.blue
+                                : IsmChatConfig
+                                        .chatTheme
+                                        .chatPageTheme
+                                        ?.messageStatusTheme
+                                        ?.unreadCheckColor ??
+                                    Colors.black,
+                            size: IsmChatConfig.chatTheme.chatPageTheme
+                                    ?.messageStatusTheme?.checkSize ??
+                                IsmChatDimens.forteen,
+                          ),
+                        ]
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-            ),
-          );
-        },
-      );
+              ]
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

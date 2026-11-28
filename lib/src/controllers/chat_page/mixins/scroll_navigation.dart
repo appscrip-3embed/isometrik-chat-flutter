@@ -130,6 +130,7 @@ mixin IsmChatPageScrollNavigationMixin on GetxController {
   }
 
   void _maybeLoadOlderMessages(double pixels, double maxScrollExtent) {
+    if (_controller.hasReachedOldestMessage) return;
     // Reverse list: older history is toward maxScrollExtent.
     if (pixels < maxScrollExtent - _olderMessagesLoadThresholdPx) {
       return;
@@ -142,6 +143,37 @@ mixin IsmChatPageScrollNavigationMixin on GetxController {
     }
     _lastOlderMessagesRequestAt = now;
     unawaited(_controller.getMessagesFromAPI(forPagination: true));
+  }
+
+  /// When the first page fills memory but the list still cannot scroll, scroll
+  /// notifications never fire — load one older page after open.
+  Future<void> maybePrefetchOlderMessagesAfterOpen(
+    String conversationId, {
+    int? openGeneration,
+  }) async {
+    if (conversationId.isEmpty) return;
+    await SchedulerBinding.instance.endOfFrame;
+    if (openGeneration != null &&
+        openGeneration != _controller.chatOpenGeneration) {
+      return;
+    }
+    if ((_controller.conversation?.conversationId ?? '') != conversationId) {
+      return;
+    }
+    if (_controller.postOpenOlderPrefetchConversationId == conversationId) {
+      return;
+    }
+    if (_controller.canCallCurrentApi) return;
+    // Short first page already proved there is nothing older.
+    if (_controller.hasReachedOldestMessage) return;
+
+    final position = _messagesScrollPosition;
+    if (position == null) return;
+    final maxExtent = position.maxScrollExtent;
+    if (maxExtent > _olderMessagesLoadThresholdPx) return;
+
+    _controller.postOpenOlderPrefetchConversationId = conversationId;
+    await _controller.getMessagesFromAPI(forPagination: true);
   }
 
   /// Sets up input controllers and focus node listeners.

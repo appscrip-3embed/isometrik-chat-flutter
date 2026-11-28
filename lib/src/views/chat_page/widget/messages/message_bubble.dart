@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
+import 'package:isometrik_chat_flutter/src/views/chat_page/widget/messages/message_inner_time_metrics.dart';
 
 class MessageBubble extends StatelessWidget {
   MessageBubble({
@@ -40,8 +41,17 @@ class MessageBubble extends StatelessWidget {
     return IsmChatMediaGridGrouping.isGridHost(group, _message) ? group : null;
   }
 
-  /// One theme value covers every bubble type (text/audio/media/location/…).
+  bool get _showTimeStatusInner =>
+      IsmChatProperties.chatPageProperties.messageStatus
+          ?.shouldShowTimeStatusInner ??
+      true;
+
+  /// Stickers paint time in [IsmChatStickerTimeCapsule] under the art, so they
+  /// skip the overlay inset (`bottom: 20`) used by decorated bubbles.
   EdgeInsets _resolveBubblePadding(IsmChatPageController controller) {
+    if (_message.isStickerMessage) {
+      return IsmChatDimens.edgeInsets0;
+    }
     final groupedMessages = _getGroupedMediaMessages(controller);
     final isMultipleMediaGrid = _message.customType ==
             IsmChatCustomMessageType.multipleAttachments &&
@@ -50,23 +60,22 @@ class MessageBubble extends StatelessWidget {
         (groupedMessages != null && groupedMessages.isNotEmpty);
     final hasCaption = (groupedMessages != null &&
             groupedMessages.any(
-              (msg) => msg.multipleAttachmentCaption.isNotEmpty,
+              (msg) => msg.mediaGridCaption.isNotEmpty,
             )) ||
-        _message.multipleAttachmentCaption.isNotEmpty;
+        _message.mediaGridCaption.isNotEmpty;
     return IsmChatPageTheme.resolveBubblePadding(
       custom: IsmChatConfig.chatTheme.chatPageTheme?.messageBubblePadding,
       isMediaGrid: isGridMessage,
       gridHasCaption: hasCaption,
-      showTimeStatusInner: IsmChatProperties
-              .chatPageProperties.messageStatus?.shouldShowTimeStatusInner ??
-          true,
+      showTimeStatusInner: _showTimeStatusInner,
     );
   }
 
   /// Theme / default width limits for the decorated bubble shell.
   ///
-  /// Reply messages use [minWidth] 0 so short quotes shrink-wrap; other types
-  /// keep the theme minimum (e.g. 25% on mobile in host apps).
+  /// Reply and sticker messages use [minWidth] 0 so short quotes / sticker +
+  /// time capsule shrink-wrap; other types keep the theme minimum (e.g. 25%
+  /// on mobile in host apps).
   BoxConstraints _messageBubbleConstraints(BuildContext context) {
     if (showMessageInCenter) {
       return BoxConstraints(
@@ -86,10 +95,32 @@ class MessageBubble extends StatelessWidget {
               : context.width * .25,
         );
 
-    if (_message.customType == IsmChatCustomMessageType.reply) {
+    if (_message.customType == IsmChatCustomMessageType.reply ||
+        _message.isStickerMessage) {
       return base.copyWith(minWidth: 0);
     }
-    return base;
+    return _widenForMedia(context, base);
+  }
+
+  /// Images, GIFs, videos and media grids are wider than the text-bubble max
+  /// on mobile ([IsmChatMediaGridLayout.chatMediaBubbleMaxWidth]); let the
+  /// bubble grow to hold them plus its padding and border instead of cropping.
+  BoxConstraints _widenForMedia(BuildContext context, BoxConstraints base) {
+    if (IsmChatResponsive.isWeb(context) || !_message.isWideMediaBubble) {
+      return base;
+    }
+    final padding = IsmChatPageTheme.resolveBubblePadding(
+      custom: IsmChatConfig.chatTheme.chatPageTheme?.messageBubblePadding,
+    );
+    // Border.all(width: 1) in the bubble decoration also insets the content.
+    final border = _message.borderColor != null ? 2.0 : 0.0;
+    final needed = IsmChatMediaGridLayout.chatMediaBubbleMaxWidth(
+          context.width,
+          isWeb: false,
+        ) +
+        padding.horizontal +
+        border;
+    return needed > base.maxWidth ? base.copyWith(maxWidth: needed) : base;
   }
 
   /// Gets the bottom position for time/status indicator
@@ -100,9 +131,9 @@ class MessageBubble extends StatelessWidget {
 
     if (isGridMessage) {
       final hasCaption = groupedMessages.any(
-            (msg) => msg.multipleAttachmentCaption.isNotEmpty,
+            (msg) => msg.mediaGridCaption.isNotEmpty,
           ) ||
-          _message.multipleAttachmentCaption.isNotEmpty;
+          _message.mediaGridCaption.isNotEmpty;
 
       if (hasCaption) {
         // Position time lower when caption is present
@@ -154,231 +185,192 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildStandardDecoratedBubble(
+  /// Sender/forwarded chrome above the message body (group name, forwarded).
+  Widget _buildBubbleHeader(IsmChatPageController controller) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: _message.sentByMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        children: [
+          if (!showMessageInCenter &&
+              (controller.conversation?.isGroup ?? false) &&
+              !_message.sentByMe) ...[
+            Padding(
+              padding: IsmChatDimens.edgeInsetsL2,
+              child: FittedBox(
+                child: Builder(builder: (context) {
+                  var name = '';
+                  if (IsmChatProperties.chatPageProperties.messageSenderName
+                          ?.call(
+                        context,
+                        _message,
+                        controller.conversation,
+                      ) !=
+                      null) {
+                    name = IsmChatProperties
+                            .chatPageProperties.messageSenderName
+                            ?.call(
+                          context,
+                          _message,
+                          controller.conversation,
+                        ) ??
+                        '';
+                  } else {
+                    name =
+                        '${_message.senderInfo?.metaData?.firstName ?? ''} ${_message.senderInfo?.metaData?.lastName ?? ''}';
+                  }
+                  return IsmChatProperties
+                          .chatPageProperties.messageSenderNameBuilder
+                          ?.call(
+                        context,
+                        _message,
+                        controller.conversation,
+                      ) ??
+                      Text(
+                        name.trim().isNotEmpty
+                            ? name
+                            : _message.senderInfo?.userName ?? '',
+                        style: _message.senderNameTextStyle,
+                        softWrap: true,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: _message.sentByMe
+                            ? TextAlign.end
+                            : TextAlign.start,
+                        maxLines: 1,
+                      );
+                }),
+              ),
+            ),
+          ],
+          if (_message.messageType == IsmChatMessageType.forward) ...[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.shortcut_outlined,
+                  color: _message.forwardedIconColor,
+                  size: IsmChatDimens.fifteen,
+                ),
+                Text(
+                  IsmChatStrings.forwarded,
+                  style: _message.forwardedTextStyle,
+                ),
+              ],
+            )
+          ],
+        ],
+      );
+
+  /// Stickers skip [SingleChildScrollView] — a vertical scroll view expands to
+  /// the bubble [maxWidth], which puts sent stickers left of a right-pinned
+  /// time capsule. Shrink-wrap so sticker + capsule stack (end for sent).
+  Widget _buildStickerBubbleBody(
     BuildContext context,
     IsmChatPageController controller,
   ) =>
-      Container(
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: _message.sentByMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        children: [
+          _buildBubbleHeader(controller),
+          _buildMessageContent(context, controller),
+          if (!showMessageInCenter && _showTimeStatusInner) ...[
+            IsmChatDimens.boxHeight4,
+            IgnorePointer(
+              child: IsmChatStickerTimeCapsule(message: _message),
+            ),
+          ],
+        ],
+      );
+
+  Widget _buildStandardDecoratedBubble(
+    BuildContext context,
+    IsmChatPageController controller,
+  ) {
+    if (_message.isStickerMessage) {
+      // No SingleChildScrollView / Stack: those expand to bubble maxWidth and
+      // leave a sent sticker left of a right-pinned capsule. Shrink-wrap with
+      // CrossAxisAlignment.end so sticker stacks above the time on the right.
+      return Container(
         key: IsmChatResponsive.isWeb(context) ? _globalKey : null,
         margin: _message.reactions?.isNotEmpty == true && !showMessageInCenter
             ? IsmChatDimens.edgeInsetsB25
             : null,
-        padding: showMessageInCenter ? IsmChatDimens.edgeInsets4 : null,
         constraints: _messageBubbleConstraints(context),
-        decoration: showMessageInCenter || _message.isStickerMessage
-            ? null
-            : BoxDecoration(
-                color: _message.backgroundColor,
-                gradient: _message.gradient,
-                border: _message.borderColor != null
-                    ? Border.all(color: _message.borderColor!)
-                    : null,
-                borderRadius: _message.sentByMe
-                    ? IsmChatConfig.chatTheme.chatPageTheme?.selfMessageTheme
-                            ?.borderRadius ??
-                        BorderRadius.circular(IsmChatDimens.twelve).copyWith(
-                          bottomRight: Radius.circular(IsmChatDimens.four),
-                        )
-                    : IsmChatConfig.chatTheme.chatPageTheme
-                            ?.opponentMessageTheme?.borderRadius ??
-                        BorderRadius.circular(IsmChatDimens.twelve).copyWith(
-                          topLeft: Radius.circular(IsmChatDimens.four),
-                        ),
-              ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            SingleChildScrollView(
-              padding: !showMessageInCenter
-                  ? _resolveBubblePadding(controller)
-                  : IsmChatDimens.edgeInsets0,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: _message.sentByMe
-                        ? CrossAxisAlignment.end
-                        : CrossAxisAlignment.start,
-                    children: [
-                      if (!showMessageInCenter &&
-                          (controller.conversation?.isGroup ?? false) &&
-                          !_message.sentByMe) ...[
-                        Padding(
-                          padding: IsmChatDimens.edgeInsetsL2,
-                          child: FittedBox(
-                            child: Builder(builder: (context) {
-                              var name = '';
-                              if (IsmChatProperties
-                                      .chatPageProperties.messageSenderName
-                                      ?.call(
-                                    context,
-                                    _message,
-                                    controller.conversation,
-                                  ) !=
-                                  null) {
-                                name = IsmChatProperties
-                                        .chatPageProperties.messageSenderName
-                                        ?.call(
-                                      context,
-                                      _message,
-                                      controller.conversation,
-                                    ) ??
-                                    '';
-                              } else {
-                                name =
-                                    '${_message.senderInfo?.metaData?.firstName ?? ''} ${_message.senderInfo?.metaData?.lastName ?? ''}';
-                              }
-                              return IsmChatProperties.chatPageProperties
-                                      .messageSenderNameBuilder
-                                      ?.call(
-                                    context,
-                                    _message,
-                                    controller.conversation,
-                                  ) ??
-                                  Text(
-                                    name.trim().isNotEmpty
-                                        ? name
-                                        : _message.senderInfo?.userName ?? '',
-                                    style: _message.senderNameTextStyle,
-                                    softWrap: true,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: _message.sentByMe
-                                        ? TextAlign.end
-                                        : TextAlign.start,
-                                    maxLines: 1,
-                                  );
-                            }),
-                          ),
-                        ),
-                      ],
-                      if (_message.messageType ==
-                          IsmChatMessageType.forward) ...[
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.shortcut_outlined,
-                              color: _message.forwardedIconColor,
-                              size: IsmChatDimens.fifteen,
-                            ),
-                            Text(
-                              IsmChatStrings.forwarded,
-                              style: _message.forwardedTextStyle,
-                            ),
-                          ],
-                        )
-                      ],
-                    ],
-                  ),
-                  _buildMessageContent(context, controller)
-                ],
-              ),
+        child: _buildStickerBubbleBody(context, controller),
+      );
+    }
+
+    return Container(
+      key: IsmChatResponsive.isWeb(context) ? _globalKey : null,
+      margin: _message.reactions?.isNotEmpty == true && !showMessageInCenter
+          ? IsmChatDimens.edgeInsetsB25
+          : null,
+      padding: showMessageInCenter ? IsmChatDimens.edgeInsets4 : null,
+      constraints: _messageBubbleConstraints(context),
+      decoration: showMessageInCenter
+          ? null
+          : BoxDecoration(
+              color: _message.backgroundColor,
+              gradient: _message.gradient,
+              border: _message.borderColor != null
+                  ? Border.all(color: _message.borderColor!)
+                  : null,
+              borderRadius: _message.sentByMe
+                  ? IsmChatConfig.chatTheme.chatPageTheme?.selfMessageTheme
+                          ?.borderRadius ??
+                      BorderRadius.circular(IsmChatDimens.twelve).copyWith(
+                        bottomRight: Radius.circular(IsmChatDimens.four),
+                      )
+                  : IsmChatConfig.chatTheme.chatPageTheme?.opponentMessageTheme
+                          ?.borderRadius ??
+                      BorderRadius.circular(IsmChatDimens.twelve).copyWith(
+                        topLeft: Radius.circular(IsmChatDimens.four),
+                      ),
             ),
-            if (!showMessageInCenter &&
-                (IsmChatProperties.chatPageProperties.messageStatus
-                        ?.shouldShowTimeStatusInner ??
-                    true)) ...[
-              Positioned(
-                bottom: _getTimeBottomPosition(controller),
-                right: IsmChatDimens.ten,
-                child: IgnorePointer(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: _message.sentByMe
-                        ? MainAxisAlignment.end
-                        : MainAxisAlignment.start,
-                    children: [
-                      if (IsmChatProperties.chatPageProperties.messageStatus
-                              ?.shouldShowMessageTime ??
-                          true) ...[
-                        if (_message.messageUpdated) ...[
-                          Text(
-                            IsmChatStrings.messageEdited,
-                            style: _message.timeStyle.copyWith(
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                          IsmChatDimens.boxWidth4,
-                        ],
-                        Text(
-                          _message.sentAt.toTimeString,
-                          style: _message.timeStyle,
-                        )
-                      ],
-                      if ((IsmChatProperties.chatPageProperties.messageStatus
-                                  ?.shouldShowMessgaeStatus ??
-                              true) &&
-                          _message.sentByMe &&
-                          ![
-                            IsmChatCustomMessageType.oneToOneCall,
-                            IsmChatCustomMessageType.deletedForEveryone
-                          ].contains(_message.customType)) ...[
-                        if (_message.messageId?.isEmpty == true) ...[
-                          IsmChatDimens.boxWidth2,
-                          if (_message.isInvalidMessage == true) ...[
-                            Icon(
-                              Icons.error_outlined,
-                              color: IsmChatConfig.chatTheme.chatPageTheme
-                                      ?.messageStatusTheme?.inValidIconColor ??
-                                  IsmChatColors.redColor,
-                              size: IsmChatConfig.chatTheme.chatPageTheme
-                                      ?.messageStatusTheme?.checkSize ??
-                                  IsmChatDimens.forteen,
-                            ),
-                          ] else ...[
-                            Icon(
-                              Icons.watch_later_outlined,
-                              color: IsmChatConfig.chatTheme.chatPageTheme
-                                      ?.messageStatusTheme?.unreadCheckColor ??
-                                  IsmChatColors.whiteColor,
-                              size: IsmChatConfig.chatTheme.chatPageTheme
-                                      ?.messageStatusTheme?.checkSize ??
-                                  IsmChatDimens.forteen,
-                            ),
-                          ]
-                        ] else if (IsmChatProperties.chatPageProperties.features
-                            .contains(
-                          IsmChatFeature.showMessageStatus,
-                        )) ...[
-                          IsmChatDimens.boxWidth2,
-                          Icon(
-                            // If readByAll is true, deliveredToAll must also be true
-                            // Always show double checkmark if read
-                            (_message.readByAll ?? false) ||
-                                    (_message.deliveredToAll ?? false)
-                                ? Icons.done_all_rounded
-                                : Icons.done_rounded,
-                            color: _message.readByAll ?? false
-                                ? IsmChatConfig.chatTheme.chatPageTheme
-                                        ?.messageStatusTheme?.readCheckColor ??
-                                    Colors.blue
-                                : IsmChatConfig
-                                        .chatTheme
-                                        .chatPageTheme
-                                        ?.messageStatusTheme
-                                        ?.unreadCheckColor ??
-                                    IsmChatColors.whiteColor,
-                            size: IsmChatConfig.chatTheme.chatPageTheme
-                                    ?.messageStatusTheme?.checkSize ??
-                                IsmChatDimens.forteen,
-                          ),
-                        ]
-                      ],
-                    ],
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          SingleChildScrollView(
+            padding: !showMessageInCenter
+                ? _resolveBubblePadding(controller)
+                : IsmChatDimens.edgeInsets0,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildBubbleHeader(controller),
+                _buildMessageContent(context, controller),
+                // Width floor so the bottom-right time / "edited" row is not
+                // painted outside the bubble (see [ismChatInnerTimeStatusMinWidth]).
+                if (!showMessageInCenter && _showTimeStatusInner)
+                  SizedBox(
+                    width: ismChatInnerTimeStatusMinWidth(context, _message),
+                    height: 0,
                   ),
+              ],
+            ),
+          ),
+          if (!showMessageInCenter && _showTimeStatusInner) ...[
+            Positioned(
+              bottom: _getTimeBottomPosition(controller),
+              right: IsmChatDimens.ten,
+              child: IgnorePointer(
+                child: Material(
+                  color: Colors.transparent,
+                  child: IsmChatMessageTimeStatusRow(message: _message),
                 ),
               ),
             ),
-            ],
           ],
-        ),
-      );
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => GetBuilder<IsmChatPageController>(

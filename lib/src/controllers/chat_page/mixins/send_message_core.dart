@@ -70,13 +70,16 @@ mixin IsmChatPageSendMessageCoreMixin {
     // Thread fields are read off the echo, never off the ambient target, so a
     // target that changes mid-upload cannot relabel a message already in
     // flight. All three are the pre-threading values for a channel send.
+    // Media captions carry their @mentions on the echo (see
+    // captionMentionedUsers); send them when the caller passed none.
+    mentionedUsers ??= _mentionMapsFromEcho(localEcho);
     final isThreadSend = IsmChatThreadCoordinator.isThreadReply(localEcho);
     final threadShowInConversation =
         isThreadSend ? localEcho!.showInConversation ?? false : true;
     final threadParentMessageId =
         isThreadSend ? localEcho!.parentMessageId : parentMessageId;
     final threadMessageType = isThreadSend
-        ? IsmChatMessageType.reply.value
+        ? IsmChatMessageType.threadReply.value
         : messageType;
     // Same as local MQTT notifications: conversationTitle, else full name.
     notificationTitle = IsmChatUtility.resolveSendNotificationTitle(
@@ -199,6 +202,24 @@ mixin IsmChatPageSendMessageCoreMixin {
         encrypted: encrypted,
       );
     }
+  }
+
+  /// Wire `mentionedUsers` (`userId` / `wordCount` / `order`) from
+  /// [localEcho], or `null` when it has none.
+  List<Map<String, dynamic>>? _mentionMapsFromEcho(
+    IsmChatMessageModel? localEcho,
+  ) {
+    final users = localEcho?.mentionedUsers;
+    if (users == null || users.isEmpty) return null;
+    return users
+        .map(
+          (e) => MentionModel(
+            userId: e.userId,
+            wordCount: e.wordCount ?? 0,
+            order: e.order ?? 0,
+          ).toMap(),
+        )
+        .toList();
   }
 
   /// Shared text-send path used by the default composer and host-app UI.
@@ -363,23 +384,10 @@ mixin IsmChatPageSendMessageCoreMixin {
         }
         return meta;
       }(),
-      mentionedUsers: _controller.userMentionedList.map(
-        (e) {
-          final member =
-              _controller.groupMembers.firstWhere((m) => m.userId == e.userId);
-          return UserDetails(
-            userProfileImageUrl: member.profileUrl,
-            userName: member.userName,
-            userIdentifier: member.userIdentifier,
-            userId: e.userId,
-            online: false,
-            lastSeen: 0,
-            metaData: member.metaData,
-            wordCount: e.wordCount,
-            order: e.order,
-          );
-        },
-      ).toList(),
+      mentionedUsers: mentionedUserDetailsFor(
+        _controller.userMentionedList,
+        _controller.groupMembers,
+      ),
     );
     _controller.messages.add(textMessage);
     unawaited(_controller.scrollDown());
@@ -627,8 +635,11 @@ mixin IsmChatPageSendMessageCoreMixin {
     required String conversationId,
     String? userId,
   }) async {
-    final chatConversationResponse =
-        await IsmChatConfig.dbWrapper?.getConversation(conversationId);
+    // Existence check only: decoding the stored conversation (every cached
+    // message) here delayed the outgoing bubble on long chats.
+    final existsLocally =
+        await IsmChatConfig.dbWrapper?.hasConversation(conversationId) ??
+            false;
     final isBroadcastConversation = _controller.isBroadcast ||
         _controller.conversation?.customType == IsmChatStrings.broadcast;
 
@@ -637,7 +648,7 @@ mixin IsmChatPageSendMessageCoreMixin {
       _controller.isBroadcast = true;
     }
 
-    if (chatConversationResponse == null && !isBroadcastConversation) {
+    if (!existsLocally && !isBroadcastConversation) {
       final existingConversation = _controller.conversation;
       if (existingConversation == null) {
         IsmChatLog.error(
@@ -708,7 +719,7 @@ mixin IsmChatPageSendMessageCoreMixin {
       // 3. The conversation is not found in local database
       if (conversationId.isEmpty &&
           (existingConversationId == null || existingConversationId.isEmpty) &&
-          chatConversationResponse == null) {
+          !existsLocally) {
         // Note: createBroadcastConversation is provided by send_message_broadcast mixin
         conversationId = await _controller.createBroadcastConversation(
               groupcastImageUrl:

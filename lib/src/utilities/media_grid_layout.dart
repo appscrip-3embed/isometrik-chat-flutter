@@ -16,12 +16,69 @@ class IsmChatMediaGridLayout {
   /// [SliverGridDelegateWithFixedCrossAxisCount.childAspectRatio] for a 2×2 grid.
   static const double baseAspectRatio = 0.85;
 
+  /// Mobile image / GIF / video / grid width as a fraction of the screen
+  /// (WhatsApp-style), before [mobileMediaWidthReduction] is taken off.
+  static const double mobileMediaWidthFactor = .75;
+
+  /// Logical px taken off the 3/4 width, so mobile media is
+  /// `screenWidth * mobileMediaWidthFactor - mobileMediaWidthReduction` wide.
+  static const double mobileMediaWidthReduction = 30;
+
+  /// Tallest mobile frame (width / height). Taller portraits are center-cropped
+  /// to 3:4 so one photo cannot fill the whole screen.
+  static const double minMobileMediaAspectRatio = 3 / 4;
+
+  /// Widest mobile frame (width / height). Wider panoramas are center-cropped
+  /// to 16:9 so the bubble never collapses into a thin strip.
+  static const double maxMobileMediaAspectRatio = 16 / 9;
+
+  /// Web keeps the older fit-inside-a-box behavior.
+  static const double webMediaMaxHeight = 250;
+
   /// Same max inner width as [IsmChatImageMessage] still/GIF bubbles.
   static double chatMediaBubbleMaxWidth(
     double screenWidth, {
     required bool isWeb,
   }) =>
-      isWeb ? screenWidth * .35 : screenWidth * .6;
+      isWeb
+          ? screenWidth * .35
+          : screenWidth * mobileMediaWidthFactor - mobileMediaWidthReduction;
+
+  /// Tallest frame [chatMediaFrameSize] can return.
+  static double chatMediaMaxHeight(
+    double screenWidth, {
+    required bool isWeb,
+  }) =>
+      isWeb
+          ? webMediaMaxHeight
+          : chatMediaBubbleMaxWidth(screenWidth, isWeb: false) /
+              minMobileMediaAspectRatio;
+
+  /// Frame for a single still image, GIF or video-thumbnail bubble.
+  ///
+  /// Mobile: fixed width ([chatMediaBubbleMaxWidth]: 3/4 of the screen minus
+  /// [mobileMediaWidthReduction]); height
+  /// follows [aspectRatio] clamped to 3:4…16:9 and the media is drawn with
+  /// `BoxFit.cover`, so out-of-range media is center-cropped.
+  /// Web: fits [aspectRatio] inside the old max width × [webMediaMaxHeight].
+  static Size chatMediaFrameSize({
+    required double screenWidth,
+    required bool isWeb,
+    double? aspectRatio,
+  }) {
+    final width = chatMediaBubbleMaxWidth(screenWidth, isWeb: isWeb);
+    if (isWeb) {
+      return constrainedMediaDisplaySize(
+        maxWidth: width,
+        maxHeight: webMediaMaxHeight,
+        aspectRatio: aspectRatio,
+      );
+    }
+    final ar = (aspectRatio != null && aspectRatio > 0) ? aspectRatio : 1.0;
+    final clamped =
+        ar.clamp(minMobileMediaAspectRatio, maxMobileMediaAspectRatio);
+    return Size(width, width / clamped);
+  }
 
   /// Multi-attachment grid width — same as single-image bubble for consistent size.
   static double multipleAttachmentGridWidth(

@@ -44,6 +44,15 @@ class IsmChatThreadComposer extends StatelessWidget {
                 style: threadTheme.errorTextStyle),
             IsmChatDimens.boxHeight4,
           ],
+          if (controller.showMentionUserList &&
+              controller.mentionSuggestions.isNotEmpty) ...[
+            IsmChatMentionSuggestionList(
+              key: const Key('ism-thread-mention-list'),
+              suggestions: controller.mentionSuggestions.toList(),
+              onSelect: controller.selectMention,
+            ),
+            IsmChatDimens.boxHeight4,
+          ],
           Row(
             mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -128,6 +137,11 @@ class IsmChatThreadComposer extends StatelessWidget {
                             cursorColor: _textFiledTheme?.cursorColor ??
                                 IsmChatConfig.chatTheme.primaryColor,
                             onSubmitted: (_) => _sendText(),
+                            // Tapping the field while the emoji panel is
+                            // open must swap it for the keyboard; the focus
+                            // listener alone misses this when the field
+                            // already has focus.
+                            onTap: controller.hideEmojiBoardForKeyboard,
                             onTapOutside: (_) => IsmChatUtility.hideKeyboard(),
                             onChanged: controller.handleComposerTextChanged,
                             decoration: InputDecoration(

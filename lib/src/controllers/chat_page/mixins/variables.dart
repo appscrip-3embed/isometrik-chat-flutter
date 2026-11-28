@@ -23,7 +23,20 @@ mixin IsmChatPageVariablesMixin on GetxController {
 
   var mediaFocusNode = FocusNode();
 
-  var chatInputController = TextEditingController();
+  /// Highlights picked `@mentions` while typing (same style as bubbles).
+  late TextEditingController chatInputController =
+      IsmChatMentionTextEditingController(
+    membersProvider: () => mentionableMembers,
+  );
+
+  /// Group members that can be `@mentioned` here: empty unless this is a group
+  /// with [IsmChatFeature.mentionMember] on. Shared by the composer and the
+  /// media caption field.
+  List<UserDetails> get mentionableMembers => conversation?.isGroup == true &&
+          IsmChatProperties.chatPageProperties.features
+              .contains(IsmChatFeature.mentionMember)
+      ? groupMembers
+      : const <UserDetails>[];
 
   var groupTitleController = TextEditingController();
 
@@ -42,7 +55,34 @@ mixin IsmChatPageVariablesMixin on GetxController {
   /// Same guard as [hasAttachedMessagesScrollListener] for search results.
   var hasAttachedSearchScrollListener = false;
 
-  final textEditingController = TextEditingController();
+  /// Conversation id for which a one-shot post-open older prefetch already ran.
+  var postOpenOlderPrefetchConversationId = '';
+
+  /// Server-side offset (from newest) of the oldest page fetched so far,
+  /// counted in raw API rows. `null` until the first fetch of this chat.
+  int? olderPagingRawSkip;
+
+  /// Newest real `sentAt` when [olderPagingRawSkip] was last set. Local rows
+  /// newer than this arrived later (MQTT / sends) and shift server offsets.
+  int olderPagingAnchorSentAt = 0;
+
+  /// Set once a page comes back short; stops further older-page requests.
+  var hasReachedOldestMessage = false;
+
+  /// Clears paging state when a chat (re)opens.
+  void resetOlderMessagesPaging() {
+    olderPagingRawSkip = null;
+    olderPagingAnchorSentAt = 0;
+    hasReachedOldestMessage = false;
+    postOpenOlderPrefetchConversationId = '';
+  }
+
+  /// Media caption field (gallery, camera, web preview) and other one-off
+  /// inputs. Highlights picked `@mentions` like [chatInputController].
+  late final TextEditingController textEditingController =
+      IsmChatMentionTextEditingController(
+    membersProvider: () => mentionableMembers,
+  );
 
   final participnatsEditingController = TextEditingController();
 
@@ -189,6 +229,10 @@ mixin IsmChatPageVariablesMixin on GetxController {
   List<UserDetails> get deliverdMessageMembers => _deliverdMessageMembers;
   set deliverdMessageMembers(List<UserDetails> value) =>
       _deliverdMessageMembers.value = value;
+
+  /// `@` picker rows for the media caption field (empty → hidden). Kept
+  /// apart from [mentionSuggestions] so the composer overlay stays closed.
+  final RxList<UserDetails> captionMentionSuggestions = <UserDetails>[].obs;
 
   final RxList<UserDetails> _mentionSuggestions = <UserDetails>[].obs;
   List<UserDetails> get mentionSuggestions => _mentionSuggestions;

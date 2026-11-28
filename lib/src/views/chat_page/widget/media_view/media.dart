@@ -4,7 +4,9 @@ import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 /// Conversation media (tabs: media, links, docs).
 ///
 /// Uses [IsmChatThemeResolver.mediaFromConfig]; omit [IsmChatPageTheme.mediaTheme]
-/// in app config for SDK light/dark defaults. Uses [Theme.of] via [IsmChatThemeResolver].
+/// in app config for SDK light/dark defaults. The app bar follows the chat
+/// header ([IsmChatThemeData.chatPageHeaderTheme]) unless the host passes a
+/// media theme, whose app bar colours are then used as before.
 class IsmMedia extends StatefulWidget {
   const IsmMedia({
     super.key,
@@ -22,76 +24,97 @@ class IsmMedia extends StatefulWidget {
 }
 
 class _IsmMediaState extends State<IsmMedia> with TickerProviderStateMixin {
-  List<Map<String, List<IsmChatMessageModel>>> storeWidgetMediaList = [];
+  late final TabController _tabController;
 
-  final chatPageController = IsmChatUtility.chatPageController;
+  bool get _isDocumentAllowed => IsmChatProperties
+      .chatPageProperties.attachments
+      .contains(IsmChatAttachmentType.document);
 
-  TabController? _tabController;
-  bool get _isDocumentAllowed =>
-      IsmChatProperties.chatPageProperties.attachments
-          .contains(IsmChatAttachmentType.document);
   int get _tabCount => _isDocumentAllowed ? 3 : 2;
-  double get _tabContainerWidth => _isDocumentAllowed ? 276 : 184;
 
   @override
   void initState() {
-    _tabController = TabController(vsync: this, length: _tabCount);
-    _tabController?.addListener(_handleTabSelection);
     super.initState();
-  }
-
-  void _handleTabSelection() {
-    setState(() {});
+    _tabController = TabController(vsync: this, length: _tabCount);
   }
 
   @override
   void dispose() {
-    _tabController?.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final mediaTheme = IsmChatThemeResolver.mediaFromConfig(context);
-        return DefaultTabController(
-          length: _tabCount,
-          child: Scaffold(
-            backgroundColor: mediaTheme.scaffoldBackgroundColor,
-            appBar: AppBar(
-              backgroundColor: mediaTheme.appBarBackgroundColor,
-              surfaceTintColor: mediaTheme.appBarBackgroundColor,
-              elevation: IsmChatDimens.three,
-              shadowColor: Colors.grey,
-              title: Container(
-                width: _tabContainerWidth,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(IsmChatDimens.eight),
-                  color: mediaTheme.tabBarContainerColor,
-                ),
-                child: _TabBarView(
-                  tabController: _tabController,
-                  isDocumentAllowed: _isDocumentAllowed,
-                  mediaTheme: mediaTheme,
-                ),
+    final headerTheme = IsmChatConfig.chatTheme.chatPageHeaderTheme;
+    final tokens = IsmChatDesignTokens.of(context);
+    final titleStyle = IsmChatThemeResolver.hasCustomMediaTheme
+        ? tokens.title.copyWith(color: mediaTheme.appBarIconColor)
+        : headerTheme?.titleStyle ?? IsmChatStyles.w600White18;
+
+    return Scaffold(
+      backgroundColor: mediaTheme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: mediaTheme.appBarBackgroundColor,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        systemOverlayStyle: headerTheme?.systemUiOverlayStyle,
+        centerTitle: true,
+        title: Text(
+          _isDocumentAllowed
+              ? IsmChatStrings.mediaLinksAndDocs
+              : IsmChatStrings.mediaLinks,
+          style: titleStyle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        leading: IconButton(
+          onPressed: IsmChatResponsive.isWeb(context)
+              ? () {
+                  IsmChatUtility.conversationController
+                      .isRenderChatPageaScreen = IsRenderChatPageScreen.none;
+                }
+              : IsmChatRoute.goBack,
+          icon: Icon(
+            IsmChatResponsive.isWeb(context)
+                ? Icons.close_rounded
+                : Icons.arrow_back_rounded,
+            color: mediaTheme.appBarIconColor,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                IsmChatDesignTokens.gutter,
+                12,
+                IsmChatDesignTokens.gutter,
+                4,
               ),
-              centerTitle: true,
-              leading: IconButton(
-                onPressed: IsmChatResponsive.isWeb(context)
-                    ? () {
-                        IsmChatUtility.conversationController
-                            .isRenderChatPageaScreen =
-                            IsRenderChatPageScreen.none;
-                      }
-                    : IsmChatRoute.goBack,
-                icon: Icon(
-                  IsmChatResponsive.isWeb(context)
-                      ? Icons.close_rounded
-                      : Icons.arrow_back_rounded,
-                  color: mediaTheme.appBarIconColor,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: IsmChatSegmentedTabs(
+                    controller: _tabController,
+                    labels: [
+                      IsmChatStrings.media,
+                      IsmChatStrings.links,
+                      if (_isDocumentAllowed) IsmChatStrings.docs,
+                    ],
+                    trackColor: mediaTheme.tabBarContainerColor,
+                    thumbColor: mediaTheme.tabSelectedBackgroundColor,
+                    selectedStyle: mediaTheme.tabSelectedTextStyle,
+                    unselectedStyle: mediaTheme.tabUnselectedTextStyle,
+                  ),
                 ),
               ),
             ),
-            body: SafeArea(
+            Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
@@ -102,68 +125,108 @@ class _IsmMediaState extends State<IsmMedia> with TickerProviderStateMixin {
                 ],
               ),
             ),
-          ),
-        );
+          ],
+        ),
+      ),
+    );
   }
 }
 
-class _TabBarView extends StatelessWidget {
-  const _TabBarView({
-    required TabController? tabController,
-    required this.isDocumentAllowed,
-    required this.mediaTheme,
-  }) : _tabController = tabController;
+/// Month / day header that sticks to the top while its section scrolls
+/// (inside a [SliverMainAxisGroup]).
+class IsmChatMediaSectionHeader extends StatelessWidget {
+  const IsmChatMediaSectionHeader({
+    super.key,
+    required this.title,
+    required this.style,
+    required this.backgroundColor,
+  });
 
-  final TabController? _tabController;
-  final bool isDocumentAllowed;
-  final IsmChatMediaTheme mediaTheme;
+  final String title;
+  final TextStyle style;
+  final Color backgroundColor;
 
-  Widget _tabItem({
-    required int index,
-    required String label,
+  /// Pinned header sliver for one section.
+  static Widget sliver(
+    BuildContext context, {
+    required String title,
+    required TextStyle style,
+    required Color backgroundColor,
   }) {
-    final isSelected = _tabController?.index == index;
-    return Container(
-      margin: IsmChatDimens.edgeInsets4,
-      height: IsmChatDimens.twentySeven,
-      width: double.infinity,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(IsmChatDimens.six),
-        color: isSelected
-            ? mediaTheme.tabSelectedBackgroundColor
-            : mediaTheme.tabUnselectedBackgroundColor,
-      ),
-      child: Text(
-        label,
-        style: isSelected
-            ? mediaTheme.tabSelectedTextStyle
-            : mediaTheme.tabUnselectedTextStyle,
+    final fontSize = style.fontSize ?? 12;
+    final extent =
+        MediaQuery.textScalerOf(context).scale(fontSize) * 1.4 + 24;
+    return SliverPersistentHeader(
+      pinned: true,
+      delegate: _SectionHeaderDelegate(
+        extent: extent,
+        child: IsmChatMediaSectionHeader(
+          title: title,
+          style: style,
+          backgroundColor: backgroundColor,
+        ),
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context) => TabBar(
-        overlayColor: WidgetStateProperty.resolveWith<Color?>(
-            (Set<WidgetState> states) => states.contains(WidgetState.focused)
-                ? null
-                : Colors.transparent),
-        dividerColor: Colors.transparent,
-        controller: _tabController,
-        labelColor: mediaTheme.tabSelectedTextStyle.color,
-        indicatorColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicatorPadding: IsmChatDimens.edgeInsets0,
-        indicatorWeight: double.minPositive,
-        labelPadding: IsmChatDimens.edgeInsets2_0,
-        labelStyle: mediaTheme.tabSelectedTextStyle,
-        splashBorderRadius: BorderRadius.zero,
-        isScrollable: false,
-        tabs: [
-          _tabItem(index: 0, label: IsmChatStrings.media),
-          _tabItem(index: 1, label: IsmChatStrings.links),
-          if (isDocumentAllowed) _tabItem(index: 2, label: IsmChatStrings.docs),
-        ],
+  Widget build(BuildContext context) => ColoredBox(
+        color: backgroundColor,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            IsmChatDesignTokens.gutter,
+            12,
+            IsmChatDesignTokens.gutter,
+            8,
+          ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Semantics(
+              header: true,
+              child: Text(
+                title.toUpperCase(),
+                style: style,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ),
       );
 }
+
+class _SectionHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _SectionHeaderDelegate({required this.extent, required this.child});
+
+  final double extent;
+  final Widget child;
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) =>
+      SizedBox.expand(child: child);
+
+  @override
+  bool shouldRebuild(covariant _SectionHeaderDelegate oldDelegate) =>
+      oldDelegate.extent != extent || oldDelegate.child != child;
+}
+
+/// Groups `sortMediaList` output into `(title, items)` pairs, skipping empty
+/// sections.
+List<({String title, List<IsmChatMessageModel> items})> ismChatMediaSections(
+  List<Map<String, List<IsmChatMessageModel>>> grouped,
+) =>
+    [
+      for (final group in grouped)
+        for (final entry in group.entries)
+          if (entry.value.isNotEmpty) (title: entry.key, items: entry.value),
+    ];

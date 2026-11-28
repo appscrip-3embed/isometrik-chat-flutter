@@ -1,5 +1,7 @@
 // coverage:ignore-file
 // Remaining branches need plugins, a live broker, or are documented parsing bugs.
+import 'dart:async';
+
 import 'package:isometrik_chat_flutter/isometrik_chat_flutter.dart';
 
 /// View model for the chat page controller.
@@ -63,6 +65,38 @@ class IsmChatPageViewModel {
     bool isLoading = false,
     bool isBroadcast = false,
     IsmChatFeedType? feedType,
+    bool showStatusEvents = false,
+  }) async =>
+      (await getChatMessagesPage(
+        conversationId: conversationId,
+        lastMessageTimestamp: lastMessageTimestamp,
+        limit: limit,
+        skip: skip,
+        searchText: searchText,
+        isLoading: isLoading,
+        isBroadcast: isBroadcast,
+        feedType: feedType,
+        showStatusEvents: showStatusEvents,
+      ))
+          .messages;
+
+  /// Same as [getChatMessages], plus `rawCount`: rows the server returned
+  /// before client-side filtering (`null` when the request failed).
+  ///
+  /// Paging must advance `skip` by `rawCount`, not by visible rows — reactions,
+  /// banners and merged call events are dropped here but still occupy server
+  /// offsets.
+  Future<({List<IsmChatMessageModel> messages, int? rawCount})>
+      getChatMessagesPage({
+    required String conversationId,
+    int? lastMessageTimestamp,
+    int limit = 20,
+    int skip = 0,
+    String? searchText,
+    bool isLoading = false,
+    bool isBroadcast = false,
+    IsmChatFeedType? feedType,
+    bool showStatusEvents = false,
   }) async {
     var messages = await _repository.getChatMessages(
       conversationId: conversationId,
@@ -72,11 +106,13 @@ class IsmChatPageViewModel {
       searchText: searchText,
       isLoading: isLoading,
       feedType: feedType ?? IsmChatThreadCoordinator.timelineFeedType,
+      showStatusEvents: showStatusEvents,
     );
 
     if (messages == null) {
-      return [];
+      return (messages: <IsmChatMessageModel>[], rawCount: null);
     }
+    final rawCount = messages.length;
     // Keep thread-only replies out of the channel list and the local DB.
     messages.removeWhere(IsmChatThreadCoordinator.shouldHideFromTimeline);
     messages.removeWhere((e) => [
@@ -100,20 +136,33 @@ class IsmChatPageViewModel {
       }
 
       if (!isBroadcast) {
-        if (conversation != null) {
-          var messageMap = Map<String, IsmChatMessageModel>.from(
-            conversation.messages ?? {},
-          );
-          for (final message in messages) {
-            messageMap = IsmChatDBWrapper.mergeCallMessageIntoMap(
-              messageMap,
-              message,
+        final fetched = messages;
+        // Queued write so MQTT inserts/receipts landing meanwhile are kept.
+        // When this user has no stored row yet (newly added member, rejoined
+        // after exit-and-delete, not yet synced into the list), seed it from
+        // the open chat; otherwise API messages were dropped and the chat
+        // stayed empty for that user.
+        await IsmChatConfig.dbWrapper?.updateConversation(
+          conversationId: conversationId,
+          update: (latest) {
+            final openConversation = controller.conversation;
+            final base = latest ??
+                (openConversation?.conversationId == conversationId
+                    ? openConversation
+                    : null);
+            if (base == null) return null;
+            var messageMap = Map<String, IsmChatMessageModel>.from(
+              latest?.messages ?? {},
             );
-          }
-          conversation = conversation.copyWith(messages: messageMap);
-          await IsmChatConfig.dbWrapper
-              ?.saveConversation(conversation: conversation);
-        }
+            for (final message in fetched) {
+              messageMap = IsmChatDBWrapper.mergeCallMessageIntoMap(
+                messageMap,
+                message,
+              );
+            }
+            return base.copyWith(messages: messageMap);
+          },
+        );
       } else {
         messages = messages;
       }
@@ -121,7 +170,7 @@ class IsmChatPageViewModel {
       messages = messages;
     }
 
-    return messages;
+    return (messages: messages, rawCount: rawCount);
   }
 
   Future<List<IsmChatMessageModel>> getBroadcastMessages({
@@ -319,13 +368,14 @@ class IsmChatPageViewModel {
         messageId: messageId,
       );
 
-  Future<void> deleteMessageForMe(
-    IsmChatMessages messages,
-  ) async {
+  Future<bool> deleteMessageForMe(
+    IsmChatMessages messages, {
+    bool isRetryAttempt = false,
+  }) async {
     final conversationId = messages.values.first.conversationId ?? '';
     messages.removeWhere((key, value) => value.messageId == '');
     if (messages.isEmpty) {
-      return;
+      return true;
     }
     final myMessages = messages.entries
         .where((m) =>
@@ -338,7 +388,13 @@ class IsmChatPageViewModel {
         messageIds: myMessages.map((e) => e.value.messageId).join(','),
       );
       if (response == null || response.hasError) {
-        return;
+        await _presentDeleteFailure(
+          operationTitle: IsmChatStrings.deleteForMeFailed,
+          response: response,
+          isRetryAttempt: isRetryAttempt,
+          onRetry: () => deleteMessageForMe(messages, isRetryAttempt: true),
+        );
+        return false;
       }
       // Media-storage quota: when quota is on the delete frees bytes; keep the
       // cached usage in sync (no-op when quota is off / no figures returned).
@@ -350,7 +406,7 @@ class IsmChatPageViewModel {
 
     final allMessages = conversation?.messages;
     if (allMessages == null) {
-      return;
+      return false;
     }
 
     for (var x in messages.values) {
@@ -377,30 +433,39 @@ class IsmChatPageViewModel {
     }
 
     await IsmChatUtility.chatPageController.getMessagesFromDB(conversationId);
+    return true;
   }
 
-  Future<void> deleteMessageForEveryone(
-    IsmChatMessages messages,
-  ) async {
-    messages.removeWhere(
-      (key, value) => (value.messageId ?? '').trim().isEmpty,
-    );
-    if (messages.isEmpty) {
-      return;
+  Future<bool> deleteMessageForEveryone(
+    IsmChatMessages messages, {
+    bool isRetryAttempt = false,
+  }) async {
+    final eligible = IsmChatMessages.from(messages)
+      ..removeWhere((key, value) => !value.isEligibleForDeleteForEveryone);
+    if (eligible.isEmpty) {
+      return true;
     }
-    final conversationId = messages.values.first.conversationId ?? '';
-    final messageIds = messages.values
+
+    final conversationId = _conversationIdForDelete(eligible);
+    if (conversationId.isEmpty) {
+      return false;
+    }
+
+    final messageIds = eligible.values
         .map((e) => (e.messageId ?? '').trim())
         .where((id) => id.isNotEmpty)
         .toSet()
         .toList();
 
     if (messageIds.isEmpty) {
-      return;
+      return false;
     }
 
     // Delete each message ID individually for compatibility with servers
     // that only honor the first ID from a comma-separated query param.
+    final deletedIds = <String>[];
+    IsmChatResponseModel? lastFailure;
+    var sawRetryableFailure = false;
     for (final messageId in messageIds) {
       final response = await _repository.deleteMessageForEveryone(
         conversationId: conversationId,
@@ -411,14 +476,18 @@ class IsmChatPageViewModel {
         // has replies (errorCode 4). Tell the user instead of failing silently.
         if (IsmChatThreadCoordinator.isRootDeleteBlocked(response)) {
           IsmChatUtility.showToast(IsmChatStrings.threadRootDeleteBlocked);
+        } else {
+          sawRetryableFailure = true;
+          lastFailure = response;
         }
-        return;
+        continue;
       }
+      deletedIds.add(messageId);
       // Media-storage quota: sync freed bytes into cached usage when quota is on.
       IsmChatStorageQuotaGuard.syncUsageFromResponse(response);
       // A deleted thread reply lowers its root's badge; keep the open panel and
       // the cached root in step (no-op with threads off).
-      final deleted = messages.values.cast<IsmChatMessageModel?>().firstWhere(
+      final deleted = eligible.values.cast<IsmChatMessageModel?>().firstWhere(
             (e) => (e?.messageId ?? '') == messageId,
             orElse: () => null,
           );
@@ -430,14 +499,34 @@ class IsmChatPageViewModel {
         );
       }
     }
+
+    if (deletedIds.isEmpty) {
+      if (sawRetryableFailure) {
+        await _presentDeleteFailure(
+          operationTitle: IsmChatStrings.deleteForEveryoneFailed,
+          response: lastFailure,
+          isRetryAttempt: isRetryAttempt,
+          onRetry: () => deleteMessageForEveryone(
+            messages,
+            isRetryAttempt: true,
+          ),
+        );
+      }
+      return false;
+    }
+
     var conversation =
         await IsmChatConfig.dbWrapper?.getConversation(conversationId);
     final allMessages = conversation?.messages;
     if (allMessages == null) {
-      return;
+      return false;
     }
 
-    for (var message in messages.entries) {
+    for (var message in eligible.entries) {
+      final messageId = (message.value.messageId ?? '').trim();
+      if (!deletedIds.contains(messageId)) {
+        continue;
+      }
       final gotMessage =
           allMessages.values.toList().cast<IsmChatMessageModel?>().firstWhere(
                 (e) => e?.messageId == message.value.messageId,
@@ -457,6 +546,82 @@ class IsmChatPageViewModel {
           ?.saveConversation(conversation: conversation);
     }
     await IsmChatUtility.chatPageController.getMessagesFromDB(conversationId);
+
+    final allSucceeded = deletedIds.length == messageIds.length;
+    if (!allSucceeded && sawRetryableFailure) {
+      final retryMap = _deleteMessagesExcludingIds(messages, deletedIds);
+      await _presentDeleteFailure(
+        operationTitle: IsmChatStrings.deleteForEveryoneFailed,
+        response: lastFailure,
+        isRetryAttempt: isRetryAttempt,
+        onRetry: () => deleteMessageForEveryone(
+          retryMap,
+          isRetryAttempt: true,
+        ),
+      );
+    }
+    return allSucceeded;
+  }
+
+  /// Host [IsmChatConfig.chatInvalidate]: use [IsmChatResponseModel.userFacingApiErrorMessage]
+  /// for delete URLs, or skip dialog when the SDK already shows this flow.
+  Future<void> _presentDeleteFailure({
+    required String operationTitle,
+    required IsmChatResponseModel? response,
+    required bool isRetryAttempt,
+    required Future<bool> Function() onRetry,
+  }) async {
+    if (isRetryAttempt) {
+      final detail = response?.userFacingApiErrorMessage(
+            fallback: IsmChatStrings.deleteRetryFailed,
+          ) ??
+          IsmChatStrings.deleteRetryFailed;
+      await IsmChatUtility.showErrorDialog(
+        detail,
+        title: operationTitle,
+      );
+      return;
+    }
+    final detail = response?.userFacingApiErrorMessage(
+          fallback: operationTitle,
+        ) ??
+        operationTitle;
+    await IsmChatUtility.showErrorDialog(
+      detail,
+      title: operationTitle,
+      onRetry: () {
+        unawaited(onRetry());
+      },
+    );
+  }
+
+  IsmChatMessages _deleteMessagesExcludingIds(
+    IsmChatMessages source,
+    List<String> excludeMessageIds,
+  ) {
+    if (excludeMessageIds.isEmpty) {
+      return IsmChatMessages.from(source);
+    }
+    final exclude = excludeMessageIds.map((e) => e.trim()).toSet();
+    return IsmChatMessages.from(source)
+      ..removeWhere(
+        (key, value) => exclude.contains((value.messageId ?? '').trim()),
+      );
+  }
+
+  String _conversationIdForDelete(IsmChatMessages messages) {
+    for (final message in messages.values) {
+      final id = (message.conversationId ?? '').trim();
+      if (id.isNotEmpty) {
+        return id;
+      }
+    }
+    if (IsmChatUtility.chatPageControllerRegistered) {
+      return (IsmChatUtility.chatPageController.conversation?.conversationId ??
+              '')
+          .trim();
+    }
+    return '';
   }
 
   /// Lowers the cached root's `replyCount` after one of its replies was
@@ -620,10 +785,13 @@ class IsmChatPageViewModel {
         );
 
     if (message != null) {
+      // Dedupe: MQTT may have already applied this reaction before HTTP
+      // returned — see MessageReactionModel.addUserIfAbsent.
+      final myUserId = IsmChatConfig.communicationConfig.userConfig.userId;
       var isEmoji = false;
       for (var x in message.reactions ?? <MessageReactionModel>[]) {
         if (x.emojiKey == reaction.reactionType.value) {
-          x.userIds.add(IsmChatConfig.communicationConfig.userConfig.userId);
+          x.addUserIfAbsent(myUserId);
           isEmoji = true;
           break;
         }
@@ -633,7 +801,7 @@ class IsmChatPageViewModel {
         message.reactions?.add(
           MessageReactionModel(
             emojiKey: reaction.reactionType.value,
-            userIds: [IsmChatConfig.communicationConfig.userConfig.userId],
+            userIds: [myUserId],
           ),
         );
       }
@@ -684,11 +852,12 @@ class IsmChatPageViewModel {
 
     if (message != null) {
       var reactionMap = message.reactions ?? [];
+      final myUserId = IsmChatConfig.communicationConfig.userConfig.userId;
       var isEmoji = false;
       for (var x in reactionMap) {
         if (x.emojiKey == reaction.reactionType.value && x.userIds.length > 1) {
-          x.userIds.remove(IsmChatConfig.communicationConfig.userConfig.userId);
-          x.userIds.toSet().toList();
+          // removeUser clears duplicates if a prior race left the same id twice
+          x.removeUser(myUserId);
           isEmoji = true;
         }
       }

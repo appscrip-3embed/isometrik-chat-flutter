@@ -7,7 +7,10 @@ enum IsmChatMessageType {
   normal(0),
   forward(1),
   reply(2),
-  admin(3);
+  admin(3),
+
+  /// A reply posted inside a thread (sent with `parentMessageId`).
+  threadReply(4);
 
   /// Creates an [IsmChatMessageType] with the given integer value.
   const IsmChatMessageType(this.value);
@@ -41,6 +44,8 @@ enum IsmChatMessageType {
         return IsmChatMessageType.reply;
       case 3:
         return IsmChatMessageType.admin;
+      case 4:
+        return IsmChatMessageType.threadReply;
       default:
         return IsmChatMessageType.normal;
     }
@@ -268,6 +273,8 @@ enum IsmChatCustomMessageType {
       case IsmChatActionEvents.messageRead:
         return null;
       case IsmChatActionEvents.messagesDeleteForAll:
+        return null;
+      case IsmChatActionEvents.messagesDeleteLocal:
         return null;
       case IsmChatActionEvents.multipleMessagesRead:
         return null;
@@ -576,6 +583,7 @@ enum IsmChatActionEvents {
   messageDelivered,
   messageRead,
   messagesDeleteForAll,
+  messagesDeleteLocal,
   multipleMessagesRead,
   userBlock,
   userBlockConversation,
@@ -617,6 +625,8 @@ enum IsmChatActionEvents {
         return IsmChatActionEvents.messageRead;
       case 'messagesDeleteForAll':
         return IsmChatActionEvents.messagesDeleteForAll;
+      case 'messagesDeleteLocal':
+        return IsmChatActionEvents.messagesDeleteLocal;
       case 'multipleMessagesRead':
         return IsmChatActionEvents.multipleMessagesRead;
       case 'userBlock':
@@ -691,6 +701,8 @@ enum IsmChatActionEvents {
         return 'messageRead';
       case IsmChatActionEvents.messagesDeleteForAll:
         return 'messagesDeleteForAll';
+      case IsmChatActionEvents.messagesDeleteLocal:
+        return 'messagesDeleteLocal';
       case IsmChatActionEvents.multipleMessagesRead:
         return 'multipleMessagesRead';
       case IsmChatActionEvents.userBlock:

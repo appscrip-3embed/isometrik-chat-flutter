@@ -18,6 +18,12 @@ class IsmChatStrings {
 
   /// Key used to store last active user id in local DB.
   static const String activeUserIdKey = 'activeUserId';
+
+  /// Prefix for per-conversation composer drafts in the local user box.
+  static const String draftKeyPrefix = 'draft_';
+
+  /// Prefix for thread composer drafts: `threadDraft_<conversationId>_<rootId>`.
+  static const String threadDraftKeyPrefix = 'threadDraft_';
   static const String user = 'user';
   static const String controllerTag = 'ism-chat-page';
 
@@ -40,6 +46,7 @@ class IsmChatStrings {
   static String get fetchingPreview => IsmChatL10n.get('fetchingPreview');
   static String get errorLoadingImage => IsmChatL10n.get('errorLoadingImage');
   static String get typing => IsmChatL10n.get('typing');
+  static String get draft => IsmChatL10n.get('draft');
   static String get online => IsmChatL10n.get('online');
   static String get lastSeen => IsmChatL10n.get('lastSeen');
   static String get today => IsmChatL10n.get('today');
@@ -132,6 +139,24 @@ class IsmChatStrings {
   static String get contactAppear => IsmChatL10n.get('contactAppear');
   static String get participants => IsmChatL10n.get('participants');
   static String get exitGroup => IsmChatL10n.get('exitGroup');
+  static String get leaveGroup => IsmChatL10n.get('leaveGroup');
+  static String get leaveAndDeleteForMe => IsmChatL10n.get('leaveAndDeleteForMe');
+  static String get youLeftTheGroup => IsmChatL10n.get('youLeftTheGroup');
+
+  static String memberLeftTheGroup(String name) =>
+      IsmChatL10n.get('memberLeftTheGroup').replaceAll('{name}', name);
+
+  static String addedMembersToGroup({
+    required String initiator,
+    required String members,
+  }) =>
+      IsmChatL10n.get('addedMembersToGroup')
+          .replaceAll('{initiator}', initiator)
+          .replaceAll('{members}', members);
+
+  static String youWereAddedToGroupBy(String initiator) =>
+      IsmChatL10n.get('youWereAddedToGroupBy')
+          .replaceAll('{initiator}', initiator);
   static String get createdOn => IsmChatL10n.get('createdOn');
   static String get by => IsmChatL10n.get('by');
   static String get noMedia => IsmChatL10n.get('noMedia');
@@ -164,6 +189,9 @@ class IsmChatStrings {
   static String get readby => IsmChatL10n.get('readby');
   static String get playedby => IsmChatL10n.get('playedby');
   static String get deliveredTo => IsmChatL10n.get('deliveredTo');
+  static String get read => IsmChatL10n.get('read');
+  static String get delivered => IsmChatL10n.get('delivered');
+  static String get played => IsmChatL10n.get('played');
   static String get deletedMessage => IsmChatL10n.get('deletedMessage');
   static String get wasDeletedMessage => IsmChatL10n.get('wasDeletedMessage');
   static String get noDataFound => IsmChatL10n.get('noDataFound');
@@ -298,10 +326,68 @@ class IsmChatStrings {
   /// Retry button in the thread panel's error state.
   static String get threadRetry => IsmChatL10n.get('threadRetry');
 
+  /// User-facing HTTP / gateway failures ([IsmChatResponseModel.userFacingApiErrorMessage]).
+  static String get errorGeneric => IsmChatL10n.get('errorGeneric');
+  static String get errorServerUnavailable =>
+      IsmChatL10n.get('errorServerUnavailable');
+  static String get errorServiceUnavailable =>
+      IsmChatL10n.get('errorServiceUnavailable');
+  static String get errorRequestTimeout =>
+      IsmChatL10n.get('errorRequestTimeout');
+  static String get deleteForEveryoneFailed =>
+      IsmChatL10n.get('deleteForEveryoneFailed');
+  static String get deleteForMeFailed => IsmChatL10n.get('deleteForMeFailed');
+  static String get deleteRetryFailed => IsmChatL10n.get('deleteRetryFailed');
+
   /// Shown when a thread reply could not reach the server and was queued for
   /// retry (offline send).
   static String get threadReplyQueued => IsmChatL10n.get('threadReplyQueued');
   static String get sameNameUploadTitle => IsmChatL10n.get('sameNameUploadTitle');
   static String get reshareOlderFile => IsmChatL10n.get('reshareOlderFile');
   static String get uploadACopy => IsmChatL10n.get('uploadACopy');
+
+  // In-chat secondary screens (media, info, pickers, wallpaper).
+  static String get mediaEmptyHint => IsmChatL10n.get('mediaEmptyHint');
+  static String get linksEmptyHint => IsmChatL10n.get('linksEmptyHint');
+  static String get docsEmptyHint => IsmChatL10n.get('docsEmptyHint');
+
+  /// "3 of 12" under the sender in the media viewer.
+  static String mediaCounter(int current, int total) =>
+      IsmChatL10n.get('mediaCounter')
+          .replaceAll('{current}', '$current')
+          .replaceAll('{total}', '$total');
+  static String get saveMedia => IsmChatL10n.get('saveMedia');
+  static String get deleteMedia => IsmChatL10n.get('deleteMedia');
+  static String get searchMessagesHint => IsmChatL10n.get('searchMessagesHint');
+  static String get searchMessagesEmptyHint =>
+      IsmChatL10n.get('searchMessagesEmptyHint');
+  static String get searchParticipantsHint =>
+      IsmChatL10n.get('searchParticipantsHint');
+  static String get sms => IsmChatL10n.get('sms');
+  static String get call => IsmChatL10n.get('call');
+  static String get viewInfo => IsmChatL10n.get('viewInfo');
+  static String get makeAdmin => IsmChatL10n.get('makeAdmin');
+  static String get revokeAdmin => IsmChatL10n.get('revokeAdmin');
+  static String get removeFromGroup => IsmChatL10n.get('removeFromGroup');
+
+  static String removeFromGroupConfirm({
+    required String name,
+    required String group,
+  }) =>
+      IsmChatL10n.get('removeFromGroupConfirm')
+          .replaceAll('{name}', name)
+          .replaceAll('{group}', group);
+  static String get sendLocation => IsmChatL10n.get('sendLocation');
+  static String get sendCurrentLocation =>
+      IsmChatL10n.get('sendCurrentLocation');
+  static String get nearbyPlaces => IsmChatL10n.get('nearbyPlaces');
+  static String get preview => IsmChatL10n.get('preview');
+  static String get setWallpaper => IsmChatL10n.get('setWallpaper');
+  static String get wallpaperSampleIncoming =>
+      IsmChatL10n.get('wallpaperSampleIncoming');
+  static String get wallpaperSampleOutgoing =>
+      IsmChatL10n.get('wallpaperSampleOutgoing');
+  static String get done => IsmChatL10n.get('done');
+  static String get cameraHint => IsmChatL10n.get('cameraHint');
+  static String get groupLabel => IsmChatL10n.get('groupLabel');
 }

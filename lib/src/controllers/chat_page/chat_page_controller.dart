@@ -56,6 +56,7 @@ part './mixins/utility_methods.dart';
 part './mixins/contact_group_operations.dart';
 part './mixins/message_operations.dart';
 part './mixins/edit_message.dart';
+part './mixins/draft_message.dart';
 part './mixins/media_operations.dart';
 part './mixins/message_management.dart';
 part './mixins/block_unblock.dart';
@@ -136,6 +137,7 @@ class IsmChatPageController extends GetxController
         IsmChatPageContactGroupOperationsMixin,
         IsmChatPageMessageOperationsMixin,
         IsmChatPageEditMessageMixin,
+        IsmChatPageDraftMessageMixin,
         IsmChatPageMediaOperationsMixin,
         IsmChatPageMessageManagementMixin,
         IsmChatPageBlockUnblockMixin,
@@ -147,6 +149,9 @@ class IsmChatPageController extends GetxController
   /// - `viewModel`: The view model instance that provides business logic
   ///   and data access for this controller.
   IsmChatPageController(this.viewModel);
+
+  /// Default `limit` for `GET /chat/messages` (must match repository default).
+  static const int messagesApiPageLimit = 20;
 
   /// The view model instance for this controller.
   ///

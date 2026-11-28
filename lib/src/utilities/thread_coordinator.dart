@@ -55,11 +55,14 @@ class IsmChatThreadCoordinator {
 
   /// Whether [message] is a reply that belongs to a thread.
   ///
-  /// Requires both `messageType: 2` and a non-empty `threadRootId`, so legacy
-  /// inline quotes (reply type, no `threadRootId`) are *not* treated as thread
-  /// replies and keep rendering inline as they do today.
+  /// `messageType: 4` ([IsmChatMessageType.threadReply]) always is. Older
+  /// thread replies were sent as `messageType: 2` and are recognized by a
+  /// non-empty `threadRootId`, so legacy inline quotes (reply type, no
+  /// `threadRootId`) are *not* treated as thread replies and keep rendering
+  /// inline as they do today.
   static bool isThreadReply(IsmChatMessageModel? message) {
     if (message == null) return false;
+    if (message.messageType == IsmChatMessageType.threadReply) return true;
     if (message.messageType != IsmChatMessageType.reply) return false;
     return (message.threadRootId ?? '').trim().isNotEmpty;
   }
@@ -81,8 +84,19 @@ class IsmChatThreadCoordinator {
       isUiEnabled && isAlsoSentThreadReply(message);
 
   /// Channel row shows **replied to a thread: …** above the bubble.
+  ///
+  /// Skipped for `messageType: 2` rows whose `customType` is
+  /// `AttachmentMessage:Reply` — those are inline quote replies and render
+  /// their own reply preview instead.
   static bool shouldShowChannelThreadContext(IsmChatMessageModel? message) =>
-      isUiEnabled && isAlsoSentThreadReply(message);
+      isUiEnabled &&
+      isAlsoSentThreadReply(message) &&
+      !isInlineQuoteReply(message);
+
+  /// `messageType: 2` with `customType` `AttachmentMessage:Reply`.
+  static bool isInlineQuoteReply(IsmChatMessageModel? message) =>
+      message?.messageType == IsmChatMessageType.reply &&
+      message?.customType == IsmChatCustomMessageType.reply;
 
   /// Whether [message] must be kept out of the channel timeline.
   ///
@@ -291,8 +305,7 @@ class IsmChatThreadCoordinator {
   /// (root or reply in the open thread — not the channel timeline).
   ///
   /// Used to hide **Reply**, **Reply in thread**, and **View thread** on
-  /// long-press inside [IsmChatThreadView]; users answer via the composer or
-  /// tap-to-reply on thread rows.
+  /// long-press inside [IsmChatThreadView]; users answer via the composer.
   static bool isMessageInOpenThreadPanel(IsmChatMessageModel? message) {
     if (message == null) return false;
     if (!Get.isRegistered<IsmChatThreadController>()) return false;
@@ -437,7 +450,7 @@ class IsmChatThreadCoordinator {
   ) {
     if (!isEnabled || target == null || !target.isValid) return message;
     return message
-      ..messageType = IsmChatMessageType.reply
+      ..messageType = IsmChatMessageType.threadReply
       ..parentMessageId = target.parentMessageId
       ..threadRootId = target.threadRootId
       ..showInConversation = target.showInConversation;
